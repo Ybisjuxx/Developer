@@ -34,6 +34,8 @@ class Cliente(Base):
     telefono = Column(String(30), nullable=True, index=True)
     direccion = Column(String(255), nullable=True)
     descuento_porcentaje = Column(Float, default=5.0, nullable=False)  # 5% por defecto para fidelización
+    fecha_nacimiento = Column(Date, nullable=True)
+    sexo = Column(String(20), nullable=True)  # MASCULINO, FEMENINO, OTRO
     notas_clinicas = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
@@ -119,6 +121,10 @@ class Lote(Base):
     fecha_caducidad = Column(Date, nullable=False, index=True)
     costo_unitario = Column(Float, nullable=False, default=0.0)
     stock_actual = Column(Integer, nullable=False, default=0)
+    laboratorio_fabricante = Column(String(100), nullable=True)
+    forma_farmaceutica = Column(String(100), nullable=True)  # Tabletas, Jarabe, Cápsulas, Solución, etc.
+    dosificacion = Column(String(100), nullable=True)  # 500mg, 10mg/5ml, etc.
+    fecha_ingreso = Column(Date, default=datetime.date.today, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 

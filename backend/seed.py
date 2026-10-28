@@ -218,6 +218,73 @@ def seed_database():
         total_l = db.query(Lote).count()
         print(f"Total en Base de Datos: {total_p} Productos, {total_l} Lotes registrados.")
 
+        # 6. Sembrar Historial Mensual de Ventas para Gráfica Anual (si hay menos de 10 ventas)
+        from app.models import Venta, VentaDetalle, VentaDetalleLote
+        if db.query(Venta).count() < 10:
+            print("Sembrando histórico de ventas mes a mes para gráfica anual 2026...")
+            prods = db.query(Producto).all()
+            if prods:
+                cajero = db.query(Usuario).filter(Usuario.rol == "CAJERO").first()
+                cajero_nom = cajero.nombre_completo if cajero else "Juan Daniel Morales"
+                
+                ventas_mensuales_config = [
+                    (1, 15, 3450.0),   # Ene: 15 tickets, aprox $3,450
+                    (2, 12, 2890.0),   # Feb: 12 tickets, aprox $2,890
+                    (3, 18, 4120.0),   # Mar: 18 tickets, aprox $4,120
+                    (4, 16, 3850.0),   # Abr: 16 tickets, aprox $3,850
+                    (5, 20, 5210.0),   # May: 20 tickets, aprox $5,210
+                    (6, 19, 4780.0),   # Jun: 19 tickets, aprox $4,780
+                    (7, 22, 5890.0),   # Jul: 22 tickets, aprox $5,890
+                    (8, 25, 6420.0),   # Ago: 25 tickets, aprox $6,420
+                    (9, 21, 5630.0),   # Sep: 21 tickets, aprox $5,630
+                    (10, 28, 7350.0),  # Oct: 28 tickets, aprox $7,350 (Mes pico)
+                ]
+                
+                for mes, num_tickets, meta_monto in ventas_mensuales_config:
+                    monto_por_ticket = round(meta_monto / num_tickets, 2)
+                    for t in range(1, num_tickets + 1):
+                        dia = min(28, (t * 2) % 27 + 1)
+                        fecha_v = datetime.datetime(2026, mes, dia, 10 + (t % 8), (t * 7) % 59)
+                        p_sel = prods[(mes * 7 + t) % len(prods)]
+                        lote_sel = p_sel.lotes[0] if p_sel.lotes else None
+                        
+                        v = Venta(
+                            folio_ticket=f"TK-2026{mes:02d}{dia:02d}-{t:04d}",
+                            fecha_venta=fecha_v,
+                            comprador_nombre="Público General" if t % 3 != 0 else "Cliente Frecuente",
+                            subtotal=monto_por_ticket,
+                            descuento=round(monto_por_ticket * 0.05, 2) if t % 4 == 0 else 0.0,
+                            total=monto_por_ticket,
+                            metodo_pago="EFECTIVO" if t % 2 == 0 else "TARJETA",
+                            monto_recibido=monto_por_ticket,
+                            cambio=0.0,
+                            cajero_nombre=cajero_nom,
+                            estado="COMPLETADA",
+                        )
+                        db.add(v)
+                        db.flush()
+                        
+                        det = VentaDetalle(
+                            venta_id=v.id,
+                            producto_id=p_sel.id,
+                            cantidad=1,
+                            precio_unitario=monto_por_ticket,
+                            subtotal=monto_por_ticket,
+                        )
+                        db.add(det)
+                        db.flush()
+                        
+                        if lote_sel:
+                            desp = VentaDetalleLote(
+                                venta_detalle_id=det.id,
+                                lote_id=lote_sel.id,
+                                cantidad_despachada=1,
+                                costo_unitario=lote_sel.costo_unitario,
+                            )
+                            db.add(desp)
+                db.commit()
+                print("Ventas históricas para gráfica 2026 sembradas con éxito.")
+
     finally:
         db.close()
 

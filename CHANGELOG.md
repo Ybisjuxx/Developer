@@ -6,6 +6,41 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.2.0] - 2026-10-28 (Inteligencia Clínica, Alertas FEFO, Gráficos Anuales y Robustez de UI)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Conexión de Tablero a Alertas de Caducidad y Pestaña de Lotes por Caducar (`dashboard_screen.dart`, `inventario_screen.dart`, `inventario.py`):**
+  - Conexión interactiva directa: Las tarjetas de *Alertas de Caducidad* y el listado de *Lotes con Prioridad de Despacho (FEFO)* en el Tablero de Mando ahora navegan con 1 clic al submódulo de caducidades en el Inventario.
+  - Pestaña dedicada *"Lotes por Caducar (Alertas FEFO)"* en el Inventario para separar y priorizar lotes próximos a vencer.
+  - Filtros rápidos por horizonte de vencimiento: *Todos*, *Críticos (≤ 30 días)*, *En Riesgo (31-60 días)* y *Preventivos (61-90 días)*.
+  - Badges de urgencia por color, días restantes, cálculo en vivo de existencias y botones directos de acción (Ajustar / Dar de baja).
+- **Sub-Agente 2: Datos de Fabricación, Forma y Dosificación en Lotes (`models.py`, `schemas.py`, `inventario_screen.dart`, `inventario.py`):**
+  - Nuevos campos en el modelo `Lote`: `laboratorio_fabricante`, `forma_farmaceutica`, `dosificacion` y `fecha_ingreso` con migración no destructiva en SQLite.
+  - Formulario de alta de lotes enriquecido con selector de formas farmacéuticas (Tabletas, Cápsulas, Solución, Suspensión, Inyectable, etc.), campo de dosificación por presentación y selector de fecha de recepción.
+  - Visualización integral de laboratorio fabricante y presentación en las tarjetas de lotes de inventario.
+- **Sub-Agente 3: Captura Opcional de Fecha de Nacimiento Desglosada y Sexo en Clientes (`models.py`, `schemas.py`, `clientes_screen.dart`, `pos_screen.dart`):**
+  - Campos `fecha_nacimiento` y `sexo` (`MASCULINO`, `FEMENINO`, `OTRO`) en `Cliente`.
+  - Captura estructurada con campos independientes para Día (DD), Mes (MM) y Año (AAAA), complementado con botón selector de calendario interactivo (`showDatePicker`).
+  - Integración en el catálogo maestro de Clientes y en el modal de *Registro Exprés* del Punto de Venta.
+  - Badges visuales con fecha de nacimiento, edad calculada y sexo en el expediente clínico del cliente.
+- **Sub-Agente 4: Menú y Navegación Responsiva sin Desbordamiento (`home_screen.dart`):**
+  - Envoltura del `NavigationRail` de 10 módulos en un contenedor con desplazamiento vertical (`SingleChildScrollView` + `ConstrainedBox`), garantizando que la navegación nunca se corte ni genere excepciones `RenderFlex overflowed` al incrementar la fuente al 115% o 130%.
+  - Integración de menú lateral desplegable (`Drawer`) completo para dispositivos móviles o monitores de baja resolución con accesos directos a todos los módulos.
+- **Sub-Agente 5: Chat Asistente IA para Búsqueda y Sustitutos Terapéuticos en Stock (`ia.py`, `home_screen.dart`, `api_service.dart`):**
+  - Botón de acceso rápido `[🤖 Consulta IA]` en la barra superior de FarmaControl.
+  - Endpoint de inteligencia clínica `POST /api/ia/consulta-medicamento` con resolución de marcas comerciales a genéricos bioequivalentes y mapeo de 8 familias terapéuticas.
+  - Cruce en tiempo real con el inventario de la farmacia para recomendar alternativas disponibles en stock cuando el fármaco solicitado no está disponible.
+  - Alertas regulatorias automáticas para antibióticos (Grupo IV) y fármacos controlados (Grupos I-III).
+  - Sugerencias rápidas de consulta en forma de chips y chat interactivo con respuestas contextuales.
+- **Sub-Agente 6: Gráfico Desglosado de Ventas Mes a Mes (`dashboard_screen.dart`, `ventas.py`, `schemas.py`, `seed.py`):**
+  - Endpoint `GET /api/ventas/reporte-mensual?anio=2026` con desglose mensual de ventas e importes acumulados.
+  - Gráfico de barras interactivo de 12 meses integrado en el Tablero de Mando, con alturas proporcionales y destacado visual del mes con mayor facturación (`★ PICO`).
+  - Selector dinámico de año fiscal (2026, 2025, 2024).
+  - Tarjetas de resumen ejecutivo: Total Anual Facturado, Promedio Mensual, Mes Pico y Total de Tickets Emitidos.
+  - Detalle interactivo por mes al hacer clic sobre cualquier columna del gráfico.
+
+---
+
 ## [1.1.0] - 2026-10-27 (Expansión Multisistema: Clientes CIE-10, Permisos de Lotes, Ajustes Visuales y Auditoría Kardex)
 
 ### 🚀 Añadido

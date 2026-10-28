@@ -231,11 +231,85 @@ def test_endpoints():
     assert mov_auditado["observaciones_auditoria"] is not None
     print(f"[OK] Movimiento #{primer_mov['id']} del Kardex marcado con observación y bandera de anomalía.")
 
+    # 15. Test Sub-Agente 1: Lotes con Alertas de Caducidad FEFO
+    print("\n[TEST] 15. Probando Sub-Agente 1: Endpoint de Lotes Próximos a Caducar...")
+    res_cad = client.get("/api/inventario/lotes/caducidades?dias=180")
+    assert res_cad.status_code == 200, f"Error en lotes caducidades: {res_cad.text}"
+    lotes_cad = res_cad.json()
+    assert isinstance(lotes_cad, list)
+    print(f"[OK] Lotes en riesgo de caducidad detectados: {len(lotes_cad)}")
+    if lotes_cad:
+        primer_lote_cad = lotes_cad[0]
+        assert "urgencia" in primer_lote_cad
+        assert "dias_restantes" in primer_lote_cad
+        print(f"     Lote: {primer_lote_cad['numero_lote']}, Producto: {primer_lote_cad['nombre_comercial']}, Urgencia: {primer_lote_cad['urgencia']}, Días: {primer_lote_cad['dias_restantes']}")
+
+    # 16. Test Sub-Agente 2: Registro de Lote con Laboratorio, Forma, Dosis y Fecha Ingreso
+    print("\n[TEST] 16. Probando Sub-Agente 2: Registro de Lote con Forma, Dosis y Laboratorio...")
+    res_nuevo_lote = client.post("/api/inventario/lotes", json={
+        "producto_id": paracetamol["id"],
+        "numero_lote": "TEST-LAB-2026-X",
+        "fecha_caducidad": "2027-12-31",
+        "stock_actual": 25,
+        "costo_unitario": 20.0,
+        "laboratorio_fabricante": "Laboratorios Liomont S.A.",
+        "forma_farmaceutica": "Tabletas",
+        "dosificacion": "500 mg",
+        "fecha_ingreso": "2026-10-27",
+    })
+    assert res_nuevo_lote.status_code == 201, f"Error al registrar lote: {res_nuevo_lote.text}"
+    lote_creado = res_nuevo_lote.json()
+    assert lote_creado["laboratorio_fabricante"] == "Laboratorios Liomont S.A."
+    assert lote_creado["forma_farmaceutica"] == "Tabletas"
+    assert lote_creado["dosificacion"] == "500 mg"
+    print(f"[OK] Lote con metadatos completos registrado: Lote {lote_creado['numero_lote']} ({lote_creado['forma_farmaceutica']} {lote_creado['dosificacion']}, Lab: {lote_creado['laboratorio_fabricante']})")
+
+    # 17. Test Sub-Agente 3: Cliente con Fecha de Nacimiento y Sexo
+    print("\n[TEST] 17. Probando Sub-Agente 3: Cliente con Fecha de Nacimiento y Sexo...")
+    res_cli_nac = client.post("/api/clientes/", json={
+        "nombre": "Beatriz",
+        "apellido": "Gutiérrez Müller",
+        "correo_electronico": "beatriz.gutierrez@email.com",
+        "telefono": "5599887766",
+        "direccion": "Col. San Ángel, CDMX",
+        "descuento_porcentaje": 10.0,
+        "fecha_nacimiento": "1969-01-13",
+        "sexo": "FEMENINO",
+        "notas_clinicas": "Alergia leve a sulfamidas",
+        "enfermedades_ids": [],
+    })
+    assert res_cli_nac.status_code == 201, f"Error al crear cliente con fecha nacimiento: {res_cli_nac.text}"
+    cli_creado = res_cli_nac.json()
+    assert cli_creado["fecha_nacimiento"] == "1969-01-13"
+    assert cli_creado["sexo"] == "FEMENINO"
+    print(f"[OK] Cliente registrado con fecha de nacimiento ({cli_creado['fecha_nacimiento']}) y sexo ({cli_creado['sexo']})")
+
+    # 18. Test Sub-Agente 5: Consulta IA de Medicamentos & Sustitutos
+    print("\n[TEST] 18. Probando Sub-Agente 5: Consulta IA de Medicamentos y Sustitutos en Inventario...")
+    res_ia = client.post("/api/ia/consulta-medicamento", json={
+        "consulta": "¿Tienen Tempra o algún sustituto con Paracetamol en existencia?",
+    })
+    assert res_ia.status_code == 200, f"Error en consulta IA: {res_ia.text}"
+    ia_res = res_ia.json()
+    assert "respuesta_ia" in ia_res
+    assert isinstance(ia_res["sustitutos_en_stock"], list)
+    print(f"[OK] Respuesta IA generada exitosamente. Sustitutos en existencia encontrados: {len(ia_res['sustitutos_en_stock'])}")
+
+    # 19. Test Sub-Agente 6: Reporte Mensual de Ventas Anual
+    print("\n[TEST] 19. Probando Sub-Agente 6: Reporte Mensual de Ventas para Gráfico Anual...")
+    res_rep = client.get("/api/ventas/reporte-mensual?anio=2026")
+    assert res_rep.status_code == 200, f"Error en reporte mensual: {res_rep.text}"
+    rep_data = res_rep.json()
+    assert rep_data["anio"] == 2026
+    assert len(rep_data["meses"]) == 12
+    print(f"[OK] Reporte anual 2026 generado. Total Anual: ${rep_data['total_anual']} MXN, Mes Pico: {rep_data['mes_pico']}, Tickets: {rep_data['total_tickets_anual']}")
+
     print("\n========================================")
-    print("TODAS LAS 14 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
+    print("TODAS LAS 19 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
     print("========================================")
 
 
 if __name__ == "__main__":
     test_endpoints()
+
 

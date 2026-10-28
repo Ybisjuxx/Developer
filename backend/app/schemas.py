@@ -115,6 +115,8 @@ class ClienteBase(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30)
     direccion: Optional[str] = Field(None, max_length=255)
     descuento_porcentaje: float = Field(default=5.0, ge=0.0, le=100.0)
+    fecha_nacimiento: Optional[date] = None
+    sexo: Optional[str] = None  # MASCULINO, FEMENINO, OTRO
     notas_clinicas: Optional[str] = None
     activo: bool = True
 
@@ -130,6 +132,8 @@ class ClienteUpdate(BaseModel):
     telefono: Optional[str] = None
     direccion: Optional[str] = None
     descuento_porcentaje: Optional[float] = None
+    fecha_nacimiento: Optional[date] = None
+    sexo: Optional[str] = None
     notas_clinicas: Optional[str] = None
     activo: Optional[bool] = None
     enfermedades_ids: Optional[List[int]] = None
@@ -151,6 +155,10 @@ class LoteBase(BaseModel):
     fecha_caducidad: date
     costo_unitario: float = Field(..., ge=0)
     stock_actual: int = Field(..., ge=0)
+    laboratorio_fabricante: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    dosificacion: Optional[str] = None
+    fecha_ingreso: Optional[date] = None
     activo: bool = True
 
 
@@ -163,6 +171,30 @@ class LoteOut(LoteBase):
     producto_id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class LoteCaducidadAlertaOut(BaseModel):
+    lote_id: int
+    numero_lote: str
+    fecha_caducidad: date
+    dias_restantes: int
+    urgencia: str  # CRITICA, PREVENTIVA, CADUCADO
+    stock_actual: int
+    costo_unitario: float
+    laboratorio_fabricante: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    dosificacion: Optional[str] = None
+    fecha_ingreso: Optional[date] = None
+    producto_id: int
+    nombre_comercial: str
+    sustancia_activa: str
+    presentacion: str
+    laboratorio_producto: str
+    precio_venta: float
+    codigo_barras: str
+    grupo_farmacopea: str
+    requiere_receta: bool
+
 
 
 class LoteAjusteInput(BaseModel):
@@ -397,3 +429,57 @@ class KardexMovimientoOut(BaseModel):
     usuario_auditor: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# REPORTES DE VENTAS ANUALES / MENSUALES
+# ============================================================================
+class MesVentaOut(BaseModel):
+    mes: int
+    nombre_mes: str
+    total_ventas: float
+    total_tickets: int
+    descuentos_otorgados: float
+    subtotal: float
+
+
+class ReporteVentasMensualOut(BaseModel):
+    anio: int
+    total_anual: float
+    total_tickets_anual: int
+    promedio_mensual: float
+    mes_pico: str
+    meses: List[MesVentaOut]
+
+
+# ============================================================================
+# CONSULTA DE MEDICAMENTOS Y SUSTITUTOS CON IA
+# ============================================================================
+class IaConsultaInput(BaseModel):
+    consulta: str = Field(..., min_length=2, max_length=500)
+    historial: Optional[List[dict]] = None
+
+
+class SustitutoSugeridoOut(BaseModel):
+    producto_id: int
+    codigo_barras: str
+    nombre_comercial: str
+    sustancia_activa: str
+    presentacion: str
+    laboratorio: str
+    precio_venta: float
+    stock_disponible: int
+    tipo_sustitucion: str  # BIOEQUIVALENTE_DIRECTO, MISMA_FAMILIA_TERAPEUTICA, ALTERNATIVA_CLINICA
+    motivo_sugerencia: str
+    requiere_receta: bool
+    grupo_farmacopea: str
+
+
+class IaConsultaOut(BaseModel):
+    pregunta: str
+    respuesta_ia: str
+    producto_consultado: Optional[str] = None
+    disponible_en_stock: bool
+    sustitutos_en_stock: List[SustitutoSugeridoOut] = []
+    aviso_sanitario: str
+

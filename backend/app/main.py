@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, engine, ensure_sqlite_schema
-from .routers import auth, caja, clientes, devoluciones, enfermedades, inventario, medicos, ventas
+from .routers import auth, caja, clientes, devoluciones, enfermedades, ia, inventario, medicos, ventas
 
 # Crear tablas y evolucionar columnas en SQLite automáticamente al iniciar
 Base.metadata.create_all(bind=engine)
@@ -10,8 +10,8 @@ ensure_sqlite_schema(engine)
 
 app = FastAPI(
     title="FarmaControl API - Backend Farmacéutico",
-    description="API para farmacias con control FEFO de inventario, recetas médicas, catálogo CIE-10, turnos de caja, devoluciones y mermas.",
-    version="1.1.0",
+    description="API para farmacias con control FEFO de inventario, recetas médicas, catálogo CIE-10, turnos de caja, devoluciones, mermas e IA de sustitución.",
+    version="1.2.0",
 )
 
 # Habilitar CORS para permitir conexión desde Flutter (Web en Chrome, Desktop y Móvil)
@@ -30,6 +30,7 @@ app.include_router(clientes.router)
 app.include_router(devoluciones.router)
 app.include_router(medicos.router)
 app.include_router(enfermedades.router)
+app.include_router(ia.router)
 app.include_router(inventario.router)
 app.include_router(ventas.router)
 

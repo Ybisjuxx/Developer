@@ -47,6 +47,30 @@ def ensure_sqlite_schema(engine):
                 if "usuario_auditor" not in existing_kardex_cols:
                     conn.exec_driver_sql("ALTER TABLE kardex_movimientos ADD COLUMN usuario_auditor VARCHAR(150)")
                 conn.commit()
+
+            # 3. Columnas en tabla clientes (fecha_nacimiento, sexo)
+            result_clientes = conn.exec_driver_sql("PRAGMA table_info(clientes)").fetchall()
+            existing_clientes_cols = [r[1] for r in result_clientes]
+            if existing_clientes_cols:
+                if "fecha_nacimiento" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN fecha_nacimiento DATE")
+                if "sexo" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN sexo VARCHAR(20)")
+                conn.commit()
+
+            # 4. Columnas en tabla lotes (laboratorio_fabricante, forma_farmaceutica, dosificacion, fecha_ingreso)
+            result_lotes = conn.exec_driver_sql("PRAGMA table_info(lotes)").fetchall()
+            existing_lotes_cols = [r[1] for r in result_lotes]
+            if existing_lotes_cols:
+                if "laboratorio_fabricante" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN laboratorio_fabricante VARCHAR(100)")
+                if "forma_farmaceutica" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN forma_farmaceutica VARCHAR(100)")
+                if "dosificacion" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosificacion VARCHAR(100)")
+                if "fecha_ingreso" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
+                conn.commit()
     except Exception as e:
         print(f"Aviso en ensure_sqlite_schema: {e}")
 

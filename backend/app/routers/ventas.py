@@ -1,7 +1,7 @@
 import datetime
 import uuid
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -16,7 +16,7 @@ from ..models import (
     VentaDetalle,
     VentaDetalleLote,
 )
-from ..schemas import VentaCreate, VentaOut
+from ..schemas import MesVentaOut, ReporteVentasMensualOut, VentaCreate, VentaOut
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas y Despacho FEFO"])
 
@@ -208,6 +208,71 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
 def listar_ventas(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     """Lista las ventas históricas con sus detalles de lotes despachados y devoluciones."""
     return db.query(Venta).order_by(Venta.fecha_venta.desc()).offset(skip).limit(limit).all()
+
+
+@router.get("/reporte-mensual", response_model=ReporteVentasMensualOut)
+def obtener_reporte_ventas_mensual(
+    anio: Optional[int] = Query(None, description="Año a consultar"),
+    db: Session = Depends(get_db)
+):
+    """
+    Genera el desglose analítico de ventas mes a mes para el año solicitado,
+    calculando montos facturados, número de tickets y descuentos otorgados.
+    """
+    if anio is None:
+        anio = datetime.datetime.utcnow().year
+
+    fecha_inicio = datetime.datetime(anio, 1, 1, 0, 0, 0)
+    fecha_fin = datetime.datetime(anio + 1, 1, 1, 0, 0, 0)
+
+    ventas_anio = db.query(Venta).filter(
+        Venta.fecha_venta >= fecha_inicio,
+        Venta.fecha_venta < fecha_fin
+    ).all()
+
+    NOMBRES_MESES = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ]
+    meses_data = {
+        m: {"ventas": 0.0, "tickets": 0, "descuentos": 0.0, "subtotal": 0.0}
+        for m in range(1, 13)
+    }
+
+    for v in ventas_anio:
+        mes = v.fecha_venta.month
+        meses_data[mes]["ventas"] = round(meses_data[mes]["ventas"] + (v.total or 0.0), 2)
+        meses_data[mes]["tickets"] += 1
+        meses_data[mes]["descuentos"] = round(meses_data[mes]["descuentos"] + (v.descuento or 0.0), 2)
+        meses_data[mes]["subtotal"] = round(meses_data[mes]["subtotal"] + (v.subtotal or 0.0), 2)
+
+    lista_meses = []
+    for m in range(1, 13):
+        lista_meses.append(
+            MesVentaOut(
+                mes=m,
+                nombre_mes=NOMBRES_MESES[m - 1],
+                total_ventas=meses_data[m]["ventas"],
+                total_tickets=meses_data[m]["tickets"],
+                descuentos_otorgados=meses_data[m]["descuentos"],
+                subtotal=meses_data[m]["subtotal"],
+            )
+        )
+
+    total_anual = round(sum(m.total_ventas for m in lista_meses), 2)
+    total_tickets_anual = sum(m.total_tickets for m in lista_meses)
+    promedio_mensual = round(total_anual / 12.0, 2)
+    mes_pico_obj = max(lista_meses, key=lambda x: x.total_ventas)
+    mes_pico = mes_pico_obj.nombre_mes if mes_pico_obj.total_ventas > 0 else "Sin ventas aún"
+
+    return ReporteVentasMensualOut(
+        anio=anio,
+        total_anual=total_anual,
+        total_tickets_anual=total_tickets_anual,
+        promedio_mensual=promedio_mensual,
+        mes_pico=mes_pico,
+        meses=lista_meses,
+    )
 
 
 @router.get("/{venta_id}", response_model=VentaOut)

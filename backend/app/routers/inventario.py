@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from ..schemas import (
     KardexObservacionInput,
     LoteAjusteInput,
     LoteBajaInput,
+    LoteCaducidadAlertaOut,
     LoteCreate,
     LoteOut,
     ProductoCreate,
@@ -70,7 +72,7 @@ def listar_productos(
 @router.post("/lotes", response_model=LoteOut, status_code=status.HTTP_201_CREATED)
 def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
     """
-    Registra un lote con fecha de caducidad y stock inicial.
+    Registra un lote con fecha de caducidad, datos de fabricación y stock inicial.
     Genera automáticamente el movimiento inmutable en el Kardex.
     """
     producto = db.query(Producto).filter(Producto.id == lote_in.producto_id).first()
@@ -90,6 +92,11 @@ def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
 
     datos = lote_in.model_dump()
     datos["numero_lote"] = numero_limpio
+    if not datos.get("laboratorio_fabricante"):
+        datos["laboratorio_fabricante"] = producto.laboratorio
+    if not datos.get("fecha_ingreso"):
+        datos["fecha_ingreso"] = datetime.date.today()
+
     nuevo_lote = Lote(**datos)
     db.add(nuevo_lote)
     db.flush()
@@ -105,7 +112,7 @@ def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
             costo_unitario=nuevo_lote.costo_unitario,
             referencia_tipo="ALTA_INICIAL_COMPRA",
             referencia_id=str(nuevo_lote.id),
-            motivo="Recepción y alta inicial de lote en inventario"
+            motivo=f"Recepción y alta inicial de lote {numero_limpio} en inventario"
         )
         db.add(movimiento)
 
@@ -123,6 +130,66 @@ def listar_lotes(producto_id: Optional[int] = None, solo_activos: bool = True, d
     if solo_activos:
         query = query.filter(Lote.activo == True)
     return query.order_by(Lote.fecha_caducidad.asc()).all()
+
+
+@router.get("/lotes/caducidades", response_model=List[LoteCaducidadAlertaOut])
+def listar_lotes_proximos_caducar(
+    dias: int = Query(90, ge=1, le=730, description="Días máximos hacia adelante para alertar"),
+    incluir_caducados: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene todos los lotes con existencia física que están próximos a caducar
+    o ya caducaron, cruzados con la información de su medicamento y clasificados
+    por nivel de urgencia sanitaria (CRITICA, PREVENTIVA, CADUCADO).
+    """
+    hoy = datetime.date.today()
+    limite = hoy + datetime.timedelta(days=dias)
+
+    query = db.query(Lote, Producto).join(Producto, Lote.producto_id == Producto.id)\
+        .filter(Lote.activo == True, Lote.stock_actual > 0, Producto.activo == True)
+
+    if not incluir_caducados:
+        query = query.filter(Lote.fecha_caducidad >= hoy)
+
+    query = query.filter(Lote.fecha_caducidad <= limite)
+    resultados = query.order_by(Lote.fecha_caducidad.asc()).all()
+
+    alertas = []
+    for lote, prod in resultados:
+        dias_restantes = (lote.fecha_caducidad - hoy).days
+        if dias_restantes < 0:
+            urgencia = "CADUCADO"
+        elif dias_restantes <= 30:
+            urgencia = "CRITICA"
+        else:
+            urgencia = "PREVENTIVA"
+
+        alertas.append(
+            LoteCaducidadAlertaOut(
+                lote_id=lote.id,
+                numero_lote=lote.numero_lote,
+                fecha_caducidad=lote.fecha_caducidad,
+                dias_restantes=dias_restantes,
+                urgencia=urgencia,
+                stock_actual=lote.stock_actual,
+                costo_unitario=lote.costo_unitario,
+                laboratorio_fabricante=lote.laboratorio_fabricante or prod.laboratorio,
+                forma_farmaceutica=lote.forma_farmaceutica,
+                dosificacion=lote.dosificacion,
+                fecha_ingreso=lote.fecha_ingreso,
+                producto_id=prod.id,
+                nombre_comercial=prod.nombre_comercial,
+                sustancia_activa=prod.sustancia_activa,
+                presentacion=prod.presentacion,
+                laboratorio_producto=prod.laboratorio,
+                precio_venta=prod.precio_venta,
+                codigo_barras=prod.codigo_barras,
+                grupo_farmacopea=prod.grupo_farmacopea,
+                requiere_receta=prod.requiere_receta,
+            )
+        )
+    return alertas
 
 
 @router.post("/lotes/{lote_id}/ajuste", response_model=LoteOut)
