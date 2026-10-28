@@ -1,3 +1,4 @@
+import datetime
 import sys
 from fastapi.testclient import TestClient
 from app.main import app
@@ -246,9 +247,10 @@ def test_endpoints():
 
     # 16. Test Sub-Agente 2: Registro de Lote con Laboratorio, Forma, Dosis y Fecha Ingreso
     print("\n[TEST] 16. Probando Sub-Agente 2: Registro de Lote con Forma, Dosis y Laboratorio...")
+    num_lote_test = f"TEST-LAB-{datetime.datetime.now().strftime('%H%M%S')}"
     res_nuevo_lote = client.post("/api/inventario/lotes", json={
         "producto_id": paracetamol["id"],
-        "numero_lote": "TEST-LAB-2026-X",
+        "numero_lote": num_lote_test,
         "fecha_caducidad": "2027-12-31",
         "stock_actual": 25,
         "costo_unitario": 20.0,
@@ -304,8 +306,50 @@ def test_endpoints():
     assert len(rep_data["meses"]) == 12
     print(f"[OK] Reporte anual 2026 generado. Total Anual: ${rep_data['total_anual']} MXN, Mes Pico: {rep_data['mes_pico']}, Tickets: {rep_data['total_tickets_anual']}")
 
+    # 20. Test Sub-Agente 5: Cliente con Apellido Paterno y Materno Desglosados
+    print("\n[TEST] 20. Probando Sub-Agente 5: Cliente con Apellidos Paterno y Materno Separados...")
+    res_cli_apellidos = client.post("/api/clientes/", json={
+        "nombre": "Guillermo",
+        "apellido_paterno": "del Toro",
+        "apellido_materno": "Gómez",
+        "telefono": "5544332211",
+        "fecha_nacimiento": "1964-10-09",
+        "sexo": "MASCULINO",
+        "descuento_porcentaje": 12.0,
+    })
+    assert res_cli_apellidos.status_code == 201, f"Error al crear cliente con apellidos desglosados: {res_cli_apellidos.text}"
+    cli_ap_data = res_cli_apellidos.json()
+    assert cli_ap_data["apellido_paterno"] == "del Toro"
+    assert cli_ap_data["apellido_materno"] == "Gómez"
+    assert "del Toro Gómez" in cli_ap_data["apellido"]
+    print(f"[OK] Cliente registrado con apellidos separados: {cli_ap_data['nombre']} {cli_ap_data['apellido_paterno']} / {cli_ap_data['apellido_materno']}")
+
+    # 21. Test Sub-Agente 2: Consulta IA con Validación Terapéutica Estricta y Solicitud de Compra
+    print("\n[TEST] 21. Probando Sub-Agente 2: Consulta IA con Validación Terapéutica Estricta...")
+    res_ia_terap = client.post("/api/ia/consulta-medicamento", json={
+        "consulta": "¿Qué alternativas tienen para Amoxicilina si no hay?",
+    })
+    assert res_ia_terap.status_code == 200, f"Error en consulta IA terapéutica: {res_ia_terap.text}"
+    ia_terap_data = res_ia_terap.json()
+    # Verificar que los sustitutos sean de la familia de antibióticos y NO analgésicos
+    for sust in ia_terap_data["sustitutos_en_stock"]:
+        assert "Paracetamol" not in sust["sustancia_activa"], "ERROR: Paracetamol sugerido para antibiótico!"
+        assert "Ibuprofeno" not in sust["sustancia_activa"], "ERROR: AINE sugerido para antibiótico!"
+    # Verificar mensaje de deslinde y orientación
+    assert "orientativo" in ia_terap_data["respuesta_ia"].lower() or "orientativo" in ia_terap_data["aviso_sanitario"].lower()
+    assert "humano" in ia_terap_data["respuesta_ia"].lower() or "humano" in ia_terap_data["aviso_sanitario"].lower()
+    print("[OK] IA respetó la clase terapéutica estricta (sin cruzar analgésicos con antibióticos) e incluyó deslinde humano.")
+
+    # 22. Test Sub-Agente 1: Dispositivos Médicos y Misceláneos en Catálogo
+    print("\n[TEST] 22. Probando Sub-Agente 1: Dispositivos Médicos y Misceláneos en Catálogo...")
+    res_prods_all = client.get("/api/inventario/productos")
+    assert res_prods_all.status_code == 200
+    prods_all = res_prods_all.json()
+    grupos_presentes = set(p["grupo_farmacopea"] for p in prods_all)
+    print(f"[OK] Grupos de catálogo presentes: {grupos_presentes}")
+
     print("\n========================================")
-    print("TODAS LAS 19 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
+    print("TODAS LAS 22 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
     print("========================================")
 
 

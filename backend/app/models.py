@@ -29,7 +29,9 @@ class Cliente(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100), nullable=False)
-    apellido = Column(String(100), nullable=False)
+    apellido = Column(String(100), nullable=False)  # Mantenido para retrocompatibilidad
+    apellido_paterno = Column(String(100), nullable=True)
+    apellido_materno = Column(String(100), nullable=True)
     correo_electronico = Column(String(150), nullable=True)
     telefono = Column(String(30), nullable=True, index=True)
     direccion = Column(String(255), nullable=True)
@@ -45,7 +47,10 @@ class Cliente(Base):
 
     @property
     def nombre_completo(self) -> str:
-        return f"{self.nombre} {self.apellido}".strip()
+        apellidos = f"{self.apellido_paterno or ''} {self.apellido_materno or ''}".strip()
+        if not apellidos:
+            apellidos = self.apellido or ""
+        return f"{self.nombre} {apellidos}".strip()
 
 
 class Usuario(Base):

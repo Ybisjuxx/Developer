@@ -48,7 +48,7 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE kardex_movimientos ADD COLUMN usuario_auditor VARCHAR(150)")
                 conn.commit()
 
-            # 3. Columnas en tabla clientes (fecha_nacimiento, sexo)
+            # 3. Columnas en tabla clientes (fecha_nacimiento, sexo, apellido_paterno, apellido_materno)
             result_clientes = conn.exec_driver_sql("PRAGMA table_info(clientes)").fetchall()
             existing_clientes_cols = [r[1] for r in result_clientes]
             if existing_clientes_cols:
@@ -56,6 +56,10 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN fecha_nacimiento DATE")
                 if "sexo" not in existing_clientes_cols:
                     conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN sexo VARCHAR(20)")
+                if "apellido_paterno" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN apellido_paterno VARCHAR(100)")
+                if "apellido_materno" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN apellido_materno VARCHAR(100)")
                 conn.commit()
 
             # 4. Columnas en tabla lotes (laboratorio_fabricante, forma_farmaceutica, dosificacion, fecha_ingreso)

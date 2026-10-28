@@ -215,7 +215,7 @@ def consultar_medicamento_ia(consulta_in: IaConsultaInput, db: Session = Depends
                         )
                     )
 
-    # Prioridad 2: Misma familia terapéutica con stock > 0
+    # Prioridad 2: Misma familia terapéutica con stock > 0 (Alineación estricta de indicación terapéutica)
     if len(sustitutos) < 4 and familia_identificada:
         fam_info = FAMILIAS_TERAPEUTICAS[familia_identificada]
         sustancias_familia = [s for s in fam_info["sustancias"]]
@@ -241,32 +241,13 @@ def consultar_medicamento_ia(consulta_in: IaConsultaInput, db: Session = Depends
                             precio_venta=p.precio_venta,
                             stock_disponible=p.stock_total,
                             tipo_sustitucion="MISMA_FAMILIA_TERAPEUTICA",
-                            motivo_sugerencia=f"Alternativa clínica en la categoría de {fam_info['nombre']}.",
+                            motivo_sugerencia=f"Alternativa clínica alineada a la indicación de {fam_info['nombre']}.",
                             requiere_receta=p.requiere_receta,
                             grupo_farmacopea=p.grupo_farmacopea,
                         )
                     )
 
-    # Si aún no hay sustitutos y no se encontró medicamento específico, devolver los productos con mayor stock
-    if not sustitutos and not disponible:
-        for p in sorted(productos_db, key=lambda x: x.stock_total, reverse=True)[:3]:
-            if p.stock_total > 0:
-                sustitutos.append(
-                    SustitutoSugeridoOut(
-                        producto_id=p.id,
-                        codigo_barras=p.codigo_barras,
-                        nombre_comercial=p.nombre_comercial,
-                        sustancia_activa=p.sustancia_activa,
-                        presentacion=p.presentacion,
-                        laboratorio=p.laboratorio,
-                        precio_venta=p.precio_venta,
-                        stock_disponible=p.stock_total,
-                        tipo_sustitucion="ALTERNATIVA_CLINICA",
-                        motivo_sugerencia="Opción destacada en stock disponible en mostrador.",
-                        requiere_receta=p.requiere_receta,
-                        grupo_farmacopea=p.grupo_farmacopea,
-                    )
-                )
+    # REGLA ESTRICTA: NUNCA sugerir fármacos de familias terapéuticas no alineadas (ej: no sustituir antibióticos con paracetamol)
 
     # 4. Redactar respuesta de la IA
     nombre_prod = producto_coincidente.nombre_comercial if producto_coincidente else (sustancia_identificada or "Fármaco consultado")
@@ -279,39 +260,47 @@ def consultar_medicamento_ia(consulta_in: IaConsultaInput, db: Session = Depends
             f"✅ **¡Tenemos existencias en la farmacia!**\n"
             f"- **Producto:** {producto_coincidente.nombre_comercial} ({producto_coincidente.sustancia_activa})\n"
             f"- **Presentación:** {producto_coincidente.presentacion} • Laboratorio {producto_coincidente.laboratorio}\n"
-            f"- **Stock Actual:** {producto_coincidente.stock_total} piezas listas para entrega.\n"
+            f"- **Stock Actual:** {producto_coincidente.stock_total} piezas listas para entrega en mostrador.\n"
             f"- **Precio:** ${producto_coincidente.precio_venta:.2f} MXN\n"
             f"- **Regulación:** {'Requiere Receta Médica (Grupo IV o Controlado)' if producto_coincidente.requiere_receta else 'Venta Libre (Grupo VI)'}\n"
         )
         if sustitutos:
-            lineas_ia.append("\n💡 **Opciones equivalentes o genéricas adicionales disponibles:**")
-    elif producto_coincidente and not disponible:
+            lineas_ia.append("\n💡 **Opciones alternativas bioequivalentes con misma indicación en inventario:**")
+    elif sustitutos:
         lineas_ia.append(
-            f"⚠️ **Agotado actualmente en mostrador:** El producto **{producto_coincidente.nombre_comercial}** "
-            f"({producto_coincidente.sustancia_activa}) se encuentra sin existencias inmediatas.\n\n"
-            f"Sin embargo, el motor de bioequivalencia de FarmaControl ha localizado **{len(sustitutos)} sustitutos terapéuticos con stock inmediato**:"
+            f"⚠️ **Sin existencias del producto específico:** "
+            f"El producto solicitado no cuenta con inventario inmediato, pero el motor clínico localizó "
+            f"**{len(sustitutos)} alternativa(s) terapéutica(s) alineada(s)** con stock disponible:\n"
         )
     else:
         lineas_ia.append(
-            f"ℹ️ Hemos analizado tu consulta sobre **{sustancia_identificada or texto_consulta}**.\n\n"
-            f"En nuestro inventario físico contamos con las siguientes alternativas terapéuticas recomendadas con existencias confirmadas:"
+            f"❌ **Sin existencias en inventario:** "
+            f"Actualmente no contamos con existencias de **{nombre_prod}** ni de sustitutos que cumplan con la misma indicación terapéutica en este momento.\n\n"
+            f"📦 **Gestión de Abastecimiento:** Le informamos al usuario que **puede solicitarse la compra / pedido especial** "
+            f"a almacén o laboratorio proveedor para surtir este fármaco a la brevedad.\n"
         )
 
     for i, s in enumerate(sustitutos, 1):
-        tipo_label = "Mismo principio activo (Bioequivalente)" if s.tipo_sustitucion == "BIOEQUIVALENTE_DIRECTO" else "Misma familia terapéutica"
+        tipo_label = "Mismo principio activo (Bioequivalente)" if s.tipo_sustitucion == "BIOEQUIVALENTE_DIRECTO" else "Misma indicación terapéutica"
         lineas_ia.append(
             f"\n{i}. **{s.nombre_comercial}** — *{s.sustancia_activa}*\n"
             f"   - **Forma / Presentación:** {s.presentacion} ({s.laboratorio})\n"
-            f"   - **Existencia:** `{s.stock_disponible} pzas` | **Precio:** `${s.precio_venta:.2f} MXN`\n"
-            f"   - **Criterio:** {tipo_label} — {s.motivo_sugerencia}\n"
-            f"   - **Prescripción:** {'Requiere Receta' if s.requiere_receta else 'Venta Libre'}"
+            f"   - **Existencia en Farmacia:** `{s.stock_disponible} pzas` | **Precio:** `${s.precio_venta:.2f} MXN`\n"
+            f"   - **Criterio de Seguridad:** {tipo_label} ({s.motivo_sugerencia})\n"
+            f"   - **Prescripción:** {'Requiere Receta Médica' if s.requiere_receta else 'Venta Libre'}"
         )
 
+    lineas_ia.append(
+        "\n> ⚠️ **Aviso Sanitario y Legal:** Esta respuesta tiene un propósito meramente **orientativo** basado en vademécum; "
+        "**no sustituye la búsqueda, evaluación clínica ni el criterio profesional de un humano calificado** "
+        "(médico o farmacéutico responsable)."
+    )
+
     aviso_sanitario = (
-        "⚖️ **Normativa Sanitaria COFEPRIS:** Si el fármaco pertenece al Grupo IV (Antibióticos) "
-        "o Grupos I-III (Controlados), la sustitución debe realizarse respetando la sustancia activa "
-        "y concentración prescrita por el médico con cédula profesional. Los medicamentos del Grupo VI "
-        "(Venta Libre) pueden intercambiarse libremente por genéricos bioequivalentes."
+        "⚖️ **Normativa Sanitaria COFEPRIS y Deslinde de Responsabilidad:** Esta respuesta es de carácter orientativo "
+        "y asistencial basada en vademécum; NO sustituye una búsqueda ni validación profesional por parte de un humano. "
+        "Para medicamentos del Grupo IV (Antibióticos) y Grupos I-III (Controlados), cualquier intercambio debe "
+        "respetar la sustancia activa y dosificación prescrita por el médico con cédula profesional."
     )
 
     return IaConsultaOut(

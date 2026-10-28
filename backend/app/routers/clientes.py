@@ -13,6 +13,26 @@ router = APIRouter(prefix="/api/clientes", tags=["Clientes e Historial Clínico"
 def crear_cliente(cli_in: ClienteCreate, db: Session = Depends(get_db)):
     """Registra un nuevo cliente con historial clínico opcional (diagnósticos CIE-10)."""
     datos = cli_in.model_dump(exclude={"enfermedades_ids"})
+
+    # Resolver apellido compuesto / paterno y materno
+    paterno = (datos.get("apellido_paterno") or "").strip()
+    materno = (datos.get("apellido_materno") or "").strip()
+    apellidos_unidos = f"{paterno} {materno}".strip()
+
+    if apellidos_unidos:
+        datos["apellido"] = apellidos_unidos
+    elif not datos.get("apellido"):
+        datos["apellido"] = paterno or "Sin Apellido"
+
+    # Si se proporcionó apellido general pero no paterno, intentar desglosar
+    if datos.get("apellido") and not datos.get("apellido_paterno"):
+        partes = datos["apellido"].split()
+        if len(partes) >= 2:
+            datos["apellido_paterno"] = partes[0]
+            datos["apellido_materno"] = " ".join(partes[1:])
+        else:
+            datos["apellido_paterno"] = datos["apellido"]
+
     nuevo_cliente = Cliente(**datos)
 
     if cli_in.enfermedades_ids:
@@ -42,6 +62,8 @@ def listar_clientes(
         query = query.filter(
             (Cliente.nombre.ilike(termino)) |
             (Cliente.apellido.ilike(termino)) |
+            (Cliente.apellido_paterno.ilike(termino)) |
+            (Cliente.apellido_materno.ilike(termino)) |
             (Cliente.telefono.ilike(termino)) |
             (Cliente.correo_electronico.ilike(termino))
         )
@@ -67,6 +89,12 @@ def actualizar_cliente(cliente_id: int, cli_in: ClienteUpdate, db: Session = Dep
     update_data = cli_in.model_dump(exclude_unset=True, exclude={"enfermedades_ids"})
     for field, value in update_data.items():
         setattr(cliente, field, value)
+
+    # Mantener sincronizado el apellido completo consolidado
+    paterno = cliente.apellido_paterno or ""
+    materno = cliente.apellido_materno or ""
+    if paterno or materno:
+        cliente.apellido = f"{paterno} {materno}".strip()
 
     if cli_in.enfermedades_ids is not None:
         enfermedades = db.query(Enfermedad).filter(Enfermedad.id.in_(cli_in.enfermedades_ids)).all()

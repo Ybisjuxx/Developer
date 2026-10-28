@@ -60,7 +60,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
   void _abrirFormularioCliente({Map<String, dynamic>? clienteExistente}) {
     final bool esEdicion = clienteExistente != null;
     final nombreCtrl = TextEditingController(text: clienteExistente?['nombre'] ?? '');
-    final apellidoCtrl = TextEditingController(text: clienteExistente?['apellido'] ?? '');
+
+    // Sub-Agente 5: Separación de Apellido Paterno y Materno (opcional si es uno solo o compuesto)
+    String initPaterno = clienteExistente?['apellido_paterno'] ?? '';
+    String initMaterno = clienteExistente?['apellido_materno'] ?? '';
+    if (initPaterno.isEmpty && initMaterno.isEmpty && clienteExistente?['apellido'] != null) {
+      final partes = clienteExistente!['apellido'].toString().trim().split(' ');
+      if (partes.length >= 2) {
+        initPaterno = partes[0];
+        initMaterno = partes.sublist(1).join(' ');
+      } else {
+        initPaterno = partes.isNotEmpty ? partes[0] : '';
+      }
+    }
+    final apellidoPaternoCtrl = TextEditingController(text: initPaterno);
+    final apellidoMaternoCtrl = TextEditingController(text: initMaterno);
+
     final telefonoCtrl = TextEditingController(text: clienteExistente?['telefono'] ?? '');
     final correoCtrl = TextEditingController(text: clienteExistente?['correo_electronico'] ?? '');
     final direccionCtrl = TextEditingController(text: clienteExistente?['direccion'] ?? '');
@@ -69,7 +84,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
     final notasCtrl = TextEditingController(text: clienteExistente?['notas_clinicas'] ?? '');
 
-    // Sub-Agente 3: Sexo y Fecha de Nacimiento desglosada
+    // Sub-Agente 3 & 4: Sexo y Fecha de Nacimiento desglosada
     String? sexoSeleccionado = clienteExistente?['sexo'];
     DateTime? fechaNacParsed;
     if (clienteExistente?['fecha_nacimiento'] != null) {
@@ -124,7 +139,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Nombre y Apellido son obligatorios. Los datos de contacto e historial clínico CIE son opcionales para seguimiento preventivo.',
+                                'Nombre y al menos un Apellido son obligatorios. El Apellido Materno es opcional para personas con un solo apellido o extranjeros.',
                                 style: TextStyle(fontSize: 11, color: Colors.blueGrey),
                               ),
                             ),
@@ -132,24 +147,36 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                      // Nombre(s)
+                      TextField(
+                        controller: nombreCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre(s) *',
+                          prefixIcon: Icon(Icons.person),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Sub-Agente 5: Apellido Paterno y Materno
                       Row(
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: nombreCtrl,
+                              controller: apellidoPaternoCtrl,
                               decoration: const InputDecoration(
-                                labelText: 'Nombre(s) *',
-                                prefixIcon: Icon(Icons.person),
+                                labelText: 'Apellido Paterno *',
+                                hintText: 'Primer apellido',
+                                prefixIcon: Icon(Icons.badge),
                               ),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
-                              controller: apellidoCtrl,
+                              controller: apellidoMaternoCtrl,
                               decoration: const InputDecoration(
-                                labelText: 'Apellido(s) *',
-                                prefixIcon: Icon(Icons.badge),
+                                labelText: 'Apellido Materno',
+                                hintText: 'Opcional (segundo apellido)',
+                                prefixIcon: Icon(Icons.badge_outlined),
                               ),
                             ),
                           ),
@@ -208,89 +235,86 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      // Sub-Agente 3: Fecha de Nacimiento (Día, Mes, Año + Calendario) y Sexo
-                      Row(
+                      // Sub-Agente 4: Sexo / Género en fila completa con isExpanded y TextOverflow.ellipsis
+                      DropdownButtonFormField<String>(
+                        value: sexoSeleccionado,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Sexo / Género (Opcional)',
+                          prefixIcon: Icon(Icons.wc),
+                          isDense: true,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('No especificar / Prefiero no decir', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'MASCULINO', child: Text('Masculino', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'FEMENINO', child: Text('Femenino', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'OTRO', child: Text('Otro / No especificado', overflow: TextOverflow.ellipsis)),
+                        ],
+                        onChanged: (val) => setDialogState(() => sexoSeleccionado = val),
+                      ),
+                      const SizedBox(height: 12),
+                      // Sub-Agente 3 & 4: Fecha de Nacimiento en bloque independiente sin colisión
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: DropdownButtonFormField<String>(
-                              value: sexoSeleccionado,
-                              decoration: const InputDecoration(
-                                labelText: 'Sexo / Género (Opcional)',
-                                prefixIcon: Icon(Icons.wc),
+                          Row(
+                            children: [
+                              const Icon(Icons.cake, size: 16, color: Colors.teal),
+                              const SizedBox(width: 6),
+                              const Text('Fecha de Nacimiento (Opcional):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              TextButton.icon(
+                                icon: const Icon(Icons.calendar_month, color: Colors.teal, size: 16),
+                                label: const Text('Buscar en calendario', style: TextStyle(fontSize: 11)),
+                                onPressed: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: fechaNacParsed ?? DateTime(1990, 1, 1),
+                                    firstDate: DateTime(1900),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    setDialogState(() {
+                                      fechaNacParsed = picked;
+                                      diaCtrl.text = picked.day.toString().padLeft(2, '0');
+                                      mesCtrl.text = picked.month.toString().padLeft(2, '0');
+                                      anioCtrl.text = picked.year.toString();
+                                    });
+                                  }
+                                },
                               ),
-                              items: const [
-                                DropdownMenuItem(value: null, child: Text('No especificar')),
-                                DropdownMenuItem(value: 'MASCULINO', child: Text('Masculino')),
-                                DropdownMenuItem(value: 'FEMENINO', child: Text('Femenino')),
-                                DropdownMenuItem(value: 'OTRO', child: Text('Otro / No especificado')),
-                              ],
-                              onChanged: (val) => setDialogState(() => sexoSeleccionado = val),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text('Fecha de Nacimiento:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                    const Spacer(),
-                                    IconButton(
-                                      icon: const Icon(Icons.calendar_month, color: Colors.teal),
-                                      tooltip: 'Buscar en calendario',
-                                      onPressed: () async {
-                                        final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: fechaNacParsed ?? DateTime(1990, 1, 1),
-                                          firstDate: DateTime(1900),
-                                          lastDate: DateTime.now(),
-                                        );
-                                        if (picked != null) {
-                                          setDialogState(() {
-                                            fechaNacParsed = picked;
-                                            diaCtrl.text = picked.day.toString().padLeft(2, '0');
-                                            mesCtrl.text = picked.month.toString().padLeft(2, '0');
-                                            anioCtrl.text = picked.year.toString();
-                                          });
-                                        }
-                                      },
-                                    ),
-                                  ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: TextField(
+                                  controller: diaCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(labelText: 'Día', hintText: 'DD', isDense: true),
                                 ),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextField(
-                                        controller: diaCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(labelText: 'Día', hintText: 'DD', isDense: true),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: TextField(
-                                        controller: mesCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(labelText: 'Mes', hintText: 'MM', isDense: true),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      flex: 2,
-                                      child: TextField(
-                                        controller: anioCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(labelText: 'Año', hintText: 'AAAA', isDense: true),
-                                      ),
-                                    ),
-                                  ],
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 1,
+                                child: TextField(
+                                  controller: mesCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(labelText: 'Mes', hintText: 'MM', isDense: true),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: anioCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(labelText: 'Año', hintText: 'AAAA', isDense: true),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -375,17 +399,19 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   ),
                   onPressed: () async {
                     final nom = nombreCtrl.text.trim();
-                    final ape = apellidoCtrl.text.trim();
-                    if (nom.isEmpty || ape.isEmpty) {
+                    final pat = apellidoPaternoCtrl.text.trim();
+                    final mat = apellidoMaternoCtrl.text.trim();
+                    if (nom.isEmpty || (pat.isEmpty && mat.isEmpty)) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('El Nombre y Apellido son obligatorios.'),
+                          content: Text('El Nombre y al menos un Apellido son obligatorios.'),
                           backgroundColor: Colors.orange,
                         ),
                       );
                       return;
                     }
 
+                    final apCompleto = "$pat $mat".trim();
                     final double desc = double.tryParse(descuentoCtrl.text.trim()) ?? 5.0;
 
                     String? fechaNacStr;
@@ -398,7 +424,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
 
                     final payload = {
                       'nombre': nom,
-                      'apellido': ape,
+                      'apellido': apCompleto,
+                      'apellido_paterno': pat.isNotEmpty ? pat : null,
+                      'apellido_materno': mat.isNotEmpty ? mat : null,
                       'telefono': telefonoCtrl.text.trim().isEmpty ? null : telefonoCtrl.text.trim(),
                       'correo_electronico': correoCtrl.text.trim().isEmpty ? null : correoCtrl.text.trim(),
                       'direccion': direccionCtrl.text.trim().isEmpty ? null : direccionCtrl.text.trim(),
@@ -422,8 +450,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           SnackBar(
                             content: Text(
                               esEdicion
-                                  ? 'Cliente "$nom $ape" actualizado.'
-                                  : 'Cliente "$nom $ape" dado de alta con éxito.',
+                                  ? 'Cliente "$nom $apCompleto" actualizado.'
+                                  : 'Cliente "$nom $apCompleto" dado de alta con éxito.',
                             ),
                             backgroundColor: Colors.green,
                           ),
@@ -742,13 +770,15 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                         ),
                                       ),
                                     ),
-                                    title: Row(
+                                    title: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
                                       children: [
                                         Text(
                                           '${c['nombre']} ${c['apellido']}',
                                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                         ),
-                                        const SizedBox(width: 10),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
@@ -771,23 +801,33 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         const SizedBox(height: 4),
-                                        Row(
+                                        // Sub-Agente 4: Wrap responsivo para evitar overflow en tamaños grandes de fuente
+                                        Wrap(
+                                          spacing: 10,
+                                          runSpacing: 4,
+                                          crossAxisAlignment: WrapCrossAlignment.center,
                                           children: [
-                                            if (c['telefono'] != null) ...[
-                                              const Icon(Icons.phone, size: 13, color: Colors.blueGrey),
-                                              const SizedBox(width: 4),
-                                              Text(c['telefono'], style: const TextStyle(fontSize: 12)),
-                                              const SizedBox(width: 12),
-                                            ],
-                                            if (c['correo_electronico'] != null) ...[
-                                              const Icon(Icons.email, size: 13, color: Colors.blueGrey),
-                                              const SizedBox(width: 4),
-                                              Text(c['correo_electronico'], style: const TextStyle(fontSize: 12)),
-                                            ],
-                                            if (c['sexo'] != null) ...[
-                                              const SizedBox(width: 8),
+                                            if (c['telefono'] != null)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.phone, size: 13, color: Colors.blueGrey),
+                                                  const SizedBox(width: 4),
+                                                  Text(c['telefono'], style: const TextStyle(fontSize: 12)),
+                                                ],
+                                              ),
+                                            if (c['correo_electronico'] != null)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(Icons.email, size: 13, color: Colors.blueGrey),
+                                                  const SizedBox(width: 4),
+                                                  Text(c['correo_electronico'], style: const TextStyle(fontSize: 12)),
+                                                ],
+                                              ),
+                                            if (c['sexo'] != null)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: Colors.blue.shade50,
                                                   borderRadius: BorderRadius.circular(4),
@@ -798,11 +838,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                                   style: TextStyle(fontSize: 10, color: Colors.blue.shade900, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
-                                            ],
-                                            if (c['fecha_nacimiento'] != null) ...[
-                                              const SizedBox(width: 8),
+                                            if (c['fecha_nacimiento'] != null)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
                                                   color: Colors.purple.shade50,
                                                   borderRadius: BorderRadius.circular(4),
@@ -813,7 +851,6 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                                   style: TextStyle(fontSize: 10, color: Colors.purple.shade900, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
-                                            ],
                                           ],
                                         ),
                                         const SizedBox(height: 6),

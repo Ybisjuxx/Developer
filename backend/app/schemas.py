@@ -110,7 +110,9 @@ class EnfermedadOut(EnfermedadBase):
 # ============================================================================
 class ClienteBase(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=100)
-    apellido: str = Field(..., min_length=2, max_length=100)
+    apellido: Optional[str] = Field(None, max_length=100)
+    apellido_paterno: Optional[str] = Field(None, max_length=100)
+    apellido_materno: Optional[str] = Field(None, max_length=100)
     correo_electronico: Optional[str] = Field(None, max_length=150)
     telefono: Optional[str] = Field(None, max_length=30)
     direccion: Optional[str] = Field(None, max_length=255)
@@ -128,6 +130,8 @@ class ClienteCreate(ClienteBase):
 class ClienteUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
+    apellido_paterno: Optional[str] = None
+    apellido_materno: Optional[str] = None
     correo_electronico: Optional[str] = None
     telefono: Optional[str] = None
     direccion: Optional[str] = None

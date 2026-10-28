@@ -85,11 +85,12 @@ class _PosScreenState extends State<PosScreen> {
 
   void _modalNuevoClienteRapido() {
     final nomCtrl = TextEditingController();
-    final apeCtrl = TextEditingController();
+    final apePaternoCtrl = TextEditingController();
+    final apeMaternoCtrl = TextEditingController();
     final telCtrl = TextEditingController();
     final descCtrl = TextEditingController(text: '5.0');
 
-    // Sub-Agente 3: Sexo y Fecha de Nacimiento en Alta Rápida
+    // Sub-Agente 3 & 4: Sexo y Fecha de Nacimiento en Alta Rápida
     String? sexoSeleccionado;
     final diaCtrl = TextEditingController();
     final mesCtrl = TextEditingController();
@@ -117,9 +118,23 @@ class _PosScreenState extends State<PosScreen> {
                     decoration: const InputDecoration(labelText: 'Nombre(s) *', prefixIcon: Icon(Icons.person)),
                   ),
                   const SizedBox(height: 10),
-                  TextField(
-                    controller: apeCtrl,
-                    decoration: const InputDecoration(labelText: 'Apellido(s) *', prefixIcon: Icon(Icons.badge)),
+                  // Sub-Agente 5: Apellido Paterno y Materno
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: apePaternoCtrl,
+                          decoration: const InputDecoration(labelText: 'Apellido Paterno *', prefixIcon: Icon(Icons.badge)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: apeMaternoCtrl,
+                          decoration: const InputDecoration(labelText: 'Apellido Materno', prefixIcon: Icon(Icons.badge_outlined)),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -143,18 +158,20 @@ class _PosScreenState extends State<PosScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  // Sexo y Fecha de Nacimiento
+                  // Sub-Agente 4: Sexo con isExpanded y TextOverflow.ellipsis
                   DropdownButtonFormField<String>(
                     value: sexoSeleccionado,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Sexo / Género (Opcional)',
                       prefixIcon: Icon(Icons.wc),
+                      isDense: true,
                     ),
                     items: const [
-                      DropdownMenuItem(value: null, child: Text('No especificar')),
-                      DropdownMenuItem(value: 'MASCULINO', child: Text('Masculino')),
-                      DropdownMenuItem(value: 'FEMENINO', child: Text('Femenino')),
-                      DropdownMenuItem(value: 'OTRO', child: Text('Otro / No especificado')),
+                      DropdownMenuItem(value: null, child: Text('No especificar / Prefiero no decir', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'MASCULINO', child: Text('Masculino', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'FEMENINO', child: Text('Femenino', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'OTRO', child: Text('Otro / No especificado', overflow: TextOverflow.ellipsis)),
                     ],
                     onChanged: (val) => setModalState(() => sexoSeleccionado = val),
                   ),
@@ -224,14 +241,16 @@ class _PosScreenState extends State<PosScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
               onPressed: () async {
                 final nom = nomCtrl.text.trim();
-                final ape = apeCtrl.text.trim();
-                if (nom.isEmpty || ape.isEmpty) {
+                final pat = apePaternoCtrl.text.trim();
+                final mat = apeMaternoCtrl.text.trim();
+                if (nom.isEmpty || (pat.isEmpty && mat.isEmpty)) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nombre y Apellido son obligatorios')),
+                    const SnackBar(content: Text('Nombre y al menos un Apellido son obligatorios')),
                   );
                   return;
                 }
 
+                final apCompleto = "$pat $mat".trim();
                 String? fechaNacStr;
                 final d = int.tryParse(diaCtrl.text.trim());
                 final m = int.tryParse(mesCtrl.text.trim());
@@ -244,7 +263,9 @@ class _PosScreenState extends State<PosScreen> {
                 try {
                   final nuevoCliente = await ApiService.createCliente({
                     'nombre': nom,
-                    'apellido': ape,
+                    'apellido': apCompleto,
+                    'apellido_paterno': pat.isNotEmpty ? pat : null,
+                    'apellido_materno': mat.isNotEmpty ? mat : null,
                     'telefono': telCtrl.text.trim().isEmpty ? null : telCtrl.text.trim(),
                     'descuento_porcentaje': desc,
                     'fecha_nacimiento': fechaNacStr,
@@ -255,13 +276,13 @@ class _PosScreenState extends State<PosScreen> {
                   setState(() {
                     _clientes.insert(0, nuevoCliente);
                     _clienteSeleccionado = nuevoCliente;
-                    _compradorController.text = '$nom $ape';
+                    _compradorController.text = '$nom $apCompleto';
                   });
 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Cliente "$nom $ape" registrado con $desc% de descuento aplicado.'),
+                        content: Text('Cliente "$nom $apCompleto" registrado con $desc% de descuento aplicado.'),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -277,6 +298,306 @@ class _PosScreenState extends State<PosScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // SUB-AGENTE 3: MODAL DE BÚSQUEDA Y CONFIRMACIÓN DE CLIENTE (TEL / FECHA NAC)
+  // =========================================================================
+  void _abrirBuscadorYConfirmacionCliente() {
+    final TextEditingController busquedaCtrl = TextEditingController();
+    String query = '';
+    Map<String, dynamic>? candidatoSeleccionado;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final q = query.trim().toLowerCase();
+          final qLimpio = q.replaceAll(RegExp(r'[^0-9a-zA-Z]'), '');
+
+          final resultados = _clientes.where((c) {
+            if (q.isEmpty) return true;
+            final nom = (c['nombre'] ?? '').toString().toLowerCase();
+            final ape = (c['apellido'] ?? '').toString().toLowerCase();
+            final tel = (c['telefono'] ?? '').toString().toLowerCase();
+            final telLimpio = tel.replaceAll(RegExp(r'[^0-9]'), '');
+            final fechaNac = (c['fecha_nacimiento'] ?? '').toString().toLowerCase();
+
+            return nom.contains(q) ||
+                ape.contains(q) ||
+                tel.contains(q) ||
+                (qLimpio.isNotEmpty && telLimpio.contains(qLimpio)) ||
+                fechaNac.contains(q);
+          }).toList();
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.person_search, color: Colors.teal, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Búsqueda y Confirmación de Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Busca por teléfono, nombre o confirma con fecha de nacimiento', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 560,
+              height: 500,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: busquedaCtrl,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por teléfono (ej: 555-321-7890), nombre o apellido...',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: query.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 18),
+                              onPressed: () {
+                                setModalState(() {
+                                  busquedaCtrl.clear();
+                                  query = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onChanged: (val) => setModalState(() => query = val),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.person_outline, size: 16),
+                        label: const Text('Asignar a Público General', style: TextStyle(fontSize: 12)),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          setState(() {
+                            _clienteSeleccionado = null;
+                            _compradorController.text = 'Público General';
+                          });
+                        },
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.person_add, size: 16, color: Colors.teal),
+                        label: const Text('Nuevo Cliente', style: TextStyle(fontSize: 12, color: Colors.teal, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _modalNuevoClienteRapido();
+                        },
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 14),
+                  Expanded(
+                    child: resultados.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.search_off, size: 36, color: Colors.grey),
+                                const SizedBox(height: 8),
+                                Text(
+                                  query.isEmpty ? 'No hay clientes registrados.' : 'Sin resultados para "$query"',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: resultados.length,
+                            separatorBuilder: (context, index) => const Divider(height: 8),
+                            itemBuilder: (context, i) {
+                              final c = resultados[i];
+                              final bool esActual = (_clienteSeleccionado?['id'] == c['id']);
+                              final bool esCandidato = (candidatoSeleccionado?['id'] == c['id']);
+                              final double desc = (c['descuento_porcentaje'] ?? 5.0).toDouble();
+                              final String? tel = c['telefono'];
+                              final String? fechaNac = c['fecha_nacimiento'];
+
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: esCandidato
+                                      ? Colors.teal.shade50
+                                      : (esActual ? Colors.green.shade50 : Colors.white),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: esCandidato
+                                        ? Colors.teal
+                                        : (esActual ? Colors.green : Colors.grey.shade300),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  dense: true,
+                                  leading: CircleAvatar(
+                                    backgroundColor: Colors.teal.shade100,
+                                    child: Text(
+                                      '${c['nombre']?[0] ?? 'C'}${c['apellido']?[0] ?? ''}'.toUpperCase(),
+                                      style: TextStyle(color: Colors.teal.shade900, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  title: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${c['nombre']} ${c['apellido']}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade100,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '$desc% Desc',
+                                          style: TextStyle(fontSize: 10, color: Colors.green.shade900, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 2,
+                                    children: [
+                                      if (tel != null)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.phone, size: 11, color: Colors.teal),
+                                            const SizedBox(width: 3),
+                                            Text(tel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                          ],
+                                        ),
+                                      if (fechaNac != null)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.cake, size: 11, color: Colors.purple),
+                                            const SizedBox(width: 3),
+                                            Text('Nac: $fechaNac', style: const TextStyle(fontSize: 11)),
+                                          ],
+                                        )
+                                      else
+                                        const Text('Sin fecha nac.', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    ],
+                                  ),
+                                  trailing: FilledButton.tonal(
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    onPressed: () {
+                                      setModalState(() {
+                                        candidatoSeleccionado = c;
+                                      });
+                                    },
+                                    child: const Text('Verificar', style: TextStyle(fontSize: 11)),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+
+                  // Panel de Confirmación con Fecha de Nacimiento
+                  if (candidatoSeleccionado != null) ...[
+                    const Divider(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.amber.shade400),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.verified_user, color: Colors.amber.shade900, size: 18),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Confirmar: ${candidatoSeleccionado!["nombre"]} ${candidatoSeleccionado!["apellido"]}',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 16),
+                                onPressed: () => setModalState(() => candidatoSeleccionado = null),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            candidatoSeleccionado!['fecha_nacimiento'] != null
+                                ? '🎂 Fecha de nacimiento para confirmar: ${candidatoSeleccionado!["fecha_nacimiento"]}  •  📞 ${candidatoSeleccionado!["telefono"] ?? "Sin tel"}'
+                                : '📞 Teléfono para confirmar: ${candidatoSeleccionado!["telefono"] ?? "No registrado"}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Spacer(),
+                              TextButton(
+                                onPressed: () => setModalState(() => candidatoSeleccionado = null),
+                                child: const Text('Cancelar'),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+                                icon: const Icon(Icons.check_circle, size: 16),
+                                label: const Text('Confirmar y Asignar Cliente', style: TextStyle(fontSize: 12)),
+                                onPressed: () {
+                                  Navigator.of(ctx).pop();
+                                  setState(() {
+                                    _clienteSeleccionado = candidatoSeleccionado;
+                                    _compradorController.text =
+                                        '${candidatoSeleccionado!["nombre"]} ${candidatoSeleccionado!["apellido"]}';
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Cliente "${candidatoSeleccionado!["nombre"]} ${candidatoSeleccionado!["apellido"]}" confirmado y asignado.',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cerrar')),
+            ],
+          );
+        },
       ),
     );
   }
@@ -900,7 +1221,7 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Selector de Cliente y Fidelización
+                  // Sub-Agente 3: Barra Buscadora y Confirmación de Clientes por Teléfono / Fecha de Nacimiento
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -911,54 +1232,124 @@ class _PosScreenState extends State<PosScreen> {
                           Text('Cliente / Lealtad:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      TextButton.icon(
-                        icon: const Icon(Icons.person_add, size: 14),
-                        label: const Text('Nuevo', style: TextStyle(fontSize: 11)),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          minimumSize: const Size(50, 24),
-                        ),
-                        onPressed: _modalNuevoClienteRapido,
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            icon: const Icon(Icons.search, size: 14),
+                            label: const Text('Buscar (Tel)', style: TextStyle(fontSize: 11)),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              minimumSize: const Size(40, 24),
+                            ),
+                            onPressed: _abrirBuscadorYConfirmacionCliente,
+                          ),
+                          const SizedBox(width: 4),
+                          TextButton.icon(
+                            icon: const Icon(Icons.person_add, size: 14),
+                            label: const Text('Nuevo', style: TextStyle(fontSize: 11)),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              minimumSize: const Size(40, 24),
+                            ),
+                            onPressed: _modalNuevoClienteRapido,
+                          ),
+                        ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  DropdownButtonFormField<int?>(
-                    value: _clienteSeleccionado?['id'],
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('👤 Público General (Sin Descuento)', style: TextStyle(fontSize: 12)),
+                  if (_clienteSeleccionado == null)
+                    InkWell(
+                      onTap: _abrirBuscadorYConfirmacionCliente,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const CircleAvatar(
+                              radius: 12,
+                              backgroundColor: Colors.blueGrey,
+                              child: Icon(Icons.person_outline, size: 14, color: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('👤 Público General', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  Text('Toca para buscar por teléfono o nombre...', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.search, size: 18, color: Colors.teal),
+                              tooltip: 'Buscar cliente por teléfono o nombre',
+                              onPressed: _abrirBuscadorYConfirmacionCliente,
+                            ),
+                          ],
+                        ),
                       ),
-                      ..._clientes.map((c) {
-                        return DropdownMenuItem<int?>(
-                          value: c['id'] as int,
-                          child: Text(
-                            '⭐️ ${c['nombre']} ${c['apellido']} (${c['descuento_porcentaje']}% Desc)',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.teal.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.teal.shade700,
+                            child: const Icon(Icons.person, size: 15, color: Colors.white),
                           ),
-                        );
-                      }),
-                    ],
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == null) {
-                          _clienteSeleccionado = null;
-                          _compradorController.text = 'Público General';
-                        } else {
-                          _clienteSeleccionado = _clientes.firstWhere((c) => c['id'] == val, orElse: () => null);
-                          if (_clienteSeleccionado != null) {
-                            _compradorController.text = '${_clienteSeleccionado!["nombre"]} ${_clienteSeleccionado!["apellido"]}';
-                          }
-                        }
-                      });
-                    },
-                  ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '⭐️ ${_clienteSeleccionado!["nombre"]} ${_clienteSeleccionado!["apellido"]}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Wrap(
+                                  spacing: 6,
+                                  children: [
+                                    if (_clienteSeleccionado!['telefono'] != null)
+                                      Text('📞 ${_clienteSeleccionado!["telefono"]}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                                    if (_clienteSeleccionado!['fecha_nacimiento'] != null)
+                                      Text('🎂 ${_clienteSeleccionado!["fecha_nacimiento"]}', style: const TextStyle(fontSize: 10, color: Colors.purple)),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.teal),
+                            tooltip: 'Cambiar cliente',
+                            onPressed: _abrirBuscadorYConfirmacionCliente,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                            tooltip: 'Quitar cliente (Público General)',
+                            onPressed: () {
+                              setState(() {
+                                _clienteSeleccionado = null;
+                                _compradorController.text = 'Público General';
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   if (_clienteSeleccionado != null) ...[
                     const SizedBox(height: 6),
                     Container(

@@ -6,6 +6,33 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.3.0] - 2026-10-28 (Dosis y Dispositivos, IA Terapéutica Estricta, Búsqueda Telefónica POS y Apellidos Paterno/Materno)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Dosis y Concentración Rápida + Catálogo de Dispositivos Médicos y Misceláneos (`inventario_screen.dart`, `seed.py`, `catalogo_medicamentos.py`):**
+  - Apartado destacado *"Dosis / Concentración del Lote"* en el diálogo de registro con chips de acceso rápido (`100mg`, `250mg`, `500mg`, `1g`, `250ml`, `500ml`, `1UI`, `100UI`, `1 kit`, `1 pza`).
+  - Incorporación al inventario de **7 dispositivos médicos y material de curación** (Termómetro Infrarrojo, Oxímetro de Pulso, Baumanómetro Digital, Glucómetro Accu-Chek, Jeringas 5ml BD, Gasas Estériles y Vendas Elásticas).
+  - Incorporación al inventario de **7 productos misceláneos y bebidas** (Electrolit Fresa, Suerox Mora Azul, Agua Purificada Ciel 1L, Agua Mineral Peñafiel, Coca-Cola 600ml, Sprite y Manzana Lift).
+  - Asignación de formas farmacéuticas como *Dispositivo Médico*, *Material de Curación*, *Solución Rehidratante* y *Refresco / Bebida*.
+- **Sub-Agente 2: Consulta IA con Validación Terapéutica Estricta, Aviso de Compra y Deslinde (`ia.py`, `test_api.py`):**
+  - **Alineación farmacológica estricta:** Bloqueo absoluto de cruces erróneos entre familias clínicas (la IA nunca sugiere analgésicos para sustituir antibióticos ni viceversa; solo bioequivalentes directos o de la misma indicación terapéutica).
+  - **Aviso de solicitud de compra:** Si un fármaco o su clase terapéutica no tiene stock físico en farmacia, notifica explícitamente al usuario que puede tramitarse una solicitud de compra o pedido urgente a proveedor/almacén.
+  - **Deslinde orientativo obligatorio:** Mensaje de deslinde clínico que aclara que la respuesta es asistencial y no reemplaza la búsqueda, diagnóstico ni validación de un humano calificado (médico o farmacéutico).
+- **Sub-Agente 3: Barra Buscadora de Clientes en Cobro (POS) y Confirmación de Identidad (`pos_screen.dart`):**
+  - Barra de búsqueda interactiva en mostrador con filtrado instantáneo por **número telefónico**, nombre completo o apellidos.
+  - Modal *"Búsqueda y Confirmación de Cliente"* con panel de verificación por **Fecha de Nacimiento** (`🎂 DD/MM/AAAA`) para corroborar la identidad del comprador y evitar seleccionar homónimos o clientes incorrectos.
+  - Acciones rápidas para asignar a *Público General* o invocar el alta rápida de clientes con 1 clic.
+- **Sub-Agente 4: Corrección de Visualización del Género ante Escalas de Fuente (`clientes_screen.dart`, `pos_screen.dart`):**
+  - Resolución del error de renderizado y desbordamiento (`RenderFlex overflowed`) al aumentar la fuente al 115% o 130%.
+  - El selector de Sexo/Género (`DropdownButtonFormField`) ahora cuenta con `isExpanded: true` y control de texto (`TextOverflow.ellipsis`).
+  - Separación del género y la fecha de nacimiento en bloques independientes y reemplazo de filas rígidas por contenedores `Wrap` adaptables en las tarjetas de cliente.
+- **Sub-Agente 5: Desglose Obligatorio/Opcional en Apellido Paterno y Materno (`models.py`, `database.py`, `schemas.py`, `clientes.py`, `clientes_screen.dart`, `pos_screen.dart`):**
+  - Desacoplamiento de apellidos en `apellido_paterno` y `apellido_materno`.
+  - Flexibilidad legal: el primer apellido (paterno o principal) es obligatorio, mientras que el materno es opcional para amparar personas con un solo apellido o de origen extranjero.
+  - Sincronización transparente con el campo consolidado `apellido` para mantener compatibilidad total con ventas y tickets previos.
+
+---
+
 ## [1.2.0] - 2026-10-28 (Inteligencia Clínica, Alertas FEFO, Gráficos Anuales y Robustez de UI)
 
 ### 🚀 Añadido

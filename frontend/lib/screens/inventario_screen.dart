@@ -430,6 +430,10 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
       'Aerosol / Inhalador',
       'Parches Transdérmicos',
       'Polvo para Solución',
+      'Dispositivo Médico',
+      'Material de Curación',
+      'Solución Rehidratante',
+      'Refresco / Bebida',
     ];
 
     showDialog(
@@ -517,14 +521,43 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(
-                          controller: dosificacionController,
-                          decoration: const InputDecoration(
-                            labelText: 'Dosificación por Presentación *',
-                            hintText: 'ej: 500 mg, 10 mg/5ml',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.scale),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              controller: dosificacionController,
+                              decoration: const InputDecoration(
+                                labelText: 'Dosis / Concentración *',
+                                hintText: 'ej: 100mg, 250ml, 1UI, etc.',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.scale),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: [
+                                '100mg', '250mg', '500mg', '1g', '250ml', '500ml', '1UI', '100UI', '1 kit', '1 pza'
+                              ].map((u) {
+                                return InkWell(
+                                  onTap: () => setDialogState(() => dosificacionController.text = u),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.teal.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.teal.shade200),
+                                    ),
+                                    child: Text(
+                                      u,
+                                      style: TextStyle(fontSize: 10, color: Colors.teal.shade900, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                         ),
                       ),
                     ],
