@@ -1,0 +1,241 @@
+import sys
+from fastapi.testclient import TestClient
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_endpoints():
+    print("========================================")
+    print("INICIANDO PRUEBAS DE ENDPOINTS FASTAPI")
+    print("========================================")
+
+    # 1. Test Autenticación y Roles
+    print("\n[TEST] 1. Probando Autenticación y Roles...")
+    res_login = client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+    assert res_login.status_code == 200, f"Error en login: {res_login.text}"
+    auth_data = res_login.json()
+    print(f"[OK] Login exitoso: Usuario '{auth_data['usuario']['username']}', Rol: '{auth_data['usuario']['rol']}'")
+
+    res_roles = client.get("/api/auth/roles")
+    assert res_roles.status_code == 200
+    print(f"[OK] Roles disponibles verificados: {[r['id'] for r in res_roles.json()]}")
+
+    # 2. Test Turnos y Cortes de Caja
+    print("\n[TEST] 2. Probando Turnos y Cortes de Caja...")
+    res_turno = client.get("/api/caja/turno-activo")
+    assert res_turno.status_code == 200
+    turno = res_turno.json()
+    if not turno:
+        # Abrir uno
+        res_abrir = client.post("/api/caja/abrir", json={
+            "cajero_nombre": "Juan Daniel Morales",
+            "monto_apertura": 1000.0,
+            "notas": "Apertura desde test automatizado",
+        })
+        assert res_abrir.status_code == 201
+        turno = res_abrir.json()
+        print(f"[OK] Nuevo turno de caja abierto: ID {turno['id']}, Fondo Inicial: ${turno['monto_apertura']}")
+    else:
+        print(f"[OK] Turno de caja activo detectado: ID {turno['id']}, Cajero: {turno['cajero_nombre']}")
+
+    # 3. Test Médicos
+    print("\n[TEST] 3. Probando Médicos...")
+    res_medicos = client.get("/api/medicos/")
+    assert res_medicos.status_code == 200
+    medicos = res_medicos.json()
+    assert len(medicos) > 0
+    print(f"[OK] Médicos encontrados: {len(medicos)}")
+    medico_id = medicos[0]["id"]
+
+    # 4. Test Inventario y Stock
+    print("\n[TEST] 4. Probando Inventario de Productos y Lotes...")
+    res_inv = client.get("/api/inventario/productos")
+    assert res_inv.status_code == 200
+    productos = res_inv.json()
+    print(f"[OK] Productos en inventario: {len(productos)}")
+
+    paracetamol = next((p for p in productos if "Paracetamol" in p["nombre_comercial"]), None)
+    assert paracetamol is not None
+
+    # 5. Test Venta con Método de Pago y Arqueo
+    print("\n[TEST] 5. Realizando Venta en Efectivo (2 piezas de Paracetamol con pago de $100)...")
+    venta_payload = {
+        "comprador_nombre": "Carlos Slim",
+        "medico_id": None,
+        "descuento": 0.0,
+        "metodo_pago": "EFECTIVO",
+        "monto_recibido": 100.0,
+        "turno_id": turno["id"],
+        "cajero_nombre": turno["cajero_nombre"],
+        "items": [
+            {
+                "producto_id": paracetamol["id"],
+                "cantidad": 2,
+            }
+        ],
+    }
+    res_venta = client.post("/api/ventas/", json=venta_payload)
+    assert res_venta.status_code == 201, f"Fallo venta: {res_venta.text}"
+    ticket = res_venta.json()
+    print(f"[OK] Venta registrada con éxito: Folio {ticket['folio_ticket']}, Total: ${ticket['total']}, Cambio: ${ticket['cambio']}")
+
+    # 6. Test Resumen de Caja en Vivo
+    print("\n[TEST] 6. Verificando Arqueo en Vivo de Caja...")
+    res_resumen = client.get("/api/caja/resumen")
+    assert res_resumen.status_code == 200
+    resumen = res_resumen.json()
+    print(f"[OK] Resumen de Turno: Ventas Efectivo: ${resumen['turno']['ventas_efectivo']}, Efectivo Esperado en Caja: ${resumen['efectivo_esperado_en_caja']}")
+
+    # 7. Test Devolución (1 pza en Buen Estado)
+    print("\n[TEST] 7. Probando Devolución Sanitaria...")
+    primer_detalle = ticket["detalles"][0]
+    primer_despacho = primer_detalle["despachos_lotes"][0]
+
+    devolucion_payload = {
+        "venta_id": ticket["id"],
+        "motivo": "Empaque con ligero maltrato exterior, paciente solicita cambio",
+        "metodo_reembolso": "EFECTIVO",
+        "cajero_nombre": turno["cajero_nombre"],
+        "items": [
+            {
+                "producto_id": primer_detalle["producto_id"],
+                "lote_id": primer_despacho["lote_id"],
+                "cantidad": 1,
+                "estado_producto": "BUEN_ESTADO",
+            }
+        ],
+    }
+    res_dev = client.post("/api/devoluciones/", json=devolucion_payload)
+    assert res_dev.status_code == 201, f"Error en devolución: {res_dev.text}"
+    dev_out = res_dev.json()
+    print(f"[OK] Devolución procesada con Folio: {dev_out['folio_devolucion']}, Reembolsado: ${dev_out['total_reembolsado']}")
+
+    # 8. Test Kardex
+    res_kardex = client.get("/api/inventario/kardex")
+    assert res_kardex.status_code == 200
+    print(f"[OK] Kardex verificado con {len(res_kardex.json())} movimientos auditados.")
+
+    # 9. Test Catálogo CIE-10 (Búsqueda e Importación Dinámica)
+    print("\n[TEST] 9. Probando Catálogo Oficial CIE-10 y Registro Dinámico...")
+    res_cie = client.get("/api/enfermedades/catalogo-cie/buscar?q=asma")
+    assert res_cie.status_code == 200, f"Error en búsqueda CIE: {res_cie.text}"
+    cie_items = res_cie.json()
+    assert len(cie_items) > 0, "No se encontraron diagnósticos CIE para 'asma'"
+    print(f"[OK] Búsqueda CIE exitosa: {len(cie_items)} diagnósticos devueltos (ej: {cie_items[0]['codigo_cie']} - {cie_items[0]['descripcion']})")
+
+    # Importar diagnóstico con 1 clic
+    item_a_importar = cie_items[0]
+    res_import = client.post("/api/enfermedades/catalogo-cie/importar", json={
+        "codigo_cie": item_a_importar["codigo_cie"],
+        "descripcion": item_a_importar["descripcion"],
+        "categoria": item_a_importar["categoria"],
+        "comentarios_especiales": item_a_importar["comentarios_especiales"],
+        "activo": True
+    })
+    assert res_import.status_code in [200, 201], f"Error al importar CIE: {res_import.text}"
+    print(f"[OK] Diagnóstico {item_a_importar['codigo_cie']} importado a base de datos de farmacia.")
+
+    # 10. Test Sub-Agente 1: Base de Datos de Clientes e Historial Clínico CIE
+    print("\n[TEST] 10. Probando Sub-Agente 1: Clientes e Historial Clínico CIE...")
+    cliente_payload = {
+        "nombre": "Laura",
+        "apellido": "Gómez Valdés",
+        "correo_electronico": "laura.gomez@test.com",
+        "telefono": "555-443-2211",
+        "direccion": "Calle Sol 102",
+        "descuento_porcentaje": 8.0,
+        "notas_clinicas": "Control trimestral de presión arterial.",
+        "enfermedades_ids": [],
+    }
+    res_cli = client.post("/api/clientes/", json=cliente_payload)
+    assert res_cli.status_code == 201, f"Error al crear cliente: {res_cli.text}"
+    cliente_creado = res_cli.json()
+    cli_id = cliente_creado["id"]
+    print(f"[OK] Cliente registrado: {cliente_creado['nombre']} {cliente_creado['apellido']} (ID: {cli_id}) con {cliente_creado['descuento_porcentaje']}% de descuento.")
+
+    # 11. Test Sub-Agente 2: Venta vinculando Cliente y Descuento Automático
+    print("\n[TEST] 11. Probando Sub-Agente 2: Venta vinculando Cliente y Descuento...")
+    venta_cli_payload = {
+        "cliente_id": cli_id,
+        "descuento": 0.0,  # Backend debe calcular automáticamente el 8% de Laura
+        "metodo_pago": "EFECTIVO",
+        "monto_recibido": 500.0,
+        "turno_id": turno["id"],
+        "cajero_nombre": turno["cajero_nombre"],
+        "items": [
+            {
+                "producto_id": primer_detalle["producto_id"],
+                "cantidad": 1,
+            }
+        ],
+    }
+    res_vcli = client.post("/api/ventas/", json=venta_cli_payload)
+    assert res_vcli.status_code == 201, f"Error en venta con cliente: {res_vcli.text}"
+    vcli_out = res_vcli.json()
+    assert vcli_out["descuento"] > 0, "No se aplicó el descuento automático del cliente"
+    assert vcli_out["comprador_nombre"] == "Laura Gómez Valdés"
+    print(f"[OK] Venta con cliente #{vcli_out['folio_ticket']}: Subtotal ${vcli_out['subtotal']}, Descuento Cliente ${vcli_out['descuento']}, Total ${vcli_out['total']}")
+
+    # 12. Test Sub-Agente 3: Ajuste de Piezas y Baja de Lote con Restricción de Roles
+    print("\n[TEST] 12. Probando Sub-Agente 3: Gestión de Inventario con Restricción de Roles...")
+    lotes_res = client.get("/api/inventario/lotes")
+    assert lotes_res.status_code == 200 and len(lotes_res.json()) > 0
+    target_lote = lotes_res.json()[0]
+    target_lote_id = target_lote["id"]
+
+    # 12.1 Intentar ajustar como CAJERO -> Debe responder 403 Forbidden
+    res_cajero_blocked = client.post(f"/api/inventario/lotes/{target_lote_id}/ajuste", json={
+        "nuevo_stock": 50,
+        "motivo": "Intento no autorizado",
+        "usuario": "Cajero Juan",
+        "rol_usuario": "CAJERO",
+    })
+    assert res_cajero_blocked.status_code == 403, "Cajero no debió poder ajustar inventario"
+    print("[OK] Restricción de rol verificada: Cajero bloqueado con 403 Forbidden.")
+
+    # 12.2 Ajustar como ADMINISTRADOR -> Permitido
+    stock_original = target_lote["stock_actual"]
+    res_admin_ajuste = client.post(f"/api/inventario/lotes/{target_lote_id}/ajuste", json={
+        "nuevo_stock": stock_original + 5,
+        "motivo": "Reconteo físico de piezas en anaquel",
+        "usuario": "Admin Farmacia",
+        "rol_usuario": "ADMINISTRADOR",
+    })
+    assert res_admin_ajuste.status_code == 200, f"Error en ajuste de admin: {res_admin_ajuste.text}"
+    print(f"[OK] Ajuste de piezas exitoso por Administrador. Nuevo stock: {res_admin_ajuste.json()['stock_actual']}")
+
+    # 13. Test Sub-Agente 4: Configuración y Edición de Usuarios
+    print("\n[TEST] 13. Probando Sub-Agente 4: Edición de Usuarios en Configuración...")
+    res_users = client.get("/api/auth/usuarios")
+    assert res_users.status_code == 200
+    user_test = res_users.json()[0]
+    res_update_user = client.put(f"/api/auth/usuarios/{user_test['id']}", json={
+        "nombre_completo": f"{user_test['nombre_completo']} (Actualizado)",
+    })
+    assert res_update_user.status_code == 200
+    print(f"[OK] Usuario #{user_test['id']} actualizado correctamente en configuración.")
+
+    # 14. Test Sub-Agente 5: Comentarios y Detección de Irregularidades en Kardex
+    print("\n[TEST] 14. Probando Sub-Agente 5: Comentarios de Auditoría en Kardex...")
+    movs = client.get("/api/inventario/kardex").json()
+    primer_mov = movs[0]
+    res_obs = client.post(f"/api/inventario/kardex/{primer_mov['id']}/observaciones", json={
+        "observaciones": "Movimiento auditado y validado en revisión nocturna.",
+        "es_irregular": True,
+        "usuario_auditor": "Lic. Alejandro Mendoza",
+    })
+    assert res_obs.status_code == 200, f"Error al comentar kardex: {res_obs.text}"
+    mov_auditado = res_obs.json()
+    assert mov_auditado["es_irregular"] is True
+    assert mov_auditado["observaciones_auditoria"] is not None
+    print(f"[OK] Movimiento #{primer_mov['id']} del Kardex marcado con observación y bandera de anomalía.")
+
+    print("\n========================================")
+    print("TODAS LAS 14 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
+    print("========================================")
+
+
+if __name__ == "__main__":
+    test_endpoints()
+

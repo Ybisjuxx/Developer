@@ -1,0 +1,131 @@
+.dynamic-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: transparent;
+  perspective: 1000px; /* Perspectiva global 3D */
+}
+
+.element-position {
+  position: absolute;
+  pointer-events: none;
+}
+
+.pos-1 { top: 60%; left: 20%; }
+.pos-2 { top: 20%; left: 10%; }
+.pos-3 { top: 15%; right: 25%; }
+.pos-4 { bottom: 25%; right: 15%; }
+.pos-5 { bottom: 15%; left: 30%; }
+
+.parallax-wrapper, .float-wrapper {
+  pointer-events: none;
+  transition: transform 0.2s ease-out;
+}
+
+@keyframes floatUp {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-30px); }
+}
+
+@keyframes floatDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(40px); }
+}
+
+.float-up { animation: floatUp 8s ease-in-out infinite; }
+.float-down { animation: floatDown 9s ease-in-out infinite; }
+
+/* 3D Spin Wrappers */
+.spin-3d { animation: spin3dAnim 12s linear infinite; transform-style: preserve-3d; }
+.spin-3d-alt { animation: spin3dAnimAlt 15s linear infinite; transform-style: preserve-3d; }
+.spin-3d-slow { animation: spin3dAnim 22s linear infinite; transform-style: preserve-3d; }
+
+@keyframes spin3dAnim {
+  0% { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+
+@keyframes spin3dAnimAlt {
+  0% { transform: rotateX(0deg) rotateY(360deg); }
+  100% { transform: rotateX(360deg) rotateY(0deg); }
+}
+
+/* Formas y Efecto de Hover */
+.shape {
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.35; /* Un poco más de opacidad para ver el volumen */
+  transition: opacity 0.3s ease, transform 0.3s transform-style;
+  transform-style: preserve-3d;
+}
+
+.shape:hover {
+  opacity: 0.6;
+}
+
+.bump-3d {
+  animation: flipAndBounce 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  opacity: 0.8 !important;
+}
+
+@keyframes flipAndBounce {
+  0% { transform: scale(1) translateZ(0) rotateY(0deg) rotateX(0deg); }
+  50% { transform: scale(1.6) translateZ(150px) rotateY(180deg) rotateX(45deg) translateX(40px); }
+  100% { transform: scale(1) translateZ(0) rotateY(360deg) rotateX(0deg); }
+}
+
+/* Cápsula Tridimensional */
+.capsule {
+  width: 40px;
+  height: 100px;
+  border-radius: 30px;
+  background: linear-gradient(135deg, var(--color-primary-light) 50%, var(--color-accent) 50%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    inset -5px -5px 15px rgba(0,0,0,0.4), 
+    inset 5px 5px 15px rgba(255,255,255,0.7),
+    2px 5px 15px rgba(0,0,0,0.3);
+}
+
+.capsule::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0,0,0,0.2);
+  box-shadow: 0 1px 1px rgba(255,255,255,0.4);
+}
+
+.capsule.alt {
+  background: linear-gradient(135deg, var(--color-accent-light) 50%, var(--color-primary) 50%);
+}
+
+/* Píldora Tridimensional (Esfera) */
+.pill {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--color-primary-light) 10%, var(--color-primary) 80%);
+  box-shadow: 
+    inset -6px -6px 12px rgba(0,0,0,0.3), 
+    inset 6px 6px 12px rgba(255,255,255,0.5),
+    3px 8px 15px rgba(0,0,0,0.2);
+}
+
+.pill.alt {
+  background: radial-gradient(circle at 35% 35%, var(--color-accent-light) 10%, var(--color-accent) 80%);
+}
+
+/* Cruz Médica Rotando */
+.cross {
+  color: var(--color-primary-light);
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));
+}

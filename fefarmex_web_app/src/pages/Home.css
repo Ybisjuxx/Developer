@@ -1,0 +1,222 @@
+.hero-section {
+  position: relative;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  background-size: cover;
+  background-position: center;
+  color: white;
+  margin-top: -85px;
+  /* Offset for navbar */
+  padding-top: 85px;
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to right, rgba(28, 49, 58, 0.9), rgba(28, 49, 58, 0.4));
+  z-index: 1;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+}
+
+.hero-subtitle {
+  color: var(--color-accent);
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.hero-title {
+  color: white;
+  font-size: 4.5rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.hero-desc {
+  font-size: 1.3rem;
+  margin-bottom: 2.5rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-lg {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+}
+
+.btn-outline-light {
+  background: transparent;
+  border: 2px solid white;
+  color: white;
+  border-radius: var(--radius-md);
+  padding: 1rem 2rem;
+  display: inline-flex;
+  font-family: var(--font-body);
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-light:hover {
+  background: white;
+  color: var(--color-primary-dark);
+}
+
+/* Logo Section */
+.logo-origin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+
+.logo-showcase {
+  padding: 4rem;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.logo-showcase img {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.1));
+  transition: transform 0.5s ease;
+}
+
+.logo-showcase:hover img {
+  transform: scale(1.05);
+}
+
+.feature-item {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: rgba(69, 90, 100, 0.1);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.feature-item h3 {
+  margin-bottom: 0.5rem;
+  font-size: 1.3rem;
+}
+
+.feature-item p {
+  color: var(--color-text-light);
+}
+
+/* History */
+.history-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 3rem;
+  text-align: center;
+}
+
+.lead-text {
+  font-size: 1.25rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.history-content p {
+  margin-bottom: 1rem;
+}
+
+/* Event Banner */
+.event-banner {
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+  max-width: 900px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 3rem;
+  align-items: center;
+  text-align: left;
+}
+
+.event-banner-image {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  /* Altura controlada si se necesita */
+}
+
+.event-banner-img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  transform: scale(1.55);
+  /* AQUÍ ESTÁ EL ZOOM (1.15 = 115%) */
+  transform-origin: center center;
+  /* Podemos cambiar esto a 'top center' si la info importante está arriba */
+  transition: transform 0.5s ease;
+  display: block;
+}
+
+.event-banner-image:hover .event-banner-img {
+  transform: scale(1.22);
+  /* Se acerca un poco más cuando pasas el mouse */
+}
+
+.event-title {
+  font-size: 3rem;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.event-subtitle {
+  font-size: 1.2rem;
+  color: var(--color-accent-light);
+  letter-spacing: 1px;
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 3rem;
+  }
+
+  .logo-origin-grid,
+  .event-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .event-banner {
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+}

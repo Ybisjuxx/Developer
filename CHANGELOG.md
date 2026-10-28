@@ -6,6 +6,34 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.1.0] - 2026-10-27 (Expansión Multisistema: Clientes CIE-10, Permisos de Lotes, Ajustes Visuales y Auditoría Kardex)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Padrón de Clientes e Historial Clínico CIE-10 (`clientes_screen.dart`, `models.py`, `routers/clientes.py`):**
+  - Modelo relacional `Cliente` y tabla asociativa `cliente_enfermedades` para vincular clientes frecuentes con sus diagnósticos del CIE-10.
+  - Campos obligatorios: `nombre`, `apellido`. Campos opcionales: `correo_electronico`, `telefono`, `direccion`, `notas_clinicas` y `descuento_porcentaje` (lealtad).
+  - Pantalla dedicada con búsqueda reactiva, visualización de expediente clínico, edición y alta de clientes.
+- **Sub-Agente 2: Integración de Clientes en Punto de Venta y Descuentos (`pos_screen.dart`, `ventas.py`):**
+  - Selector en barra lateral de cobro: alternancia fluida entre *Público General* y clientes registrados.
+  - Botón de *Registro Exprés* directo desde el mostrador para dar de alta clientes al instante sin perder la venta.
+  - Cálculo automático y transparente del porcentaje de descuento de fidelidad sobre el subtotal.
+  - Visualización de credenciales y padecimientos CIE-10 del cliente en mostrador para alertar al farmacéutico.
+  - Desglose del descuento en el ticket térmico de 80mm y almacenamiento en la base de datos fiscal.
+- **Sub-Agente 3: Ajustes de Piezas y Baja de Lotes con Restricción de Roles (`inventario_screen.dart`, `routers/inventario.py`):**
+  - Endpoints seguros `POST /api/inventario/lotes/{id}/ajuste` y `POST /api/inventario/lotes/{id}/baja` protegidos por rol.
+  - Restricción estricta: Acceso concedido solo a `ADMINISTRADOR` y `RESPONSABLE_SANITARIO`; usuarios con rol `CAJERO` reciben bloqueo preventivo y error HTTP `403 Forbidden`.
+  - Trazabilidad total en Kardex mediante asientos inmutables `ENTRADA_AJUSTE`, `SALIDA_AJUSTE` o `BAJA_LOTE` con registro de usuario y motivo.
+- **Sub-Agente 4: Panel de Configuración, Administración de Usuarios y Temas (`configuracion_screen.dart`, `theme_service.dart`, `routers/auth.py`):**
+  - Módulo completo de administración de usuarios: alta, edición de nombres, asignación de roles y actualización de contraseñas.
+  - Selector dinámico de paleta de colores institucional: *Teal Farmacéutico*, *Azul Clínico*, *Verde Médico*, *Índigo Quirúrgico* y *Cian Sanitario*.
+  - Escala de tipografía global en tiempo real: 4 niveles de ajuste (*Compacta 88%*, *Estándar 100%*, *Grande 115%*, *Alta Legibilidad 130%*) para accesibilidad en pantallas táctiles.
+- **Sub-Agente 5: Auditoría de Kardex y Detección de Irregularidades (`inventario_screen.dart`, `models.py`):**
+  - Campos de auditoría `observaciones_auditoria`, `es_irregular` y `usuario_auditor` en la bitácora del Kardex.
+  - Modal interactivo para que supervisores y usuarios añadan notas explicativas y marquen movimientos sospechosos o "fuera de lugar".
+  - Filtro dinámico en vista de Kardex: chip para aislar instantáneamente movimientos marcados como irregulares.
+
+---
+
 ## [1.0.0] - 2026-10-26 (Versión Mayor: Búsqueda POS, Catálogo Maestro 100 y API CIE-10)
 
 ### 🚀 Añadido
