@@ -22,9 +22,9 @@ def buscar_catalogo_cie(
     si el diagnóstico ya se encuentra registrado o está listo para incorporarse.
     """
     resultados_locales = buscar_en_catalogo_cie_local(q, limit=limit)
-    
-    # Si pocos resultados o búsqueda específica de código raro, complementar con API externa
-    if len(resultados_locales) < 5 and len(q.strip()) >= 3:
+
+    # Si hay muy pocos resultados locales o se busca un código/término raro, complementar con API externa
+    if len(resultados_locales) < 3 and len(q.strip()) >= 3:
         externos = consultar_api_cie_externa(q, limit=10)
         codigos_existentes = {r["codigo"].upper() for r in resultados_locales}
         for ext in externos:

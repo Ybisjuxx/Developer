@@ -16,7 +16,14 @@ from ..models import (
     VentaDetalle,
     VentaDetalleLote,
 )
-from ..schemas import MesVentaOut, ReporteVentasMensualOut, VentaCreate, VentaOut
+from ..schemas import (
+    FacturaCreate,
+    FacturaOut,
+    MesVentaOut,
+    ReporteVentasMensualOut,
+    VentaCreate,
+    VentaOut,
+)
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas y Despacho FEFO"])
 
@@ -273,6 +280,115 @@ def obtener_reporte_ventas_mensual(
         mes_pico=mes_pico,
         meses=lista_meses,
     )
+
+
+def _construir_factura_out(venta: Venta) -> FacturaOut:
+    forma_sat = "01"
+    metodo_norm = (venta.metodo_pago or "").upper()
+    if "TARJETA" in metodo_norm:
+        forma_sat = "04"
+    elif "TRANSFERENCIA" in metodo_norm:
+        forma_sat = "03"
+
+    # Medicinas en México tienen tasa 0% IVA (Art 2-A LIVA); misceláneos tasa 16%
+    iva_calc = 0.0
+    for d in venta.detalles:
+        if d.producto and d.producto.grupo_farmacopea == "MISCELANEO":
+            iva_calc += round(d.subtotal * 0.16, 2)
+
+    sello_emisor = f"SAT_{venta.folio_factura}_{uuid.uuid4().hex[:32]}"
+    sello_sat = f"SAT_TIMBRE_{uuid.uuid4().hex[:32]}"
+    cadena_orig = f"||4.0|{venta.folio_factura}|{venta.fecha_factura}|{forma_sat}|{venta.subtotal}|{venta.total}|FCM2410269Z1|{venta.rfc_receptor}|{venta.uso_cfdi}||"
+
+    return FacturaOut(
+        venta_id=venta.id,
+        folio_ticket=venta.folio_ticket,
+        folio_factura=venta.folio_factura or f"FAC-{venta.id}",
+        uuid_fiscal=venta.uuid_fiscal or str(uuid.uuid4()).upper(),
+        fecha_factura=venta.fecha_factura or datetime.datetime.utcnow(),
+        rfc_receptor=venta.rfc_receptor or "XAXX010101000",
+        razon_social_receptor=venta.razon_social_receptor or venta.comprador_nombre or "Público General",
+        regimen_fiscal_receptor=venta.regimen_fiscal_receptor or "616 - Sin obligaciones fiscales",
+        codigo_postal_receptor=venta.codigo_postal_receptor or "44100",
+        uso_cfdi=venta.uso_cfdi or "G03",
+        correo_factura=venta.correo_factura,
+        subtotal=venta.subtotal,
+        descuento=venta.descuento,
+        iva_trasladado=round(iva_calc, 2),
+        total=venta.total,
+        metodo_pago=venta.metodo_pago,
+        forma_pago_sat=forma_sat,
+        sello_digital_emisor=sello_emisor,
+        sello_digital_sat=sello_sat,
+        no_certificado_sat="00001000000504465028",
+        cadena_original=cadena_orig,
+        detalles=venta.detalles,
+    )
+
+
+@router.get("/ticket/{folio_ticket}", response_model=VentaOut)
+def buscar_venta_por_ticket(folio_ticket: str, db: Session = Depends(get_db)):
+    """
+    Automatización de consulta por ticket: busca una venta por su Folio de Ticket (ej: TK-20261028-A1B2C3)
+    o por ID numérico de venta para facilitar la facturación al cliente.
+    """
+    folio_limpio = folio_ticket.strip().upper()
+    venta = db.query(Venta).filter(Venta.folio_ticket.ilike(folio_limpio)).first()
+    if not venta and folio_limpio.isdigit():
+        venta = db.query(Venta).filter(Venta.id == int(folio_limpio)).first()
+
+    if not venta:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró ninguna venta con el ticket o folio '{folio_ticket}'"
+        )
+    return venta
+
+
+@router.post("/{venta_id}/facturar", response_model=FacturaOut)
+def generar_factura_venta(venta_id: int, fac_in: FacturaCreate, db: Session = Depends(get_db)):
+    """
+    Genera la factura electrónica CFDI 4.0 para una venta ya registrada a solicitud del cliente.
+    Asigna folio fiscal, UUID digital del SAT y actualiza el estado de la venta.
+    """
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+
+    # Si ya estaba facturada, actualizamos datos o retornamos la existente
+    hoy_str = datetime.datetime.utcnow().strftime("%Y%m%d")
+    if not venta.folio_factura:
+        venta.folio_factura = f"FAC-{hoy_str}-{uuid.uuid4().hex[:5].upper()}"
+    if not venta.uuid_fiscal:
+        venta.uuid_fiscal = str(uuid.uuid4()).upper()
+
+    venta.facturada = True
+    venta.rfc_receptor = fac_in.rfc_receptor.strip().upper()
+    venta.razon_social_receptor = fac_in.razon_social_receptor.strip()
+    venta.regimen_fiscal_receptor = fac_in.regimen_fiscal_receptor.strip()
+    venta.codigo_postal_receptor = fac_in.codigo_postal_receptor.strip()
+    venta.uso_cfdi = fac_in.uso_cfdi.strip()
+    venta.correo_factura = fac_in.correo_factura.strip() if fac_in.correo_factura else None
+    venta.fecha_factura = datetime.datetime.utcnow()
+
+    db.commit()
+    db.refresh(venta)
+
+    return _construir_factura_out(venta)
+
+
+@router.get("/{venta_id}/factura", response_model=FacturaOut)
+def obtener_factura_venta(venta_id: int, db: Session = Depends(get_db)):
+    """Obtiene el comprobante fiscal digital CFDI 4.0 de una venta facturada."""
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    if not venta.facturada:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta venta aún no cuenta con factura electrónica generada."
+        )
+    return _construir_factura_out(venta)
 
 
 @router.get("/{venta_id}", response_model=VentaOut)

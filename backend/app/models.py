@@ -72,7 +72,9 @@ class Medico(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombres = Column(String(100), nullable=False)
-    apellidos = Column(String(100), nullable=False)
+    apellidos = Column(String(100), nullable=False)  # Sincronizado para retrocompatibilidad
+    apellido_paterno = Column(String(100), nullable=True)
+    apellido_materno = Column(String(100), nullable=True)
     cedula_profesional = Column(String(30), unique=True, index=True, nullable=False)
     especialidad = Column(String(100), nullable=True)
     institucion_emisora = Column(String(150), nullable=True)
@@ -82,6 +84,13 @@ class Medico(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     ventas = relationship("Venta", back_populates="medico")
+
+    @property
+    def nombre_completo(self) -> str:
+        aps = f"{self.apellido_paterno or ''} {self.apellido_materno or ''}".strip()
+        if not aps:
+            aps = self.apellidos or ""
+        return f"{self.nombres} {aps}".strip()
 
 
 class Enfermedad(Base):
@@ -128,7 +137,9 @@ class Lote(Base):
     stock_actual = Column(Integer, nullable=False, default=0)
     laboratorio_fabricante = Column(String(100), nullable=True)
     forma_farmaceutica = Column(String(100), nullable=True)  # Tabletas, Jarabe, Cápsulas, Solución, etc.
-    dosificacion = Column(String(100), nullable=True)  # 500mg, 10mg/5ml, etc.
+    dosificacion = Column(String(100), nullable=True)  # 500mg, 10mg/5ml, Tableta | 100 | mg, etc.
+    dosis_valor = Column(String(50), nullable=True)  # Valor numérico manual (ej: 100)
+    dosis_unidad = Column(String(50), nullable=True)  # Unidad manual (ej: mg, ml, mcg, g, UI)
     fecha_ingreso = Column(Date, default=datetime.date.today, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
@@ -202,6 +213,18 @@ class Venta(Base):
     cajero_nombre = Column(String(150), default="Cajero Principal", nullable=False)
     estado = Column(String(20), default="COMPLETADA", nullable=False)  # COMPLETADA, DEVOLUCION_PARCIAL, DEVUELTA
 
+    # Facturación Electrónica (CFDI 4.0)
+    facturada = Column(Boolean, default=False, nullable=False)
+    folio_factura = Column(String(50), nullable=True, index=True)
+    rfc_receptor = Column(String(20), nullable=True)
+    razon_social_receptor = Column(String(200), nullable=True)
+    regimen_fiscal_receptor = Column(String(100), nullable=True)
+    codigo_postal_receptor = Column(String(10), nullable=True)
+    uso_cfdi = Column(String(50), nullable=True)
+    correo_factura = Column(String(150), nullable=True)
+    fecha_factura = Column(DateTime, nullable=True)
+    uuid_fiscal = Column(String(60), nullable=True)
+
     cliente = relationship("Cliente", back_populates="ventas")
     medico = relationship("Medico", back_populates="ventas")
     turno = relationship("TurnoCaja", back_populates="ventas")
@@ -223,6 +246,14 @@ class VentaDetalle(Base):
     venta = relationship("Venta", back_populates="detalles")
     producto = relationship("Producto", back_populates="detalles_venta")
     despachos_lotes = relationship("VentaDetalleLote", back_populates="venta_detalle", cascade="all, delete-orphan")
+
+    @property
+    def producto_nombre(self) -> str:
+        return self.producto.nombre_comercial if self.producto else f"Producto #{self.producto_id}"
+
+    @property
+    def sustancia_activa(self) -> str:
+        return self.producto.sustancia_activa if self.producto else ""
 
 
 class VentaDetalleLote(Base):

@@ -46,7 +46,9 @@ class LoginResponse(BaseModel):
 # ============================================================================
 class MedicoBase(BaseModel):
     nombres: str = Field(..., min_length=2, max_length=100)
-    apellidos: str = Field(..., min_length=2, max_length=100)
+    apellidos: Optional[str] = Field(None, max_length=100)
+    apellido_paterno: Optional[str] = Field(None, max_length=100)
+    apellido_materno: Optional[str] = Field(None, max_length=100)
     cedula_profesional: str = Field(..., min_length=4, max_length=30)
     especialidad: Optional[str] = Field(None, max_length=100)
     institucion_emisora: Optional[str] = Field(None, max_length=150)
@@ -62,6 +64,8 @@ class MedicoCreate(MedicoBase):
 class MedicoUpdate(BaseModel):
     nombres: Optional[str] = None
     apellidos: Optional[str] = None
+    apellido_paterno: Optional[str] = None
+    apellido_materno: Optional[str] = None
     cedula_profesional: Optional[str] = None
     especialidad: Optional[str] = None
     institucion_emisora: Optional[str] = None
@@ -162,6 +166,8 @@ class LoteBase(BaseModel):
     laboratorio_fabricante: Optional[str] = None
     forma_farmaceutica: Optional[str] = None
     dosificacion: Optional[str] = None
+    dosis_valor: Optional[str] = None
+    dosis_unidad: Optional[str] = None
     fecha_ingreso: Optional[date] = None
     activo: bool = True
 
@@ -273,6 +279,8 @@ class VentaDetalleLoteOut(BaseModel):
 class VentaDetalleOut(BaseModel):
     id: int
     producto_id: int
+    producto_nombre: Optional[str] = None
+    sustancia_activa: Optional[str] = None
     cantidad: int
     precio_unitario: float
     subtotal: float
@@ -322,8 +330,60 @@ class VentaOut(BaseModel):
     turno_id: Optional[int] = None
     cajero_nombre: str = "Cajero Principal"
     estado: str
+    facturada: bool = False
+    folio_factura: Optional[str] = None
+    rfc_receptor: Optional[str] = None
+    razon_social_receptor: Optional[str] = None
+    regimen_fiscal_receptor: Optional[str] = None
+    codigo_postal_receptor: Optional[str] = None
+    uso_cfdi: Optional[str] = None
+    correo_factura: Optional[str] = None
+    fecha_factura: Optional[datetime] = None
+    uuid_fiscal: Optional[str] = None
     detalles: List[VentaDetalleOut] = []
     devoluciones: List[DevolucionOut] = []
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# FACTURACIÓN ELECTRÓNICA (CFDI 4.0)
+# ============================================================================
+class FacturaCreate(BaseModel):
+    rfc_receptor: str = Field(..., min_length=12, max_length=13)
+    razon_social_receptor: str = Field(..., min_length=2, max_length=200)
+    regimen_fiscal_receptor: str = Field(..., min_length=3, max_length=100)
+    codigo_postal_receptor: str = Field(..., min_length=5, max_length=10)
+    uso_cfdi: str = Field(default="G03", max_length=50)
+    correo_factura: Optional[str] = Field(None, max_length=150)
+
+
+class FacturaOut(BaseModel):
+    venta_id: int
+    folio_ticket: str
+    folio_factura: str
+    uuid_fiscal: str
+    fecha_factura: datetime
+    rfc_emisor: str = "FCM-241026-9Z1"
+    razon_social_emisor: str = "FARMACONTROL MÉXICO S.A. DE C.V."
+    regimen_fiscal_emisor: str = "601 - General de Ley Personas Morales"
+    lugar_expedicion: str = "44100"
+    rfc_receptor: str
+    razon_social_receptor: str
+    regimen_fiscal_receptor: str
+    codigo_postal_receptor: str
+    uso_cfdi: str
+    correo_factura: Optional[str] = None
+    subtotal: float
+    descuento: float
+    iva_trasladado: float
+    total: float
+    metodo_pago: str
+    forma_pago_sat: str
+    sello_digital_emisor: str
+    sello_digital_sat: str
+    no_certificado_sat: str
+    cadena_original: str
+    detalles: List[VentaDetalleOut] = []
     model_config = ConfigDict(from_attributes=True)
 
 

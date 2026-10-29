@@ -2,7 +2,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./farmacia.db")
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_DB_PATH = os.path.join(BACKEND_DIR, "farmacia.db").replace("\\", "/")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
 engine = create_engine(
     DATABASE_URL,
@@ -34,6 +36,26 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN cajero_nombre VARCHAR(150) DEFAULT 'Cajero Principal'")
                 if "cliente_id" not in existing_cols:
                     conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN cliente_id INTEGER REFERENCES clientes(id)")
+                if "facturada" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN facturada BOOLEAN DEFAULT 0")
+                if "folio_factura" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN folio_factura VARCHAR(50)")
+                if "rfc_receptor" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN rfc_receptor VARCHAR(20)")
+                if "razon_social_receptor" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN razon_social_receptor VARCHAR(200)")
+                if "regimen_fiscal_receptor" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN regimen_fiscal_receptor VARCHAR(100)")
+                if "codigo_postal_receptor" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN codigo_postal_receptor VARCHAR(10)")
+                if "uso_cfdi" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN uso_cfdi VARCHAR(50)")
+                if "correo_factura" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN correo_factura VARCHAR(150)")
+                if "fecha_factura" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN fecha_factura DATETIME")
+                if "uuid_fiscal" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN uuid_fiscal VARCHAR(60)")
                 conn.commit()
 
             # 2. Columnas de auditoría e irregularidades en kardex_movimientos
@@ -62,7 +84,7 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN apellido_materno VARCHAR(100)")
                 conn.commit()
 
-            # 4. Columnas en tabla lotes (laboratorio_fabricante, forma_farmaceutica, dosificacion, fecha_ingreso)
+            # 4. Columnas en tabla lotes (laboratorio_fabricante, forma_farmaceutica, dosificacion, fecha_ingreso, dosis_valor, dosis_unidad)
             result_lotes = conn.exec_driver_sql("PRAGMA table_info(lotes)").fetchall()
             existing_lotes_cols = [r[1] for r in result_lotes]
             if existing_lotes_cols:
@@ -72,12 +94,29 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN forma_farmaceutica VARCHAR(100)")
                 if "dosificacion" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosificacion VARCHAR(100)")
+                if "dosis_valor" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_valor VARCHAR(50)")
+                if "dosis_unidad" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_unidad VARCHAR(50)")
                 if "fecha_ingreso" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
+                conn.commit()
+
+            # 5. Columnas en tabla medicos (apellido_paterno, apellido_materno)
+            result_medicos = conn.exec_driver_sql("PRAGMA table_info(medicos)").fetchall()
+            existing_medicos_cols = [r[1] for r in result_medicos]
+            if existing_medicos_cols:
+                if "apellido_paterno" not in existing_medicos_cols:
+                    conn.exec_driver_sql("ALTER TABLE medicos ADD COLUMN apellido_paterno VARCHAR(100)")
+                if "apellido_materno" not in existing_medicos_cols:
+                    conn.exec_driver_sql("ALTER TABLE medicos ADD COLUMN apellido_materno VARCHAR(100)")
                 conn.commit()
     except Exception as e:
         print(f"Aviso en ensure_sqlite_schema: {e}")
 
+
+# Ejecutar migración automática al cargar database
+ensure_sqlite_schema(engine)
 
 
 def get_db():

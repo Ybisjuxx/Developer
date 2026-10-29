@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/ticket_impresion_dialog.dart';
@@ -15,10 +16,20 @@ class _VentasScreenState extends State<VentasScreen> {
   bool _isLoading = true;
   String? _error;
 
+  // Sub-Agente 1: Automatización de búsqueda por ticket para facturación
+  final _ticketSearchController = TextEditingController();
+  bool _buscandoTicket = false;
+
   @override
   void initState() {
     super.initState();
     _cargarVentas();
+  }
+
+  @override
+  void dispose() {
+    _ticketSearchController.dispose();
+    super.dispose();
   }
 
   Future<void> _cargarVentas() async {
@@ -45,6 +56,443 @@ class _VentasScreenState extends State<VentasScreen> {
     }
   }
 
+  // Sub-Agente 1: Automatización de búsqueda y carga de ticket para facturar
+  Future<void> _buscarTicketParaFacturar(String folioTicket) async {
+    final folio = folioTicket.trim();
+    if (folio.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingrese el folio de ticket o ID de compra para facturar.')),
+      );
+      return;
+    }
+
+    setState(() => _buscandoTicket = true);
+
+    try {
+      final venta = await ApiService.buscarVentaPorTicket(folio);
+      if (mounted) {
+        setState(() => _buscandoTicket = false);
+        _ticketSearchController.clear();
+        _abrirModalFacturacion(venta);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _buscandoTicket = false);
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(Icons.search_off, color: Colors.orange, size: 40),
+            title: const Text('Ticket no encontrado'),
+            content: Text(
+              'No se encontró ninguna venta registrada con el folio o ID "$folio". Verifique el número impreso en el ticket de compra.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Aceptar')),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  // Sub-Agente 1: Modal para Generar o Consultar Factura CFDI 4.0
+  void _abrirModalFacturacion(Map<String, dynamic> venta) {
+    final bool yaFacturada = venta['facturada'] == true;
+
+    final rfcController = TextEditingController(text: venta['rfc_receptor'] ?? 'XAXX010101000');
+    final razonSocialController = TextEditingController(
+      text: venta['razon_social_receptor'] ?? venta['comprador_nombre'] ?? 'Público General',
+    );
+    final cpController = TextEditingController(text: venta['codigo_postal_receptor'] ?? '44100');
+    final correoController = TextEditingController(text: venta['correo_factura'] ?? '');
+
+    String regimenFiscal = venta['regimen_fiscal_receptor'] ?? '616 - Sin obligaciones fiscales';
+    String usoCfdi = venta['uso_cfdi'] ?? 'G03 - Gastos en general';
+
+    final List<String> opcionesRegimen = [
+      '601 - General de Ley Personas Morales',
+      '603 - Personas Morales con Fines no Lucrativos',
+      '605 - Sueldos y Salarios e Ingresos Asimilados',
+      '612 - Personas Físicas con Actividades Empresariales y Profesionales',
+      '616 - Sin obligaciones fiscales',
+      '621 - Incorporación Fiscal',
+      '625 - Actividades Empresariales con Plataformas Tecnológicas',
+      '626 - Régimen Simplificado de Confianza (RESICO)',
+    ];
+
+    final List<String> opcionesUsoCfdi = [
+      'G01 - Adquisición de mercancías',
+      'G03 - Gastos en general',
+      'D01 - Honorarios médicos, dentales y gastos hospitalarios',
+      'D02 - Gastos médicos por incapacidad o discapacidad',
+      'S01 - Sin efectos fiscales',
+      'CP01 - Pagos',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final double subtotal = (venta['subtotal'] as num? ?? 0.0).toDouble();
+          final double descuento = (venta['descuento'] as num? ?? 0.0).toDouble();
+          final double total = (venta['total'] as num? ?? 0.0).toDouble();
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.receipt_long, color: Colors.indigo.shade800),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    yaFacturada ? 'Factura Fiscal CFDI 4.0' : 'Generar Factura para Ticket',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tarjeta Resumen del Ticket
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.teal.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Folio Ticket: ${venta["folio_ticket"]}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              Text(
+                                '\$${total.toStringAsFixed(2)} MXN',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.teal.shade900),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Fecha: ${venta["fecha_venta"].toString().replaceFirst("T", " ").substring(0, 16)}  •  Método: ${venta["metodo_pago"] ?? "EFECTIVO"}',
+                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                          if (yaFacturada) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.verified, size: 16, color: Colors.indigo.shade900),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Factura: ${venta["folio_factura"]} | UUID: ${venta["uuid_fiscal"]}',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.indigo.shade900),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    if (yaFacturada) ...[
+                      // Consulta de Factura Emitida
+                      const Text('Datos Fiscales Registrados:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 8),
+                      _buildDatoFactura('RFC Receptor:', venta['rfc_receptor'] ?? 'N/A'),
+                      _buildDatoFactura('Razón Social:', venta['razon_social_receptor'] ?? 'N/A'),
+                      _buildDatoFactura('Régimen Fiscal:', venta['regimen_fiscal_receptor'] ?? 'N/A'),
+                      _buildDatoFactura('Código Postal:', venta['codigo_postal_receptor'] ?? 'N/A'),
+                      _buildDatoFactura('Uso de CFDI:', venta['uso_cfdi'] ?? 'N/A'),
+                      if (venta['correo_factura'] != null)
+                        _buildDatoFactura('Correo:', venta['correo_factura']),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('Copiar Folio Fiscal (UUID SAT)'),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: venta['uuid_fiscal'] ?? ''));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('UUID Fiscal copiado al portapapeles.')),
+                          );
+                        },
+                      ),
+                    ] else ...[
+                      // Formulario de Emisión de Factura
+                      const Text(
+                        'Ingrese los datos fiscales del cliente para timbrar la factura:',
+                        style: TextStyle(fontSize: 12, color: Colors.black87),
+                      ),
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: rfcController,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration: const InputDecoration(
+                                labelText: 'RFC del Receptor *',
+                                hintText: 'XAXX010101000',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 1,
+                            child: TextField(
+                              controller: cpController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'C.P. Fiscal *',
+                                hintText: '44100',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      TextField(
+                        controller: razonSocialController,
+                        decoration: const InputDecoration(
+                          labelText: 'Razón Social / Nombre Completo *',
+                          hintText: 'Nombre de la empresa o persona física',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      DropdownButtonFormField<String>(
+                        value: opcionesRegimen.contains(regimenFiscal) ? regimenFiscal : opcionesRegimen[0],
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Régimen Fiscal (SAT) *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: opcionesRegimen
+                            .map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setModalState(() => regimenFiscal = val);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      DropdownButtonFormField<String>(
+                        value: opcionesUsoCfdi.contains(usoCfdi) ? usoCfdi : opcionesUsoCfdi[0],
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Uso de CFDI (SAT) *',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: opcionesUsoCfdi
+                            .map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 12))))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null) setModalState(() => usoCfdi = val);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
+                      TextField(
+                        controller: correoController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Correo Electrónico (Envío de XML y PDF)',
+                          hintText: 'cliente@ejemplo.com',
+                          prefixIcon: Icon(Icons.email_outlined),
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Desglose de Facturación
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Subtotal:', style: TextStyle(fontSize: 12)),
+                                Text('\$${subtotal.toStringAsFixed(2)} MXN', style: const TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                            if (descuento > 0)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Descuento Otorgado:', style: TextStyle(fontSize: 12, color: Colors.red)),
+                                  Text('-\$${descuento.toStringAsFixed(2)} MXN', style: const TextStyle(fontSize: 12, color: Colors.red)),
+                                ],
+                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('IVA (Medicamentos Tasa 0% / Misceláneos 16%):', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                const Text('\$0.00 MXN (Tasa 0%)', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                              ],
+                            ),
+                            const Divider(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Total Facturado:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text(
+                                  '\$${total.toStringAsFixed(2)} MXN',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.teal.shade900),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cerrar'),
+              ),
+              if (!yaFacturada)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
+                  icon: const Icon(Icons.send_and_archive, size: 18),
+                  label: const Text('Emitir Factura CFDI 4.0'),
+                  onPressed: () async {
+                    final rfc = rfcController.text.trim().toUpperCase();
+                    final razon = razonSocialController.text.trim();
+                    final cp = cpController.text.trim();
+
+                    if (rfc.length < 12 || rfc.length > 13) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('El RFC debe contar con 12 (moral) o 13 (física) caracteres.')),
+                      );
+                      return;
+                    }
+
+                    if (razon.isEmpty || cp.length < 5) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Razón social y Código Postal válidos son obligatorios.')),
+                      );
+                      return;
+                    }
+
+                    Navigator.of(ctx).pop();
+                    await _procesarFacturaApi(
+                      ventaId: venta['id'],
+                      rfc: rfc,
+                      razonSocial: razon,
+                      regimenFiscal: regimenFiscal,
+                      codigoPostal: cp,
+                      usoCfdi: usoCfdi,
+                      correo: correoController.text.trim().isEmpty ? null : correoController.text.trim(),
+                    );
+                  },
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDatoFactura(String etiqueta, String valor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(etiqueta, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black54)),
+          ),
+          Expanded(
+            child: Text(valor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _procesarFacturaApi({
+    required int ventaId,
+    required String rfc,
+    required String razonSocial,
+    required String regimenFiscal,
+    required String codigoPostal,
+    required String usoCfdi,
+    String? correo,
+  }) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final resFactura = await ApiService.generarFacturaVenta(ventaId, {
+        'rfc_receptor': rfc,
+        'razon_social_receptor': razonSocial,
+        'regimen_fiscal_receptor': regimenFiscal,
+        'codigo_postal_receptor': codigoPostal,
+        'uso_cfdi': usoCfdi,
+        'correo_factura': correo,
+      });
+
+      if (mounted) {
+        await _cargarVentas();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('¡Factura ${resFactura["folio_factura"]} emitida exitosamente! UUID: ${resFactura["uuid_fiscal"]}'),
+            backgroundColor: Colors.indigo.shade900,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al emitir factura: $e'), backgroundColor: Colors.red.shade800),
+        );
+      }
+    }
+  }
+
   void _abrirModalDevolucion(Map<String, dynamic> venta) {
     final detalles = venta['detalles'] as List<dynamic>? ?? [];
     if (detalles.isEmpty) {
@@ -61,7 +509,7 @@ class _VentasScreenState extends State<VentasScreen> {
 
     final cantController = TextEditingController(text: '1');
     final motivoController = TextEditingController(text: 'Producto con empaque maltratado');
-    String estadoProducto = 'BUEN_ESTADO'; // BUEN_ESTADO o DANADO
+    String estadoProducto = 'BUEN_ESTADO';
 
     showDialog(
       context: context,
@@ -101,9 +549,10 @@ class _VentasScreenState extends State<VentasScreen> {
                         isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Artículo a Devolver', isDense: true),
                         items: detalles.map((d) {
+                          final nombre = d['producto_nombre'] ?? 'Prod #${d["producto_id"]}';
                           return DropdownMenuItem(
                             value: d,
-                            child: Text('Prod #${d["producto_id"]} (${d["cantidad"]} pzas vendidas)'),
+                            child: Text('$nombre (${d["cantidad"]} pzas vendidas)'),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -304,11 +753,12 @@ class _VentasScreenState extends State<VentasScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Encabezado
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Historial de Ventas y Tickets',
+                  'Historial de Ventas, Tickets y Facturación',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 IconButton(
@@ -319,6 +769,72 @@ class _VentasScreenState extends State<VentasScreen> {
               ],
             ),
             const SizedBox(height: 12),
+
+            // Sub-Agente 1: Apartado de Automatización de Facturación por Folio de Ticket
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.indigo.shade200),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.indigo.shade100,
+                    child: Icon(Icons.receipt_long, color: Colors.indigo.shade900),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Módulo de Facturación Electrónica (CFDI 4.0)',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        Text(
+                          'Automatización: Si el cliente solicita su factura, ingrese su folio de ticket (ej: TK-20261028-A1B2C3) para emitirla al instante.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 280,
+                    child: TextField(
+                      controller: _ticketSearchController,
+                      decoration: InputDecoration(
+                        hintText: 'Folio de ticket (ej: TK-...)...',
+                        prefixIcon: const Icon(Icons.qr_code_scanner, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        isDense: true,
+                        suffixIcon: _buscandoTicket
+                            ? const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                              )
+                            : null,
+                      ),
+                      onSubmitted: (val) => _buscarTicketParaFacturar(val),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
+                    onPressed: _buscandoTicket ? null : () => _buscarTicketParaFacturar(_ticketSearchController.text),
+                    icon: const Icon(Icons.request_quote_outlined, size: 18),
+                    label: const Text('Facturar'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Lista de Ventas
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -332,14 +848,18 @@ class _VentasScreenState extends State<VentasScreen> {
                                 final v = _ventas[index];
                                 final List<dynamic> detalles = v['detalles'] ?? [];
                                 final String estado = v['estado'] ?? 'COMPLETADA';
+                                final bool estaFacturada = v['facturada'] == true;
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 12),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   child: ExpansionTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: Colors.teal.shade50,
-                                      child: const Icon(Icons.receipt, color: Colors.teal),
+                                      backgroundColor: estaFacturada ? Colors.indigo.shade50 : Colors.teal.shade50,
+                                      child: Icon(
+                                        estaFacturada ? Icons.verified : Icons.receipt,
+                                        color: estaFacturada ? Colors.indigo.shade800 : Colors.teal,
+                                      ),
                                     ),
                                     title: Row(
                                       children: [
@@ -364,6 +884,25 @@ class _VentasScreenState extends State<VentasScreen> {
                                             ),
                                           ),
                                         ),
+                                        if (estaFacturada) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.indigo.shade100,
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: Colors.indigo.shade400),
+                                            ),
+                                            child: Text(
+                                              'FACTURADA: ${v["folio_factura"] ?? "CFDI"}',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.indigo.shade900,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                     subtitle: Text(
@@ -393,6 +932,20 @@ class _VentasScreenState extends State<VentasScreen> {
                                                   onPressed: () => TicketImpresionDialog.mostrar(context, v),
                                                 ),
                                                 const SizedBox(width: 8),
+                                                // Sub-Agente 1: Botón Facturar o Ver Factura
+                                                FilledButton.tonalIcon(
+                                                  icon: Icon(estaFacturada ? Icons.description : Icons.request_quote_outlined, size: 16),
+                                                  label: Text(
+                                                    estaFacturada ? 'Ver Factura CFDI' : 'Facturar Ticket',
+                                                    style: const TextStyle(fontSize: 12),
+                                                  ),
+                                                  style: FilledButton.styleFrom(
+                                                    backgroundColor: estaFacturada ? Colors.indigo.shade100 : null,
+                                                    foregroundColor: estaFacturada ? Colors.indigo.shade900 : null,
+                                                  ),
+                                                  onPressed: () => _abrirModalFacturacion(v),
+                                                ),
+                                                const SizedBox(width: 8),
                                                 if (estado != 'DEVUELTA')
                                                   FilledButton.tonalIcon(
                                                     icon: const Icon(Icons.replay, size: 16),
@@ -403,12 +956,13 @@ class _VentasScreenState extends State<VentasScreen> {
                                             ),
                                             const Divider(),
                                             const Text(
-                                              'Detalle de artículos y lotes asignados (FEFO):',
+                                              'Detalle de artículos despachados:',
                                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                             ),
                                             const SizedBox(height: 8),
                                             ...detalles.map((d) {
                                               final List<dynamic> lotesDespachados = d['despachos_lotes'] ?? [];
+                                              final String nombreProd = d['producto_nombre'] ?? 'Prod ID #${d["producto_id"]}';
                                               return Container(
                                                 margin: const EdgeInsets.only(bottom: 8),
                                                 padding: const EdgeInsets.all(8),
@@ -421,7 +975,7 @@ class _VentasScreenState extends State<VentasScreen> {
                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      'Producto ID: ${d["producto_id"]}  •  Cantidad: ${d["cantidad"]} pzas  •  Subtotal: \$${d["subtotal"]}',
+                                                      '$nombreProd [ID: #${d["producto_id"]}]  •  Cantidad: ${d["cantidad"]} pzas  •  Subtotal: \$${d["subtotal"]}',
                                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                                     ),
                                                     const SizedBox(height: 4),
@@ -430,7 +984,7 @@ class _VentasScreenState extends State<VentasScreen> {
                                                       children: lotesDespachados.map((ld) {
                                                         return Chip(
                                                           label: Text(
-                                                            'Lote ID ${ld["lote_id"]}: ${ld["cantidad_despachada"]} pzas',
+                                                            'Lote #${ld["lote_id"]}: ${ld["cantidad_despachada"]} pzas',
                                                             style: const TextStyle(fontSize: 11),
                                                           ),
                                                           backgroundColor: Colors.teal.shade50,

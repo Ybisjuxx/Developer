@@ -37,15 +37,12 @@ class TicketImpresionDialog extends StatelessWidget {
     final detalles = ticket['detalles'] as List<dynamic>? ?? [];
     for (var d in detalles) {
       final pId = d['producto_id'];
+      final pNombre = d['producto_nombre'] ?? d['nombre_comercial'] ?? 'Producto #$pId';
       final cant = d['cantidad'];
       final sub = d['subtotal'];
-      final itemHeader = '${cant.toString().padRight(5)} Prod #$pId'.padRight(31);
-      sb.writeln('$itemHeader\$$sub');
-
-      final despachos = d['despachos_lotes'] as List<dynamic>? ?? [];
-      for (var l in despachos) {
-        sb.writeln('      Lote #${l["lote_id"]} (${l["cantidad_despachada"]} pzas FEFO)');
-      }
+      final lineaArticulo = '${cant.toString().padRight(4)} [ID: #$pId] $pNombre';
+      sb.writeln(lineaArticulo);
+      sb.writeln('     Importe: \$$sub MXN');
     }
 
     sb.writeln('----------------------------------------');
@@ -171,10 +168,11 @@ class TicketImpresionDialog extends StatelessWidget {
               const SizedBox(height: 6),
 
               ...detalles.map((d) {
-                final int cant = d['cantidad'];
-                final double pUnit = (d['precio_unitario'] as num).toDouble();
-                final double sub = (d['subtotal'] as num).toDouble();
-                final despachos = d['despachos_lotes'] as List<dynamic>? ?? [];
+                final int cant = d['cantidad'] ?? 1;
+                final int pId = d['producto_id'] ?? 0;
+                final String pNombre = d['producto_nombre'] ?? d['nombre_comercial'] ?? 'Producto #$pId';
+                final double pUnit = (d['precio_unitario'] as num? ?? 0.0).toDouble();
+                final double sub = (d['subtotal'] as num? ?? 0.0).toDouble();
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6.0),
@@ -184,9 +182,9 @@ class TicketImpresionDialog extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            flex: 2,
+                            flex: 3,
                             child: Text(
-                              '$cant x Prod ID #${d["producto_id"]}',
+                              '$cant x $pNombre [ID: #$pId]',
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                             ),
                           ),
@@ -200,14 +198,6 @@ class TicketImpresionDialog extends StatelessWidget {
                           ),
                         ],
                       ),
-                      // Trazabilidad FEFO
-                      ...despachos.map((desp) => Padding(
-                        padding: const EdgeInsets.only(left: 8.0, top: 2),
-                        child: Text(
-                          '↳ Lote #${desp["lote_id"]} - Despachadas: ${desp["cantidad_despachada"]} pzas',
-                          style: TextStyle(fontSize: 10, color: Colors.teal.shade800, fontStyle: FontStyle.italic),
-                        ),
-                      )),
                     ],
                   ),
                 );

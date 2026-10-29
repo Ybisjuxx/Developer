@@ -6,6 +6,39 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.0] - 2026-10-28 (Facturación CFDI Ventas, Catálogo CIE-10 Ampliado, Gestión y Apellidos de Médicos, ID en Tickets y Dosis Separada)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Facturación Electrónica CFDI 4.0 y Automatización por Búsqueda de Ticket (`ventas_screen.dart`, `ventas.py`, `schemas.py`, `models.py`, `database.py`, `api_service.dart`):**
+  - Módulo y apartado dedicado de **Facturación Electrónica** en el panel de Ventas con banner interactivo de automatización para que el cliente o cajero busque la venta por Folio de Ticket (`TK-...` o ID numérico).
+  - Modal integral de emisión de factura con validación de campos fiscales del SAT (RFC, Razón Social, Régimen Fiscal, Código Postal, Uso de CFDI y Correo Electrónico).
+  - Emisión de CFDI 4.0 con generación de UUID Fiscal simétrico (36 caracteres), folio `FAC-YYYYMMDD-XXXXX` y almacenamiento persistente en base de datos.
+  - Visor interactivo de comprobante fiscal digital con opción de visualización de datos timbrados, desglose de IVA y badges de estado `FACTURADA` en el historial de ventas.
+  - Endpoints implementados: `GET /api/ventas/ticket/{folio_ticket}`, `POST /api/ventas/{venta_id}/facturar` y `GET /api/ventas/{venta_id}/factura`.
+- **Sub-Agente 2: Catálogo Epidemiológico CIE-10 Enriquecido y Motor de Búsqueda Normalizado (`catalogo_cie.py`, `enfermedades.py`, `test_api.py`):**
+  - Catálogo nativo ampliado con más de **200 diagnósticos clínicos y epidemiológicos** representativos del sistema de salud mexicano, cubriendo los 22 capítulos de la Clasificación Internacional de Enfermedades (CIE-10).
+  - Algoritmo de búsqueda inteligente insensible a mayúsculas y acentos (`á`, `é`, `í`, `ó`, `ú`, `ñ`), con tokenización multitérmino ponderada por concordancia de código y descripción clínica.
+  - Diccionario de mapeo bilingüe (Español a Inglés) para integración resiliente con la API NIH ICD-10 externa, ejecutándose con fallback inmediato sin bloqueos de red.
+  - Soporte de búsqueda por términos populares y síntomas comunes (ej: "resfriado" -> `J00`, "dolor de cabeza" -> `R51`, "gripe" -> `J11`).
+- **Sub-Agente 3: Desglose de Apellidos Paterno y Materno en Registro de Médicos (`medico.dart`, `registrar_medico_screen.dart`, `models.py`, `schemas.py`, `medicos.py`, `database.py`):**
+  - Desacoplamiento de apellidos en `apellido_paterno` y `apellido_materno` en el formulario y entidad de Médicos.
+  - Flexibilidad para médicos con un solo apellido y compatibilidad con apellidos compuestos (ej: *de la Cruz*, *del Moral*, *Montes de Oca*).
+  - Propiedad de lectura calculada `nombre_completo` y sincronización bidireccional no destructiva con el campo histórico `apellidos` para preservar la compatibilidad con recetas existentes.
+- **Sub-Agente 4: Módulo de Gestión Completa de Médicos: Edición y Borrado / Desactivación (`medicos_screen.dart`, `registrar_medico_screen.dart`, `medicos.py`, `api_service.dart`):**
+  - Acción de **Edición de Médicos** directamente desde la tarjeta del médico en el catálogo, precargando todos sus datos en el formulario para actualización inmediata.
+  - Acción de **Borrado de Médicos** con modal de confirmación inteligente: si el médico tiene recetas o ventas vinculadas, se ejecuta una baja lógica / desactivación (`vigente = False`) protegiendo la integridad referencial; si no tiene registros vinculados, permite la eliminación definitiva.
+  - Endpoints actualizados: `PUT /api/medicos/{medico_id}` y `DELETE /api/medicos/{medico_id}`.
+- **Sub-Agente 5: Ticket de Compra al Cliente con Nombre de Producto e ID de Inventario y Remoción de Lote Interno (`ticket_impresion_dialog.dart`, `models.py`, `schemas.py`, `ventas.py`):**
+  - En el ticket de compra entregado al cliente, se despliega de forma destacada el **Nombre del Producto** y su **ID de Inventario** (ej: `[ID: #1] Paracetamol 500mg`).
+  - **Eliminación del número de lote en el comprobante del cliente:** Los lotes se mantienen como información de control interno exclusiva de la farmacia para devoluciones, mermas y auditoría de Kardex, evitando confusión en el comprador final.
+  - Campos calculados `@property producto_nombre` y `@property sustancia_activa` expuestos en `VentaDetalleOut`.
+- **Sub-Agente 6: Dosis Separada de Dosificación, Eliminación de Botones de Concentración y Autocompletado por Código de Barras Previo (`inventario_screen.dart`, `inventario.py`, `models.py`, `schemas.py`, `api_service.dart`):**
+  - **Estructuración canónica de dosis:** Separación de la forma farmacéutica y la dosis en campos independientes (`forma_farmaceutica`, `dosis_valor`, `dosis_unidad`), consolidándose bajo el formato canónico estricto: `Forma | Dosis | Unidad` (ej: `Tableta | 100 | mg`).
+  - **Eliminación de botones de concentración:** Se retiraron los botones de chips predeterminados, habilitando la captura manual y precisa de la magnitud y su unidad (mg, ml, mcg, g, UI, pza).
+  - **Restricción estricta de autocompletado de producto:** El nombre del medicamento o producto se ingresa manualmente por defecto; el autocompletado inteligente se activa **únicamente** si el código de barras escaneado ya se encuentra registrado previamente en la base de datos de la farmacia mediante el nuevo endpoint `GET /api/inventario/productos/buscar-codigo/{codigo_barras}`.
+
+---
+
 ## [1.3.0] - 2026-10-28 (Dosis y Dispositivos, IA Terapéutica Estricta, Búsqueda Telefónica POS y Apellidos Paterno/Materno)
 
 ### 🚀 Añadido

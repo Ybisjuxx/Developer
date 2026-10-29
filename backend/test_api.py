@@ -348,8 +348,148 @@ def test_endpoints():
     grupos_presentes = set(p["grupo_farmacopea"] for p in prods_all)
     print(f"[OK] Grupos de catálogo presentes: {grupos_presentes}")
 
+    # 23. Test Sub-Agente 1: Facturación Electrónica y Automatización de Búsqueda por Ticket
+    print("\n[TEST] 23. Probando Sub-Agente 1: Facturación Electrónica (CFDI 4.0) y Búsqueda por Ticket...")
+    # Obtener una venta existente
+    ventas_existentes = client.get("/api/ventas/").json()
+    assert len(ventas_existentes) > 0, "Debe haber al menos una venta para probar facturación"
+    venta_a_facturar = ventas_existentes[0]
+
+    # Búsqueda automatizada por Folio de Ticket
+    res_buscar_ticket = client.get(f"/api/ventas/ticket/{venta_a_facturar['folio_ticket']}")
+    assert res_buscar_ticket.status_code == 200, f"Error buscando ticket: {res_buscar_ticket.text}"
+    ticket_hallado = res_buscar_ticket.json()
+    assert ticket_hallado["id"] == venta_a_facturar["id"]
+    print(f"[OK] Ticket encontrado automáticamente por folio: {ticket_hallado['folio_ticket']} (Total: ${ticket_hallado['total']} MXN)")
+
+    # Facturación CFDI 4.0
+    res_factura = client.post(f"/api/ventas/{venta_a_facturar['id']}/facturar", json={
+        "rfc_receptor": "FME010101XYZ",
+        "razon_social_receptor": "FARMACIAS DE MÉXICO S.A.",
+        "regimen_fiscal_receptor": "601 - General de Ley Personas Morales",
+        "codigo_postal_receptor": "44100",
+        "uso_cfdi": "G03 - Gastos en general",
+        "correo_factura": "facturacion@farmaciasmexico.com",
+    })
+    assert res_factura.status_code == 200, f"Error al generar factura: {res_factura.text}"
+    factura_data = res_factura.json()
+    assert factura_data["folio_factura"].startswith("FAC-")
+    assert len(factura_data["uuid_fiscal"]) >= 32
+    assert factura_data["rfc_receptor"] == "FME010101XYZ"
+    print(f"[OK] Factura CFDI 4.0 emitida: Folio {factura_data['folio_factura']}, UUID Fiscal: {factura_data['uuid_fiscal']}")
+
+    # Consulta de factura generada
+    res_get_fac = client.get(f"/api/ventas/{venta_a_facturar['id']}/factura")
+    assert res_get_fac.status_code == 200
+    assert res_get_fac.json()["uuid_fiscal"] == factura_data["uuid_fiscal"]
+    print(f"[OK] Consulta de factura generada validada exitosamente.")
+
+    # 24. Test Sub-Agente 2: Catálogo CIE-10 Enriquecido y Búsqueda Normalizada Inteligente
+    print("\n[TEST] 24. Probando Sub-Agente 2: Consulta Ampliada CIE-10 (Búsqueda sin acentos y multitérmino)...")
+    res_cie_hipert = client.get("/api/enfermedades/catalogo-cie/buscar?q=hipertension%20arterial")
+    assert res_cie_hipert.status_code == 200, f"Error en búsqueda CIE: {res_cie_hipert.text}"
+    cie_resultados = res_cie_hipert.json()
+    assert len(cie_resultados) > 0, "Debe encontrar resultados para 'hipertension arterial'"
+    assert any("I10" in r["codigo_cie"] for r in cie_resultados)
+    print(f"[OK] Búsqueda CIE inteligente exitosa: 'hipertension arterial' retornó {len(cie_resultados)} diagnósticos (Top: {cie_resultados[0]['codigo_cie']} - {cie_resultados[0]['descripcion']})")
+
+    res_cie_resp = client.get("/api/enfermedades/catalogo-cie/buscar?q=resfriado")
+    assert res_cie_resp.status_code == 200
+    assert any("J00" in r["codigo_cie"] for r in res_cie_resp.json())
+    print(f"[OK] Búsqueda CIE por síntoma común: 'resfriado' localizó J00 (Rinofaringitis aguda).")
+
+    # 25. Test Sub-Agente 3: Médico con Apellidos Desglosados (Paterno y Materno)
+    print("\n[TEST] 25. Probando Sub-Agente 3: Alta de Médico con Apellidos Paterno y Materno...")
+    cedula_medico_test = f"CED-{datetime.datetime.now().strftime('%H%M%S')}"
+    res_medico_ap = client.post("/api/medicos/", json={
+        "nombres": "Manuel",
+        "apellido_paterno": "de la Cruz",
+        "apellido_materno": "Montes",
+        "cedula_profesional": cedula_medico_test,
+        "especialidad": "Medicina Interna",
+        "institucion_emisora": "Universidad de Guadalajara",
+        "telefono": "3312345678",
+        "correo": "dr.manuel.delacruz@hospital.org",
+        "vigente": True,
+    })
+    assert res_medico_ap.status_code == 201, f"Error al crear médico: {res_medico_ap.text}"
+    medico_creado = res_medico_ap.json()
+    assert medico_creado["apellido_paterno"] == "de la Cruz"
+    assert medico_creado["apellido_materno"] == "Montes"
+    assert "de la Cruz Montes" in medico_creado["apellidos"]
+    medico_nuevo_id = medico_creado["id"]
+    print(f"[OK] Médico registrado con apellidos separados: Dr. {medico_creado['nombres']} {medico_creado['apellido_paterno']} {medico_creado['apellido_materno']} (Cédula: {medico_creado['cedula_profesional']})")
+
+    # 26. Test Sub-Agente 4: Edición y Borrado / Desactivación de Médicos
+    print("\n[TEST] 26. Probando Sub-Agente 4: Edición y Borrado de Médicos...")
+    # Actualizar médico
+    res_edit_med = client.put(f"/api/medicos/{medico_nuevo_id}", json={
+        "especialidad": "Cardiología Clínica",
+        "telefono": "3399887766",
+    })
+    assert res_edit_med.status_code == 200, f"Error al editar médico: {res_edit_med.text}"
+    med_editado = res_edit_med.json()
+    assert med_editado["especialidad"] == "Cardiología Clínica"
+    assert med_editado["telefono"] == "3399887766"
+    print(f"[OK] Médico #{medico_nuevo_id} editado exitosamente: Especialidad '{med_editado['especialidad']}'")
+
+    # Borrado permanente o desactivación
+    res_del_med = client.delete(f"/api/medicos/{medico_nuevo_id}?permanente=true")
+    assert res_del_med.status_code == 200, f"Error al eliminar médico: {res_del_med.text}"
+    del_data = res_del_med.json()
+    assert del_data["eliminado_permanente"] is True
+    print(f"[OK] Médico #{medico_nuevo_id} eliminado exitosamente ({del_data['mensaje']})")
+
+    # 27. Test Sub-Agente 5: Nombre del Producto e ID de Inventario en Detalles de Venta
+    print("\n[TEST] 27. Probando Sub-Agente 5: Nombre de Producto e ID de Inventario en Detalles de Venta...")
+    res_vta_det = client.get(f"/api/ventas/{venta_a_facturar['id']}")
+    assert res_vta_det.status_code == 200
+    vta_obj = res_vta_det.json()
+    assert len(vta_obj["detalles"]) > 0
+    primer_det = vta_obj["detalles"][0]
+    assert primer_det["producto_id"] is not None
+    assert primer_det["producto_nombre"] is not None and len(primer_det["producto_nombre"]) > 0
+    print(f"[OK] Detalle de venta validado: Prod ID #{primer_det['producto_id']} - Nombre: '{primer_det['producto_nombre']}' (Sin exposición de lote en compra al cliente)")
+
+    # 28. Test Sub-Agente 6: Dosis Separada de Dosificación y Verificación de Código de Barras
+    print("\n[TEST] 28. Probando Sub-Agente 6: Dosis Separada y Verificación de Código de Barras...")
+    # Búsqueda de código existente
+    codigo_existente = paracetamol["codigo_barras"]
+    res_busq_cod = client.get(f"/api/inventario/productos/buscar-codigo/{codigo_existente}")
+    assert res_busq_cod.status_code == 200, f"Error buscando código existente: {res_busq_cod.text}"
+    prod_autocompletado = res_busq_cod.json()
+    assert prod_autocompletado["nombre_comercial"] == paracetamol["nombre_comercial"]
+    print(f"[OK] Código de barras '{codigo_existente}' verificado para autocompletado: {prod_autocompletado['nombre_comercial']}")
+
+    # Búsqueda de código no existente
+    res_busq_inexistente = client.get("/api/inventario/productos/buscar-codigo/999999999999")
+    assert res_busq_inexistente.status_code == 404
+    print("[OK] Código no registrado responde 404 (requiere captura manual sin autocompletado forzado).")
+
+    # Registro de lote con dosis separada de dosificación: Tableta | 100 | mg
+    lote_dosis_num = f"DOSIS-{datetime.datetime.now().strftime('%H%M%S')}"
+    res_lote_dosis = client.post("/api/inventario/lotes", json={
+        "producto_id": paracetamol["id"],
+        "numero_lote": lote_dosis_num,
+        "fecha_caducidad": "2028-06-30",
+        "stock_actual": 50,
+        "costo_unitario": 18.5,
+        "laboratorio_fabricante": "Laboratorios Liomont",
+        "forma_farmaceutica": "Tableta",
+        "dosis_valor": "100",
+        "dosis_unidad": "mg",
+        "fecha_ingreso": "2026-10-28",
+    })
+    assert res_lote_dosis.status_code == 201, f"Error registrando lote con dosis separada: {res_lote_dosis.text}"
+    lote_dosis_data = res_lote_dosis.json()
+    assert lote_dosis_data["dosis_valor"] == "100"
+    assert lote_dosis_data["dosis_unidad"] == "mg"
+    assert lote_dosis_data["forma_farmaceutica"] == "Tableta"
+    assert "Tableta | 100 | mg" in lote_dosis_data["dosificacion"]
+    print(f"[OK] Lote registrado con dosis separada de la dosificación: {lote_dosis_data['dosificacion']}")
+
     print("\n========================================")
-    print("TODAS LAS 22 PRUEBAS DE BACKEND PASARON EXITOSAMENTE")
+    print("TODAS LAS 28 PRUEBAS DE BACKEND PASARON EXITOSAMENTE (100%)")
     print("========================================")
 
 

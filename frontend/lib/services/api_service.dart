@@ -209,6 +209,39 @@ class ApiService {
     }
   }
 
+  static Future<Medico> updateMedico(int id, Medico medico) async {
+    final uri = Uri.parse('$baseUrl/api/medicos/$id');
+    final response = await http.put(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(medico.toJson()),
+    ).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      return Medico.fromJson(data);
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      final detail = errorData['detail'] ?? 'Error al actualizar médico';
+      throw Exception(detail);
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteMedico(int id, {bool permanente = false}) async {
+    final uri = Uri.parse('$baseUrl/api/medicos/$id?permanente=$permanente');
+    final response = await http.delete(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 || response.statusCode == 204) {
+      if (response.body.isNotEmpty) {
+        return jsonDecode(utf8.decode(response.bodyBytes));
+      }
+      return {'mensaje': 'Médico eliminado/desactivado correctamente'};
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Error al eliminar médico');
+    }
+  }
+
   // =========================================================================
   // INVENTARIO / PRODUCTOS / LOTES / KARDEX
   // =========================================================================
@@ -294,6 +327,60 @@ class ApiService {
     } else {
       final errorData = jsonDecode(utf8.decode(response.bodyBytes));
       throw Exception(errorData['detail'] ?? 'Error al procesar la venta');
+    }
+  }
+
+  static Future<Map<String, dynamic>> buscarVentaPorTicket(String folioTicket) async {
+    final uri = Uri.parse('$baseUrl/api/ventas/ticket/${Uri.encodeComponent(folioTicket.trim())}');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Ticket no encontrado');
+    }
+  }
+
+  static Future<Map<String, dynamic>> generarFacturaVenta(int ventaId, Map<String, dynamic> datosFiscales) async {
+    final uri = Uri.parse('$baseUrl/api/ventas/$ventaId/facturar');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(datosFiscales),
+    ).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Error al emitir factura electrónica');
+    }
+  }
+
+  static Future<Map<String, dynamic>> obtenerFacturaVenta(int ventaId) async {
+    final uri = Uri.parse('$baseUrl/api/ventas/$ventaId/factura');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Error al consultar factura');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> buscarProductoPorCodigo(String codigoBarras) async {
+    final uri = Uri.parse('$baseUrl/api/inventario/productos/buscar-codigo/${Uri.encodeComponent(codigoBarras.trim())}');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else if (response.statusCode == 404) {
+      return null;
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Error al verificar código de barras');
     }
   }
 

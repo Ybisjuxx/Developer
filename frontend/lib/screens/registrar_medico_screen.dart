@@ -3,7 +3,9 @@ import '../models/medico.dart';
 import '../services/api_service.dart';
 
 class RegistrarMedicoScreen extends StatefulWidget {
-  const RegistrarMedicoScreen({super.key});
+  final Medico? medicoAEditar;
+
+  const RegistrarMedicoScreen({super.key, this.medicoAEditar});
 
   @override
   State<RegistrarMedicoScreen> createState() => _RegistrarMedicoScreenState();
@@ -13,7 +15,8 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nombresController = TextEditingController();
-  final _apellidosController = TextEditingController();
+  final _apellidoPaternoController = TextEditingController();
+  final _apellidoMaternoController = TextEditingController();
   final _cedulaController = TextEditingController();
   final _especialidadController = TextEditingController();
   final _institucionController = TextEditingController();
@@ -23,10 +26,30 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
   bool _vigente = true;
   bool _isLoading = false;
 
+  bool get _esEdicion => widget.medicoAEditar != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_esEdicion) {
+      final m = widget.medicoAEditar!;
+      _nombresController.text = m.nombres;
+      _apellidoPaternoController.text = m.apellidoPaterno ?? m.apellidos;
+      _apellidoMaternoController.text = m.apellidoMaterno ?? '';
+      _cedulaController.text = m.cedulaProfesional;
+      _especialidadController.text = m.especialidad ?? '';
+      _institucionController.text = m.institucionEmisora ?? '';
+      _telefonoController.text = m.telefono ?? '';
+      _correoController.text = m.correo ?? '';
+      _vigente = m.vigente;
+    }
+  }
+
   @override
   void dispose() {
     _nombresController.dispose();
-    _apellidosController.dispose();
+    _apellidoPaternoController.dispose();
+    _apellidoMaternoController.dispose();
     _cedulaController.dispose();
     _especialidadController.dispose();
     _institucionController.dispose();
@@ -40,9 +63,16 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
 
     setState(() => _isLoading = true);
 
+    final pat = _apellidoPaternoController.text.trim();
+    final mat = _apellidoMaternoController.text.trim();
+    final consolidado = ('$pat $mat').trim();
+
     final medico = Medico(
+      id: widget.medicoAEditar?.id,
       nombres: _nombresController.text.trim(),
-      apellidos: _apellidosController.text.trim(),
+      apellidoPaterno: pat.isNotEmpty ? pat : null,
+      apellidoMaterno: mat.isNotEmpty ? mat : null,
+      apellidos: consolidado,
       cedulaProfesional: _cedulaController.text.trim(),
       especialidad: _especialidadController.text.trim().isEmpty ? null : _especialidadController.text.trim(),
       institucionEmisora: _institucionController.text.trim().isEmpty ? null : _institucionController.text.trim(),
@@ -52,14 +82,25 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
     );
 
     try {
-      final nuevo = await ApiService.createMedico(medico);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Médico "${nuevo.nombreCompleto}" registrado con éxito'),
-          backgroundColor: Colors.teal.shade700,
-        ),
-      );
+      if (_esEdicion) {
+        final actualizado = await ApiService.updateMedico(widget.medicoAEditar!.id!, medico);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Médico "${actualizado.nombreCompleto}" actualizado con éxito'),
+            backgroundColor: Colors.teal.shade700,
+          ),
+        );
+      } else {
+        final nuevo = await ApiService.createMedico(medico);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Médico "${nuevo.nombreCompleto}" registrado con éxito'),
+            backgroundColor: Colors.teal.shade700,
+          ),
+        );
+      }
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -67,7 +108,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           icon: const Icon(Icons.error_outline, color: Colors.red, size: 40),
-          title: const Text('Error de Registro'),
+          title: Text(_esEdicion ? 'Error al Actualizar' : 'Error de Registro'),
           content: Text(e.toString().replaceAll('Exception: ', '')),
           actions: [
             TextButton(
@@ -88,13 +129,13 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registrar Médico'),
+        title: Text(_esEdicion ? 'Editar Médico' : 'Registrar Médico'),
         backgroundColor: Colors.teal.shade800,
         foregroundColor: Colors.white,
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
+          constraints: const BoxConstraints(maxWidth: 720),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Card(
@@ -109,10 +150,16 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.badge_outlined, color: theme.colorScheme.primary, size: 30),
+                          Icon(
+                            _esEdicion ? Icons.edit_note : Icons.badge_outlined,
+                            color: theme.colorScheme.primary,
+                            size: 30,
+                          ),
                           const SizedBox(width: 12),
                           Text(
-                            'Alta Sanitaria de Profesional Médico',
+                            _esEdicion
+                                ? 'Edición de Datos de Profesional Médico'
+                                : 'Alta Sanitaria de Profesional Médico',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -126,35 +173,51 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                       ),
                       const Divider(height: 32),
 
-                      // Nombres y Apellidos
+                      // Nombre(s)
+                      TextFormField(
+                        controller: _nombresController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nombre(s) *',
+                          hintText: 'ej: Manuel, María Elena',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (val) => (val == null || val.trim().isEmpty)
+                            ? 'Ingrese el nombre o nombres'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Sub-Agente 3: Separación en Apellido Paterno y Materno
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: TextFormField(
-                              controller: _nombresController,
+                              controller: _apellidoPaternoController,
                               decoration: const InputDecoration(
-                                labelText: 'Nombre(s) *',
-                                prefixIcon: Icon(Icons.person_outline),
+                                labelText: 'Apellido Paterno *',
+                                hintText: 'ej: de la Cruz, del Toro',
+                                helperText: 'Primer apellido o principal',
+                                prefixIcon: Icon(Icons.badge),
                                 border: OutlineInputBorder(),
                               ),
                               validator: (val) => (val == null || val.trim().isEmpty)
-                                  ? 'Ingrese el nombre'
+                                  ? 'Ingrese el apellido paterno'
                                   : null,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: TextFormField(
-                              controller: _apellidosController,
+                              controller: _apellidoMaternoController,
                               decoration: const InputDecoration(
-                                labelText: 'Apellidos *',
-                                prefixIcon: Icon(Icons.person),
+                                labelText: 'Apellido Materno',
+                                hintText: 'ej: Montes, Sánchez',
+                                helperText: 'Opcional (extranjeros o 1 apellido)',
+                                prefixIcon: Icon(Icons.person_outline),
                                 border: OutlineInputBorder(),
                               ),
-                              validator: (val) => (val == null || val.trim().isEmpty)
-                                  ? 'Ingrese los apellidos'
-                                  : null,
                             ),
                           ),
                         ],
@@ -189,9 +252,9 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                             child: TextFormField(
                               controller: _especialidadController,
                               decoration: const InputDecoration(
-                                labelText: 'Especialidad',
+                                labelText: 'Especialidad Médica',
                                 prefixIcon: Icon(Icons.medical_services_outlined),
-                                hintText: 'Ej. Medicina General, Pediatría',
+                                hintText: 'Ej. Medicina General, Cardiología',
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -201,7 +264,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                             child: TextFormField(
                               controller: _institucionController,
                               decoration: const InputDecoration(
-                                labelText: 'Institución Titulación',
+                                labelText: 'Institución de Egreso / DGP',
                                 prefixIcon: Icon(Icons.school_outlined),
                                 hintText: 'Ej. UNAM, IPN, UdeG',
                                 border: OutlineInputBorder(),
@@ -247,7 +310,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                         value: _vigente,
                         onChanged: (val) => setState(() => _vigente = val),
                         title: const Text('Cédula Vigente y Activa'),
-                        subtitle: const Text('Habilita al médico para autorizar surtido de recetas'),
+                        subtitle: const Text('Habilita al médico para autorizar surtido de recetas en POS'),
                         secondary: Icon(
                           _vigente ? Icons.check_circle_outline : Icons.cancel_outlined,
                           color: _vigente ? Colors.teal : Colors.grey,
@@ -276,8 +339,10 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                                     height: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                   )
-                                : const Icon(Icons.save_outlined),
-                            label: Text(_isLoading ? 'Guardando...' : 'Registrar Médico'),
+                                : Icon(_esEdicion ? Icons.save : Icons.save_outlined),
+                            label: Text(_isLoading
+                                ? 'Guardando...'
+                                : (_esEdicion ? 'Actualizar Médico' : 'Registrar Médico')),
                           ),
                         ],
                       ),

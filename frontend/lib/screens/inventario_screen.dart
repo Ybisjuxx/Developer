@@ -400,26 +400,40 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   }
 
   void _mostrarDialogoNuevoLote() {
-    if (_productos.isEmpty) return;
-    int productoIdSeleccionado = _productos[0]['id'];
-    final prodInicial = _productos[0];
+    // Controladores de producto
+    final codigoBarrasController = TextEditingController();
+    final nombreComercialController = TextEditingController();
+    final sustanciaActivaController = TextEditingController();
+    final laboratorioController = TextEditingController();
+    final precioVentaController = TextEditingController(text: '100.0');
+    String grupoFarmacopea = 'GRUPO_VI';
+    bool requiereReceta = false;
+
+    // Estado de autocompletado por código de barras
+    int? productoIdSeleccionado;
+    bool codigoVerificado = false;
+    bool codigoPreviamenteRegistrado = false;
+    bool verificandoCodigo = false;
+
+    // Controladores de Lote y Dosis separada
     final loteController = TextEditingController();
     final fechaCaducidadController = TextEditingController();
     final costoController = TextEditingController(text: '0.0');
     final stockController = TextEditingController(text: '10');
 
-    // Sub-Agente 2: Nuevos campos de fabricación y dosificación
-    final labController = TextEditingController(text: prodInicial['laboratorio'] ?? '');
-    String formaFarmaceutica = 'Tabletas';
-    final dosificacionController = TextEditingController(text: prodInicial['presentacion'] ?? '500 mg');
+    // Sub-Agente 6: Dosis separada de la dosificación (Forma | Cantidad | Unidad)
+    String formaFarmaceutica = 'Tableta';
+    final dosisValorController = TextEditingController(text: '100');
+    final dosisUnidadController = TextEditingController(text: 'mg');
+
     final hoy = DateTime.now();
     final fechaIngresoController = TextEditingController(
       text: "${hoy.year}-${hoy.month.toString().padLeft(2, '0')}-${hoy.day.toString().padLeft(2, '0')}",
     );
 
     final List<String> opcionesForma = [
-      'Tabletas',
-      'Cápsulas',
+      'Tableta',
+      'Cápsula',
       'Jarabe',
       'Suspensión Oral',
       'Solución Inyectable',
@@ -436,255 +450,590 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
       'Refresco / Bebida',
     ];
 
+    final List<String> unidadesComunes = ['mg', 'ml', 'g', 'mcg', 'UI', 'kit', 'pza', '%'];
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.inventory, color: Colors.teal),
-              SizedBox(width: 8),
-              Text('Registrar Nuevo Lote con Metadatos FEFO'),
-            ],
-          ),
-          content: SizedBox(
-            width: 540,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<int>(
-                    value: productoIdSeleccionado,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Medicamento / Fármaco *', border: OutlineInputBorder()),
-                    items: _productos.map((p) {
-                      return DropdownMenuItem<int>(
-                        value: p['id'] as int,
-                        child: Text('${p["nombre_comercial"]} (${p["sustancia_activa"]})'),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          productoIdSeleccionado = val;
-                          final pSel = _productos.firstWhere((x) => x['id'] == val, orElse: () => null);
-                          if (pSel != null) {
-                            labController.text = pSel['laboratorio'] ?? '';
-                            dosificacionController.text = pSel['presentacion'] ?? '';
-                          }
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: loteController,
-                          decoration: const InputDecoration(
-                            labelText: 'Número de Lote * (ej: LOT-2026-X)',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.qr_code),
-                          ),
-                        ),
+        builder: (context, setDialogState) {
+          // Función para consultar código de barras
+          Future<void> verificarCodigoBarras(String codigo) async {
+            final codLimpio = codigo.trim();
+            if (codLimpio.isEmpty) return;
+
+            setDialogState(() {
+              verificandoCodigo = true;
+            });
+
+            try {
+              // 1. Buscar en lista local de productos
+              final matchLocal = _productos.firstWhere(
+                (p) => (p['codigo_barras'] ?? '').toString().trim() == codLimpio,
+                orElse: () => null,
+              );
+
+              if (matchLocal != null) {
+                setDialogState(() {
+                  productoIdSeleccionado = matchLocal['id'];
+                  nombreComercialController.text = matchLocal['nombre_comercial'] ?? '';
+                  sustanciaActivaController.text = matchLocal['sustancia_activa'] ?? '';
+                  laboratorioController.text = matchLocal['laboratorio'] ?? '';
+                  precioVentaController.text = (matchLocal['precio_venta'] ?? 0.0).toString();
+                  grupoFarmacopea = matchLocal['grupo_farmacopea'] ?? 'GRUPO_VI';
+                  requiereReceta = matchLocal['requiere_receta'] ?? false;
+                  codigoPreviamenteRegistrado = true;
+                  codigoVerificado = true;
+                  verificandoCodigo = false;
+                });
+              } else {
+                // 2. Consultar al backend
+                final prodApi = await ApiService.buscarProductoPorCodigo(codLimpio);
+                setDialogState(() {
+                  if (prodApi != null) {
+                    productoIdSeleccionado = prodApi['id'];
+                    nombreComercialController.text = prodApi['nombre_comercial'] ?? '';
+                    sustanciaActivaController.text = prodApi['sustancia_activa'] ?? '';
+                    laboratorioController.text = prodApi['laboratorio'] ?? '';
+                    precioVentaController.text = (prodApi['precio_venta'] ?? 0.0).toString();
+                    grupoFarmacopea = prodApi['grupo_farmacopea'] ?? 'GRUPO_VI';
+                    requiereReceta = prodApi['requiere_receta'] ?? false;
+                    codigoPreviamenteRegistrado = true;
+                  } else {
+                    productoIdSeleccionado = null;
+                    codigoPreviamenteRegistrado = false;
+                  }
+                  codigoVerificado = true;
+                  verificandoCodigo = false;
+                });
+              }
+            } catch (e) {
+              setDialogState(() {
+                productoIdSeleccionado = null;
+                codigoPreviamenteRegistrado = false;
+                codigoVerificado = true;
+                verificandoCodigo = false;
+              });
+            }
+          }
+
+          final String dosisVistaPrevia =
+              '$formaFarmaceutica | ${dosisValorController.text.trim().isEmpty ? "100" : dosisValorController.text.trim()} | ${dosisUnidadController.text.trim().isEmpty ? "mg" : dosisUnidadController.text.trim()}';
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                Icon(Icons.inventory, color: Colors.teal.shade800),
+                const SizedBox(width: 8),
+                const Text('Alta de Producto y Lote FEFO', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SizedBox(
+              width: 580,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Sub-Agente 6: Verificación de Código de Barras previo para Autocompletado
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade50.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.teal.shade200),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: labController,
-                          decoration: const InputDecoration(
-                            labelText: 'Laboratorio de Fabricación *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.factory),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '1. Identificación por Código de Barras:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: opcionesForma.contains(formaFarmaceutica) ? formaFarmaceutica : opcionesForma[0],
-                          decoration: const InputDecoration(
-                            labelText: 'Forma Farmacéutica *',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.medication),
-                          ),
-                          items: opcionesForma.map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 13)))).toList(),
-                          onChanged: (val) {
-                            if (val != null) setDialogState(() => formaFarmaceutica = val);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            TextField(
-                              controller: dosificacionController,
-                              decoration: const InputDecoration(
-                                labelText: 'Dosis / Concentración *',
-                                hintText: 'ej: 100mg, 250ml, 1UI, etc.',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.scale),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: codigoBarrasController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Código de Barras *',
+                                    hintText: 'Escanee o ingrese código (ej: 750100000001)',
+                                    prefixIcon: const Icon(Icons.qr_code_scanner),
+                                    border: const OutlineInputBorder(),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    isDense: true,
+                                    suffixIcon: verificandoCodigo
+                                        ? const Padding(
+                                            padding: EdgeInsets.all(10),
+                                            child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                          )
+                                        : null,
+                                  ),
+                                  onSubmitted: (val) => verificarCodigoBarras(val),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                '100mg', '250mg', '500mg', '1g', '250ml', '500ml', '1UI', '100UI', '1 kit', '1 pza'
-                              ].map((u) {
-                                return InkWell(
-                                  onTap: () => setDialogState(() => dosificacionController.text = u),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.teal.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.teal.shade200),
-                                    ),
+                              const SizedBox(width: 8),
+                              FilledButton.tonalIcon(
+                                onPressed: verificandoCodigo
+                                    ? null
+                                    : () => verificarCodigoBarras(codigoBarrasController.text),
+                                icon: const Icon(Icons.search, size: 18),
+                                label: const Text('Verificar'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          if (codigoVerificado && codigoPreviamenteRegistrado)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.green.shade400),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: Colors.green.shade800, size: 16),
+                                  const SizedBox(width: 6),
+                                  Expanded(
                                     child: Text(
-                                      u,
-                                      style: TextStyle(fontSize: 10, color: Colors.teal.shade900, fontWeight: FontWeight.bold),
+                                      '✓ Código previamente registrado. Datos autocompletados desde catálogo.',
+                                      style: TextStyle(color: Colors.green.shade900, fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
-                                );
-                              }).toList(),
+                                ],
+                              ),
+                            )
+                          else if (codigoVerificado && !codigoPreviamenteRegistrado)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.amber.shade400),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: Colors.amber.shade900, size: 16),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'ℹ Código nuevo no registrado. Capture el nombre y datos del fármaco manualmente.',
+                                      style: TextStyle(color: Colors.amber.shade900, fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: fechaIngresoController,
-                          decoration: InputDecoration(
-                            labelText: 'Fecha de Ingreso *',
-                            border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.input),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.calendar_today),
-                              onPressed: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now(),
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime.now().add(const Duration(days: 30)),
-                                );
-                                if (date != null) {
-                                  fechaIngresoController.text =
-                                      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-                                }
-                              },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 2. Datos del Medicamento / Producto (Captura Manual o Autocompletada)
+                    const Text(
+                      '2. Datos del Medicamento / Fármaco:',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nombreComercialController,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre del Medicamento / Fármaco / Producto *',
+                        hintText: 'ej: Paracetamol 500mg, Amoxicilina, Electrolit Fresa',
+                        prefixIcon: const Icon(Icons.medication_liquid),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                        helperText: codigoPreviamenteRegistrado
+                            ? 'Autocompletado con base en el código de barras registrado'
+                            : 'Capture manualmente el nombre del producto',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: sustanciaActivaController,
+                            decoration: const InputDecoration(
+                              labelText: 'Sustancia Activa / Fórmula *',
+                              hintText: 'ej: Paracetamol, Amoxicilina',
+                              prefixIcon: Icon(Icons.science),
+                              border: OutlineInputBorder(),
+                              isDense: true,
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: fechaCaducidadController,
-                          decoration: InputDecoration(
-                            labelText: 'Fecha de Caducidad *',
-                            border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.event_busy),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.calendar_today),
-                              onPressed: () async {
-                                final date = await showDatePicker(
-                                  context: context,
-                                  initialDate: DateTime.now().add(const Duration(days: 180)),
-                                  firstDate: DateTime.now(),
-                                  lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-                                );
-                                if (date != null) {
-                                  fechaCaducidadController.text =
-                                      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-                                }
-                              },
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: laboratorioController,
+                            decoration: const InputDecoration(
+                              labelText: 'Laboratorio Fabricante *',
+                              hintText: 'ej: Liomont, Pisa, Bayer',
+                              prefixIcon: Icon(Icons.factory),
+                              border: OutlineInputBorder(),
+                              isDense: true,
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: stockController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Cantidad / Stock *', border: OutlineInputBorder(), prefixIcon: Icon(Icons.format_list_numbered)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: precioVentaController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Precio de Venta (MXN) *',
+                              prefixIcon: Icon(Icons.attach_money),
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: costoController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(labelText: 'Costo Unitario (MXN)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: grupoFarmacopea,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Grupo Farmacopea',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: const [
+                              DropdownMenuItem(value: 'GRUPO_IV', child: Text('Grupo IV (Antibióticos)')),
+                              DropdownMenuItem(value: 'GRUPO_II', child: Text('Grupo II (Controlados)')),
+                              DropdownMenuItem(value: 'GRUPO_III', child: Text('Grupo III (Psicotrópicos)')),
+                              DropdownMenuItem(value: 'GRUPO_V', child: Text('Grupo V (Receta Médica)')),
+                              DropdownMenuItem(value: 'GRUPO_VI', child: Text('Grupo VI (Venta Libre / OTC)')),
+                              DropdownMenuItem(value: 'DISPOSITIVO_MEDICO', child: Text('Dispositivo Médico')),
+                              DropdownMenuItem(value: 'MATERIAL_CURACION', child: Text('Material Curación')),
+                              DropdownMenuItem(value: 'MISCELANEO', child: Text('Misceláneo / Bebida')),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDialogState(() {
+                                  grupoFarmacopea = val;
+                                  requiereReceta = (val == 'GRUPO_IV' || val == 'GRUPO_II' || val == 'GRUPO_III' || val == 'GRUPO_V');
+                                });
+                              }
+                            },
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Sub-Agente 6: DOSIS SEPARADA DE LA DOSIFICACIÓN (Forma | 100 | mg)
+                    // Se eliminaron por completo los botones táctiles de concentración.
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.shade50.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.indigo.shade200),
                       ),
-                    ],
-                  ),
-                ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                '3. Dosificación y Concentración Separadas:',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.shade800,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  dosisVistaPrevia,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              // Forma Farmacéutica
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<String>(
+                                  value: opcionesForma.contains(formaFarmaceutica) ? formaFarmaceutica : opcionesForma[0],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Forma Farmacéutica *',
+                                    border: OutlineInputBorder(),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    isDense: true,
+                                  ),
+                                  items: opcionesForma
+                                      .map((f) => DropdownMenuItem(value: f, child: Text(f, style: const TextStyle(fontSize: 12))))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) setDialogState(() => formaFarmaceutica = val);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Dosis / Valor Numérico Manual
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: dosisValorController,
+                                  keyboardType: TextInputType.text,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Dosis (Valor) *',
+                                    hintText: 'ej: 100, 250, 500',
+                                    border: OutlineInputBorder(),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    isDense: true,
+                                  ),
+                                  onChanged: (_) => setDialogState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Unidad de Medida Manual
+                              Expanded(
+                                flex: 2,
+                                child: Autocomplete<String>(
+                                  initialValue: TextEditingValue(text: dosisUnidadController.text),
+                                  optionsBuilder: (textVal) {
+                                    if (textVal.text.isEmpty) return unidadesComunes;
+                                    return unidadesComunes.where((u) => u.toLowerCase().contains(textVal.text.toLowerCase()));
+                                  },
+                                  onSelected: (val) {
+                                    setDialogState(() => dosisUnidadController.text = val);
+                                  },
+                                  fieldViewBuilder: (ctx, textEditingCtrl, focusNode, onFieldSubmitted) {
+                                    textEditingCtrl.addListener(() {
+                                      dosisUnidadController.text = textEditingCtrl.text;
+                                      setDialogState(() {});
+                                    });
+                                    return TextField(
+                                      controller: textEditingCtrl,
+                                      focusNode: focusNode,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Unidad *',
+                                        hintText: 'ej: mg, ml, UI',
+                                        border: OutlineInputBorder(),
+                                        filled: true,
+                                        fillColor: Colors.white,
+                                        isDense: true,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Captura manual requerida: Forma farmacéutica, cantidad y unidad se integran como "Forma | Dosis | Unidad".',
+                            style: TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 4. Metadatos de Lote y Trazabilidad FEFO
+                    const Text(
+                      '4. Datos del Lote de Inventario (FEFO):',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: loteController,
+                            decoration: const InputDecoration(
+                              labelText: 'Número de Lote *',
+                              hintText: 'ej: LOT-2026-X',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.qr_code),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: stockController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Stock Inicial (Pzas) *',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.format_list_numbered),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: fechaIngresoController,
+                            decoration: InputDecoration(
+                              labelText: 'Fecha de Ingreso *',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.input),
+                              isDense: true,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.calendar_today, size: 18),
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: DateTime.now(),
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime.now().add(const Duration(days: 30)),
+                                  );
+                                  if (date != null) {
+                                    fechaIngresoController.text =
+                                        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: fechaCaducidadController,
+                            decoration: InputDecoration(
+                              labelText: 'Fecha Caducidad *',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.event_busy),
+                              isDense: true,
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.calendar_today, size: 18),
+                                onPressed: () async {
+                                  final date = await showDatePicker(
+                                    context: context,
+                                    initialDate: DateTime.now().add(const Duration(days: 180)),
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                                  );
+                                  if (date != null) {
+                                    fechaCaducidadController.text =
+                                        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: costoController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Costo Unitario de Adquisición (MXN)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.attach_money),
+                        isDense: true,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
-            FilledButton.icon(
-              icon: const Icon(Icons.save),
-              style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
-              onPressed: () async {
-                if (loteController.text.trim().isEmpty || fechaCaducidadController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Número de lote y fecha de caducidad son obligatorios')),
-                  );
-                  return;
-                }
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+              FilledButton.icon(
+                icon: const Icon(Icons.save),
+                style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+                onPressed: () async {
+                  final cod = codigoBarrasController.text.trim();
+                  final nombre = nombreComercialController.text.trim();
+                  final numLote = loteController.text.trim();
+                  final fCad = fechaCaducidadController.text.trim();
 
-                try {
-                  await ApiService.createLote({
-                    'producto_id': productoIdSeleccionado,
-                    'numero_lote': loteController.text.trim(),
-                    'fecha_caducidad': fechaCaducidadController.text.trim(),
-                    'stock_actual': int.tryParse(stockController.text.trim()) ?? 0,
-                    'costo_unitario': double.tryParse(costoController.text.trim()) ?? 0.0,
-                    'laboratorio_fabricante': labController.text.trim(),
-                    'forma_farmaceutica': formaFarmaceutica,
-                    'dosificacion': dosificacionController.text.trim(),
-                    'fecha_ingreso': fechaIngresoController.text.trim(),
-                    'activo': true,
-                  });
-                  if (!mounted) return;
-                  Navigator.of(ctx).pop();
-                  _cargarTodo();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lote registrado con metadatos completos y auditado en Kardex')),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-                  );
-                }
-              },
-              label: const Text('Guardar Lote'),
-            ),
-          ],
-        ),
+                  if (cod.isEmpty || nombre.isEmpty || numLote.isEmpty || fCad.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Código de barras, nombre del producto, lote y caducidad son obligatorios')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    int prodId = productoIdSeleccionado ?? 0;
+
+                    // Si el producto no estaba registrado previamente, lo damos de alta primero
+                    if (!codigoPreviamenteRegistrado || prodId == 0) {
+                      final nuevoProd = await ApiService.createProducto({
+                        'codigo_barras': cod,
+                        'nombre_comercial': nombre,
+                        'sustancia_activa': sustanciaActivaController.text.trim().isEmpty
+                            ? nombre
+                            : sustanciaActivaController.text.trim(),
+                        'presentacion': dosisVistaPrevia,
+                        'laboratorio': laboratorioController.text.trim().isEmpty
+                            ? 'Genérico'
+                            : laboratorioController.text.trim(),
+                        'grupo_farmacopea': grupoFarmacopea,
+                        'requiere_receta': requiereReceta,
+                        'precio_venta': double.tryParse(precioVentaController.text.trim()) ?? 100.0,
+                        'activo': true,
+                      });
+                      prodId = nuevoProd['id'];
+                    }
+
+                    // Registrar el lote con dosis separada
+                    await ApiService.createLote({
+                      'producto_id': prodId,
+                      'numero_lote': numLote,
+                      'fecha_caducidad': fCad,
+                      'stock_actual': int.tryParse(stockController.text.trim()) ?? 0,
+                      'costo_unitario': double.tryParse(costoController.text.trim()) ?? 0.0,
+                      'laboratorio_fabricante': laboratorioController.text.trim(),
+                      'forma_farmaceutica': formaFarmaceutica,
+                      'dosis_valor': dosisValorController.text.trim(),
+                      'dosis_unidad': dosisUnidadController.text.trim(),
+                      'dosificacion': dosisVistaPrevia,
+                      'fecha_ingreso': fechaIngresoController.text.trim(),
+                      'activo': true,
+                    });
+
+                    if (!mounted) return;
+                    Navigator.of(ctx).pop();
+                    _cargarTodo();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('¡Lote $numLote registrado con éxito! Dosificación: $dosisVistaPrevia'),
+                        backgroundColor: Colors.teal.shade800,
+                      ),
+                    );
+                  } catch (e) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                    );
+                  }
+                },
+                label: const Text('Guardar Registro'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

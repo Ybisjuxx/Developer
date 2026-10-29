@@ -69,6 +69,23 @@ def listar_productos(
     return productos
 
 
+@router.get("/productos/buscar-codigo/{codigo_barras}", response_model=ProductoOut)
+def buscar_producto_por_codigo(codigo_barras: str, db: Session = Depends(get_db)):
+    """
+    Busca si un código de barras ya se encuentra previamente registrado en el inventario.
+    Permite el autocompletado en registro únicamente para códigos existentes.
+    """
+    cod = codigo_barras.strip()
+    prod = db.query(Producto).filter(Producto.codigo_barras == cod).first()
+    if not prod:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"El código de barras '{codigo_barras}' no está dado de alta en el sistema."
+        )
+    prod.stock_total = sum(lote.stock_actual for lote in prod.lotes if lote.activo)
+    return prod
+
+
 @router.post("/lotes", response_model=LoteOut, status_code=status.HTTP_201_CREATED)
 def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
     """
@@ -96,6 +113,13 @@ def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
         datos["laboratorio_fabricante"] = producto.laboratorio
     if not datos.get("fecha_ingreso"):
         datos["fecha_ingreso"] = datetime.date.today()
+
+    # Dosis separada de la dosificación: Tableta | 100 | mg
+    d_valor = (datos.get("dosis_valor") or "").strip()
+    d_unidad = (datos.get("dosis_unidad") or "").strip()
+    forma = (datos.get("forma_farmaceutica") or "").strip()
+    if d_valor and d_unidad:
+        datos["dosificacion"] = f"{forma} | {d_valor} | {d_unidad}".strip(" |")
 
     nuevo_lote = Lote(**datos)
     db.add(nuevo_lote)
