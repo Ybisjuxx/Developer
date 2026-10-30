@@ -1,15 +1,23 @@
 import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+
+load_dotenv()
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DB_PATH = os.path.join(BACKEND_DIR, "farmacia.db").replace("\\", "/")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
-)
+engine_kwargs = {}
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Parámetros robustos para MySQL / MariaDB / PostgreSQL
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 3600
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -18,6 +26,8 @@ Base = declarative_base()
 
 def ensure_sqlite_schema(engine):
     """Añade columnas faltantes a tablas existentes en SQLite sin romper datos."""
+    if not DATABASE_URL.startswith("sqlite"):
+        return
     try:
         with engine.connect() as conn:
             # 1. Columnas en tabla ventas
