@@ -38,6 +38,13 @@ social_media_editor/venv/
 frontend/build/
 build/
 
+# Otros proyectos no relacionados con FarmaControl
+fefarmex_web_app/
+incientiva_web/
+personal_finance_app/
+social_media_editor/
+
+
 # Node / JS
 node_modules/
 npm-debug.log*
