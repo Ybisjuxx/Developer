@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ============================================================================
@@ -125,6 +125,12 @@ class ClienteBase(BaseModel):
     sexo: Optional[str] = None  # MASCULINO, FEMENINO, OTRO
     notas_clinicas: Optional[str] = None
     activo: bool = True
+    # Sub-Agente 1: Seguimiento de Pacientes Crónicos y Resurtimiento Preventivo
+    ultima_visita: Optional[datetime] = None
+    tiene_padecimientos_cronicos: bool = False
+    dias_tratamiento: int = Field(default=30, ge=1)
+    fecha_proximo_resurtimiento: Optional[date] = None
+    medicamento_cronico_principal: Optional[str] = None
 
 
 class ClienteCreate(ClienteBase):
@@ -145,12 +151,20 @@ class ClienteUpdate(BaseModel):
     notas_clinicas: Optional[str] = None
     activo: Optional[bool] = None
     enfermedades_ids: Optional[List[int]] = None
+    ultima_visita: Optional[datetime] = None
+    tiene_padecimientos_cronicos: Optional[bool] = None
+    dias_tratamiento: Optional[int] = None
+    fecha_proximo_resurtimiento: Optional[date] = None
+    medicamento_cronico_principal: Optional[str] = None
 
 
 class ClienteOut(ClienteBase):
     id: int
     created_at: datetime
     enfermedades: List[EnfermedadOut] = []
+    alerta_resurtimiento_activa: bool = False
+    dias_para_resurtimiento: Optional[int] = None
+    mensaje_alerta_resurtimiento: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -349,12 +363,19 @@ class VentaOut(BaseModel):
 # FACTURACIÓN ELECTRÓNICA (CFDI 4.0)
 # ============================================================================
 class FacturaCreate(BaseModel):
-    rfc_receptor: str = Field(..., min_length=12, max_length=13)
+    rfc_receptor: str = Field(..., min_length=12, max_length=15)
     razon_social_receptor: str = Field(..., min_length=2, max_length=200)
     regimen_fiscal_receptor: str = Field(..., min_length=3, max_length=100)
     codigo_postal_receptor: str = Field(..., min_length=5, max_length=10)
     uso_cfdi: str = Field(default="G03", max_length=50)
     correo_factura: Optional[str] = Field(None, max_length=150)
+
+    @field_validator("rfc_receptor", mode="before")
+    @classmethod
+    def limpiar_rfc(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.replace("-", "").replace(" ", "").strip().upper()
+        return v
 
 
 class FacturaOut(BaseModel):
@@ -383,6 +404,7 @@ class FacturaOut(BaseModel):
     sello_digital_sat: str
     no_certificado_sat: str
     cadena_original: str
+    xml_cfdi: Optional[str] = None
     detalles: List[VentaDetalleOut] = []
     model_config = ConfigDict(from_attributes=True)
 

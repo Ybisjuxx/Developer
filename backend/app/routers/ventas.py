@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -180,11 +180,17 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
     # 5. Calcular totales finales y cambio en efectivo
     nueva_venta.subtotal = round(subtotal_acumulado, 2)
 
-    # Si se asoció cliente y no se ingresó descuento manual, aplicar descuento de cliente
-    if venta_in.cliente_id and venta_in.descuento == 0.0:
+    # Si se asoció cliente, registrar última visita y aplicar descuento si corresponde
+    if venta_in.cliente_id:
         cli = db.query(Cliente).filter(Cliente.id == venta_in.cliente_id).first()
-        if cli and cli.descuento_porcentaje > 0:
-            nueva_venta.descuento = round(subtotal_acumulado * (cli.descuento_porcentaje / 100.0), 2)
+        if cli:
+            # Sub-Agente 1: Registrar fecha de última visita y reprogramar resurtimiento preventivo
+            cli.ultima_visita = nueva_venta.fecha_venta
+            dias = cli.dias_tratamiento or 30
+            cli.fecha_proximo_resurtimiento = nueva_venta.fecha_venta.date() + datetime.timedelta(days=dias)
+
+            if venta_in.descuento == 0.0 and cli.descuento_porcentaje > 0:
+                nueva_venta.descuento = round(subtotal_acumulado * (cli.descuento_porcentaje / 100.0), 2)
 
     nueva_venta.total = max(0.0, round(nueva_venta.subtotal - nueva_venta.descuento, 2))
 
@@ -282,6 +288,55 @@ def obtener_reporte_ventas_mensual(
     )
 
 
+def _generar_xml_cfdi_40(venta: Venta, forma_sat: str, iva_calc: float, sello_emisor: str, sello_sat: str) -> str:
+    fecha_iso = (venta.fecha_factura or datetime.datetime.utcnow()).strftime("%Y-%m-%dT%H:%M:%S")
+    rfc_rec = (venta.rfc_receptor or "XAXX010101000").replace("-", "").strip().upper()
+    razon_rec = (venta.razon_social_receptor or venta.comprador_nombre or "PÚBLICO EN GENERAL").strip().upper()
+    cp_rec = (venta.codigo_postal_receptor or "44100").strip()
+    regimen_rec = (venta.regimen_fiscal_receptor or "616").split(" ")[0]
+    uso_cfdi = (venta.uso_cfdi or "G03").split(" ")[0]
+    uuid_timbre = venta.uuid_fiscal or str(uuid.uuid4()).upper()
+
+    conceptos_xml = []
+    for d in venta.detalles:
+        prod_nom = (d.producto.nombre_comercial if d.producto else f"PRODUCTO {d.producto_id}").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        clave_prod = "51101500"  # Medicamentos y productos farmacéuticos según catálogo SAT
+        tasa_iva = "0.000000"
+        impuesto_iva = 0.0
+        if d.producto and d.producto.grupo_farmacopea == "MISCELANEO":
+            tasa_iva = "0.160000"
+            impuesto_iva = round(d.subtotal * 0.16, 2)
+
+        c_xml = f'''    <cfdi:Concepto ClaveProdServ="{clave_prod}" Cantidad="{d.cantidad}" ClaveUnidad="H87" Unidad="Pieza" Descripcion="{prod_nom}" ValorUnitario="{d.precio_unitario:.2f}" Importe="{d.subtotal:.2f}" ObjetoImp="02">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="{d.subtotal:.2f}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="{tasa_iva}" Importe="{impuesto_iva:.2f}"/>
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>'''
+        conceptos_xml.append(c_xml)
+
+    conceptos_block = "\n".join(conceptos_xml)
+
+    xml_text = f'''<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="4.0" Serie="FAC" Folio="{venta.folio_factura or f"FAC-{venta.id}"}" Fecha="{fecha_iso}" Sello="{sello_emisor}" FormaPago="{forma_sat}" NoCertificado="00001000000504465028" SubTotal="{venta.subtotal:.2f}" Descuento="{venta.descuento:.2f}" Moneda="MXN" Total="{venta.total:.2f}" TipoDeComprobante="I" Exportacion="01" MetodoPago="PUE" LugarExpedicion="44100">
+  <cfdi:Emisor Rfc="FCM2410269Z1" Nombre="FARMACONTROL MÉXICO S.A. DE C.V." RegimenFiscal="601"/>
+  <cfdi:Receptor Rfc="{rfc_rec}" Nombre="{razon_rec}" DomicilioFiscalReceptor="{cp_rec}" RegimenFiscalReceptor="{regimen_rec}" UsoCFDI="{uso_cfdi}"/>
+  <cfdi:Conceptos>
+{conceptos_block}
+  </cfdi:Conceptos>
+  <cfdi:Impuestos TotalImpuestosTrasladados="{iva_calc:.2f}">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="{venta.subtotal:.2f}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="{iva_calc:.2f}"/>
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+  <cfdi:Complemento>
+    <tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" Version="1.1" UUID="{uuid_timbre}" FechaTimbrado="{fecha_iso}" RfcProvCertif="SAT970701NN3" SelloCFD="{sello_emisor}" NoCertificadoSAT="00001000000504465028" SelloSAT="{sello_sat}"/>
+  </cfdi:Complemento>
+</cfdi:Comprobante>'''
+    return xml_text
+
+
 def _construir_factura_out(venta: Venta) -> FacturaOut:
     forma_sat = "01"
     metodo_norm = (venta.metodo_pago or "").upper()
@@ -296,15 +351,18 @@ def _construir_factura_out(venta: Venta) -> FacturaOut:
         if d.producto and d.producto.grupo_farmacopea == "MISCELANEO":
             iva_calc += round(d.subtotal * 0.16, 2)
 
-    sello_emisor = f"SAT_{venta.folio_factura}_{uuid.uuid4().hex[:32]}"
+    folio_fac = venta.folio_factura or f"FAC-{venta.id}"
+    uuid_fisc = venta.uuid_fiscal or str(uuid.uuid4()).upper()
+    sello_emisor = f"SAT_{folio_fac}_{uuid.uuid4().hex[:32]}"
     sello_sat = f"SAT_TIMBRE_{uuid.uuid4().hex[:32]}"
-    cadena_orig = f"||4.0|{venta.folio_factura}|{venta.fecha_factura}|{forma_sat}|{venta.subtotal}|{venta.total}|FCM2410269Z1|{venta.rfc_receptor}|{venta.uso_cfdi}||"
+    cadena_orig = f"||4.0|{folio_fac}|{venta.fecha_factura}|{forma_sat}|{venta.subtotal}|{venta.total}|FCM2410269Z1|{venta.rfc_receptor}|{venta.uso_cfdi}||"
+    xml_generado = _generar_xml_cfdi_40(venta, forma_sat, iva_calc, sello_emisor, sello_sat)
 
     return FacturaOut(
         venta_id=venta.id,
         folio_ticket=venta.folio_ticket,
-        folio_factura=venta.folio_factura or f"FAC-{venta.id}",
-        uuid_fiscal=venta.uuid_fiscal or str(uuid.uuid4()).upper(),
+        folio_factura=folio_fac,
+        uuid_fiscal=uuid_fisc,
         fecha_factura=venta.fecha_factura or datetime.datetime.utcnow(),
         rfc_receptor=venta.rfc_receptor or "XAXX010101000",
         razon_social_receptor=venta.razon_social_receptor or venta.comprador_nombre or "Público General",
@@ -322,6 +380,7 @@ def _construir_factura_out(venta: Venta) -> FacturaOut:
         sello_digital_sat=sello_sat,
         no_certificado_sat="00001000000504465028",
         cadena_original=cadena_orig,
+        xml_cfdi=xml_generado,
         detalles=venta.detalles,
     )
 
@@ -336,6 +395,10 @@ def buscar_venta_por_ticket(folio_ticket: str, db: Session = Depends(get_db)):
     venta = db.query(Venta).filter(Venta.folio_ticket.ilike(folio_limpio)).first()
     if not venta and folio_limpio.isdigit():
         venta = db.query(Venta).filter(Venta.id == int(folio_limpio)).first()
+
+    # Búsqueda flexible parcial si no hubo coincidencia exacta
+    if not venta:
+        venta = db.query(Venta).filter(Venta.folio_ticket.ilike(f"%{folio_limpio}%")).first()
 
     if not venta:
         raise HTTPException(
@@ -389,6 +452,28 @@ def obtener_factura_venta(venta_id: int, db: Session = Depends(get_db)):
             detail="Esta venta aún no cuenta con factura electrónica generada."
         )
     return _construir_factura_out(venta)
+
+
+@router.get("/{venta_id}/factura/xml")
+def descargar_xml_factura(venta_id: int, db: Session = Depends(get_db)):
+    """Descarga el comprobante oficial en formato XML CFDI 4.0 de la factura."""
+    venta = db.query(Venta).filter(Venta.id == venta_id).first()
+    if not venta:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    if not venta.facturada:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta venta aún no cuenta con factura electrónica generada."
+        )
+    factura = _construir_factura_out(venta)
+    nombre_archivo = f"Factura_{venta.folio_factura or venta.id}.xml"
+    return Response(
+        content=factura.xml_cfdi or "",
+        media_type="application/xml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{nombre_archivo}"'
+        }
+    )
 
 
 @router.get("/{venta_id}", response_model=VentaOut)

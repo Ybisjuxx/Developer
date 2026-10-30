@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -35,6 +36,11 @@ def crear_cliente(cli_in: ClienteCreate, db: Session = Depends(get_db)):
 
     nuevo_cliente = Cliente(**datos)
 
+    # Sub-Agente 1: Calcular fecha estimada de resurtimiento si tiene padecimiento crónico
+    if nuevo_cliente.tiene_padecimientos_cronicos and nuevo_cliente.ultima_visita and not nuevo_cliente.fecha_proximo_resurtimiento:
+        dias = nuevo_cliente.dias_tratamiento or 30
+        nuevo_cliente.fecha_proximo_resurtimiento = nuevo_cliente.ultima_visita.date() + datetime.timedelta(days=dias)
+
     if cli_in.enfermedades_ids:
         enfermedades = db.query(Enfermedad).filter(Enfermedad.id.in_(cli_in.enfermedades_ids)).all()
         nuevo_cliente.enfermedades = enfermedades
@@ -70,6 +76,19 @@ def listar_clientes(
     return query.order_by(Cliente.nombre.asc()).offset(skip).limit(limit).all()
 
 
+@router.get("/alertas-resurtimiento", response_model=List[ClienteOut])
+def listar_clientes_con_alerta_resurtimiento(db: Session = Depends(get_db)):
+    """
+    Sub-Agente 1: Lista pacientes con padecimientos crónicos cuya ventana de resurtimiento
+    esté activa (alerta al cajero con 2 a 3 semanas de anticipación).
+    """
+    clientes_cronicos = db.query(Cliente).filter(
+        Cliente.activo == True,
+        Cliente.tiene_padecimientos_cronicos == True
+    ).all()
+    return [c for c in clientes_cronicos if c.alerta_resurtimiento_activa]
+
+
 @router.get("/{cliente_id}", response_model=ClienteOut)
 def obtener_cliente(cliente_id: int, db: Session = Depends(get_db)):
     """Obtiene los detalles de un cliente y su historial clínico."""
@@ -95,6 +114,11 @@ def actualizar_cliente(cliente_id: int, cli_in: ClienteUpdate, db: Session = Dep
     materno = cliente.apellido_materno or ""
     if paterno or materno:
         cliente.apellido = f"{paterno} {materno}".strip()
+
+    # Recalcular fecha de resurtimiento si corresponde
+    if cliente.tiene_padecimientos_cronicos and cliente.ultima_visita and not cliente.fecha_proximo_resurtimiento:
+        dias = cliente.dias_tratamiento or 30
+        cliente.fecha_proximo_resurtimiento = cliente.ultima_visita.date() + datetime.timedelta(days=dias)
 
     if cli_in.enfermedades_ids is not None:
         enfermedades = db.query(Enfermedad).filter(Enfermedad.id.in_(cli_in.enfermedades_ids)).all()

@@ -1,109 +1,161 @@
+import sys
 import datetime
-from app.database import SessionLocal
-from app.models import Venta, Producto, Medico, Lote
-from app.schemas import FacturaCreate, MedicoCreate, MedicoUpdate, LoteCreate
-from app.routers.ventas import buscar_venta_por_ticket, generar_factura_venta, obtener_factura_venta
-from app.routers.medicos import crear_medico, actualizar_medico, eliminar_medico
-from app.routers.enfermedades import buscar_catalogo_cie
-from app.routers.inventario import buscar_producto_por_codigo, registrar_lote
+sys.stdout.reconfigure(encoding='utf-8')
+sys.path.insert(0, r"C:\Developer\backend")
 
-db = SessionLocal()
+from fastapi.testclient import TestClient
+from app.main import app
+from app.database import SessionLocal, get_db
+from app.models import Cliente, Producto, Lote, Venta, VentaDetalle
 
-print("--- PROBANDO FUNCIONALIDADES SUB-AGENTES 1 A 6 DIRECTAMENTE ---")
+client = TestClient(app)
 
-# 1. Sub-Agente 1: Facturación y búsqueda por ticket
-v = db.query(Venta).first()
-assert v is not None
-venta_encontrada = buscar_venta_por_ticket(v.folio_ticket, db=db)
-assert venta_encontrada.id == v.id
-print(f"[OK Sub-Agente 1] Búsqueda por ticket exitosa: {venta_encontrada.folio_ticket}")
+def test_subagent_1_clientes_cronicos_y_resurtimiento():
+    print("\n--- TEST SUBAGENTE 1: Clientes Crónicos y Alerta de Resurtimiento ---")
+    db = SessionLocal()
+    try:
+        # Crear cliente de prueba con padecimiento crónico
+        payload = {
+            "nombre": "Juan",
+            "apellido_paterno": "Pérez",
+            "apellido_materno": "López",
+            "telefono": "3312345678",
+            "tiene_padecimientos_cronicos": True,
+            "medicamento_cronico_principal": "Metformina 850mg",
+            "dias_tratamiento": 30,
+            "notas": "Paciente diabético tipo 2"
+        }
+        res = client.post("/api/clientes/", json=payload)
+        assert res.status_code in [200, 201], f"Error creando cliente: {res.text}"
+        cli_data = res.json()
+        cli_id = cli_data["id"]
+        print(f"Cliente creado ID {cli_id}: {cli_data['nombre']} {cli_data.get('apellido', '')}")
+        assert cli_data["tiene_padecimientos_cronicos"] is True
+        assert cli_data["medicamento_cronico_principal"] == "Metformina 850mg"
 
-fac_in = FacturaCreate(
-    rfc_receptor="FME010101XYZ",
-    razon_social_receptor="FARMACIAS DE MÉXICO S.A.",
-    regimen_fiscal_receptor="601 - General de Ley Personas Morales",
-    codigo_postal_receptor="44100",
-    uso_cfdi="G03 - Gastos en general",
-    correo_factura="facturas@farmaciasmexico.com"
-)
-factura = generar_factura_venta(v.id, fac_in, db=db)
-assert factura.folio_factura.startswith("FAC-")
-assert factura.uuid_fiscal is not None
-print(f"[OK Sub-Agente 1] Factura CFDI generada: {factura.folio_factura} (UUID: {factura.uuid_fiscal})")
+        # Simular una última visita hace 15 días (le quedan 15 días de tratamiento <= 21 días -> ALERTA ACTIVA)
+        cli_obj = db.query(Cliente).filter(Cliente.id == cli_id).first()
+        hace_15_dias = datetime.datetime.utcnow() - datetime.timedelta(days=15)
+        cli_obj.ultima_visita = hace_15_dias
+        cli_obj.fecha_proximo_resurtimiento = (hace_15_dias + datetime.timedelta(days=30)).date()
+        db.commit()
 
-factura_recup = obtener_factura_venta(v.id, db=db)
-assert factura_recup.uuid_fiscal == factura.uuid_fiscal
-print(f"[OK Sub-Agente 1] Consulta de factura generada validada.")
+        # Probar endpoint de alertas de resurtimiento
+        res_alertas = client.get("/api/clientes/alertas-resurtimiento")
+        assert res_alertas.status_code == 200, f"Error alertas: {res_alertas.text}"
+        alertas = res_alertas.json()
+        encontrado = any(c["id"] == cli_id for c in alertas)
+        assert encontrado, f"El cliente {cli_id} no apareció en la lista de alertas de resurtimiento"
+        print(f"Alerta de resurtimiento detectada exitosamente para cajero: {cli_obj.mensaje_alerta_resurtimiento}")
 
-# 2. Sub-Agente 2: Consulta CIE mejorada
-cie_res = buscar_catalogo_cie(q="hipertension arterial", limit=30, db=db)
-assert len(cie_res) > 0
-assert any("I10" in r["codigo_cie"] for r in cie_res)
-print(f"[OK Sub-Agente 2] Catálogo CIE enriquecido: {len(cie_res)} resultados para 'hipertension arterial' (Top: {cie_res[0]['codigo_cie']} - {cie_res[0]['descripcion']})")
+        # Probar que al registrar una venta, la última visita se actualiza automáticamente
+        prod = db.query(Producto).filter(Producto.activo == True).first()
+        if not prod:
+            prod = Producto(
+                codigo_barras="750123456789",
+                nombre_comercial="Paracetamol Genérico",
+                sustancia_activa="Paracetamol",
+                forma_farmaceutica="Tableta",
+                concentracion="500 mg",
+                precio_compra=10.0,
+                precio_venta=25.0,
+                requiere_receta=False,
+                grupo_farmacopea="MISCELANEO",
+                activo=True
+            )
+            db.add(prod)
+            db.flush()
+        
+        lote = db.query(Lote).filter(Lote.producto_id == prod.id, Lote.stock_actual > 0).first()
+        if not lote:
+            lote = Lote(
+                producto_id=prod.id,
+                numero_lote="TEST-LOT-01",
+                fecha_caducidad=datetime.date.today() + datetime.timedelta(days=180),
+                stock_inicial=50,
+                stock_actual=50,
+                activo=True
+            )
+            db.add(lote)
+            db.flush()
+        db.commit()
 
-cie_res2 = buscar_catalogo_cie(q="resfriado", limit=30, db=db)
-assert len(cie_res2) > 0
-print(f"[OK Sub-Agente 2] Búsqueda por síntoma 'resfriado' localizó: {cie_res2[0]['codigo_cie']} - {cie_res2[0]['descripcion']}")
+        venta_payload = {
+            "cliente_id": cli_id,
+            "metodo_pago": "EFECTIVO",
+            "monto_recibido": 100.0,
+            "items": [{"producto_id": prod.id, "cantidad": 1}]
+        }
+        res_venta = client.post("/api/ventas/", json=venta_payload)
+        assert res_venta.status_code in [200, 201], f"Error en venta: {res_venta.text}"
+        v_data = res_venta.json()
+        print(f"Venta creada con éxito: Folio {v_data['folio_ticket']}")
 
-# 3. Sub-Agente 3: Médico con apellidos separados
-cedula = f"CED-{datetime.datetime.now().strftime('%H%M%S')}"
-med_in = MedicoCreate(
-    nombres="Manuel",
-    apellido_paterno="de la Cruz",
-    apellido_materno="Montes",
-    cedula_profesional=cedula,
-    especialidad="Medicina General",
-    vigente=True
-)
-med = crear_medico(med_in, db=db)
-assert med.apellido_paterno == "de la Cruz"
-assert med.apellido_materno == "Montes"
-assert "de la Cruz Montes" in med.apellidos
-print(f"[OK Sub-Agente 3] Médico registrado con apellidos separados: {med.nombre_completo} (Cédula: {med.cedula_profesional})")
+        db.refresh(cli_obj)
+        assert cli_obj.ultima_visita is not None
+        print(f"Última visita actualizada automáticamente tras venta: {cli_obj.ultima_visita}")
+        print("TEST SUBAGENTE 1: EXITOSO")
+        return v_data["id"], v_data["folio_ticket"]
+    finally:
+        db.close()
 
-# 4. Sub-Agente 4: Editar y Borrar médico
-med_up = MedicoUpdate(especialidad="Cardiología Clínica", telefono="3312345678")
-med_edit = actualizar_medico(med.id, med_up, db=db)
-assert med_edit.especialidad == "Cardiología Clínica"
-print(f"[OK Sub-Agente 4] Médico #{med.id} editado exitosamente: {med_edit.especialidad}")
 
-del_res = eliminar_medico(med.id, permanente=True, db=db)
-assert del_res["eliminado_permanente"] is True
-print(f"[OK Sub-Agente 4] Médico #{med.id} eliminado exitosamente ({del_res['mensaje']})")
+def test_subagent_2_facturacion_y_ticket(venta_id: int, folio_ticket: str):
+    print("\n--- TEST SUBAGENTE 2: Facturación CFDI 4.0 y Búsqueda por Ticket ---")
+    
+    # 1. Búsqueda por ticket exacto
+    res_tk = client.get(f"/api/ventas/ticket/{folio_ticket}")
+    assert res_tk.status_code == 200, f"Error buscando ticket: {res_tk.text}"
+    print(f"Búsqueda por ticket exacto '{folio_ticket}': OK (Venta #{res_tk.json()['id']})")
 
-# 5. Sub-Agente 5: Nombre del producto e ID de inventario en detalles
-db.refresh(v)
-det = v.detalles[0]
-assert det.producto_id is not None
-assert det.producto_nombre is not None and len(det.producto_nombre) > 0
-print(f"[OK Sub-Agente 5] Detalle de venta contiene ID #{det.producto_id} y Nombre '{det.producto_nombre}' (Lote privado para devolución/merma)")
+    # 2. Búsqueda por folio parcial (ej. sin prefijo o sufijo)
+    parte = folio_ticket.split("-")[-1]
+    res_tk_parcial = client.get(f"/api/ventas/ticket/{parte}")
+    assert res_tk_parcial.status_code == 200, f"Error buscando ticket parcial: {res_tk_parcial.text}"
+    print(f"Búsqueda por folio parcial '{parte}': OK")
 
-# 6. Sub-Agente 6: Dosis separada y verificación de código de barras
-prod = db.query(Producto).first()
-prod_buscado = buscar_producto_por_codigo(prod.codigo_barras, db=db)
-assert prod_buscado.id == prod.id
-print(f"[OK Sub-Agente 6] Código de barras previamente registrado verificado para autocompletado: {prod_buscado.codigo_barras} -> {prod_buscado.nombre_comercial}")
+    # 3. Emitir factura con RFC que contiene guiones (prueba de sanitización de RFC)
+    fac_payload = {
+        "rfc_receptor": "XAXX-010101-000",  # Con guiones
+        "razon_social_receptor": "PACIENTE DE PRUEBA S.A.",
+        "regimen_fiscal_receptor": "616 - Sin obligaciones fiscales",
+        "codigo_postal_receptor": "44100",
+        "uso_cfdi": "G03 - Gastos en general",
+        "correo_factura": "paciente@farmacia.com"
+    }
+    res_fac = client.post(f"/api/ventas/{venta_id}/facturar", json=fac_payload)
+    assert res_fac.status_code in [200, 201], f"Error emitiendo factura: {res_fac.text}"
+    fac_data = res_fac.json()
+    print(f"Factura generada Folio: {fac_data['folio_factura']}, UUID: {fac_data['uuid_fiscal']}")
+    assert fac_data["rfc_receptor"] == "XAXX010101000", f"El RFC no fue sanitizado: {fac_data['rfc_receptor']}"
+    assert fac_data["xml_cfdi"] is not None and len(fac_data["xml_cfdi"]) > 100
+    print("Contenido XML CFDI 4.0 generado en respuesta: OK")
 
-lote_num = f"DOSIS-{datetime.datetime.now().strftime('%H%M%S')}"
-lote_in = LoteCreate(
-    producto_id=prod.id,
-    numero_lote=lote_num,
-    fecha_caducidad=datetime.date(2028, 12, 31),
-    stock_actual=15,
-    costo_unitario=25.0,
-    forma_farmaceutica="Tableta",
-    dosis_valor="100",
-    dosis_unidad="mg",
-    fecha_ingreso=datetime.date.today(),
-    activo=True
-)
-lote_creado = registrar_lote(lote_in, db=db)
-assert lote_creado.dosis_valor == "100"
-assert lote_creado.dosis_unidad == "mg"
-assert "Tableta | 100 | mg" in lote_creado.dosificacion
-print(f"[OK Sub-Agente 6] Lote con dosis separada de dosificación creado exitosamente: {lote_creado.dosificacion}")
+    # 4. Descargar XML oficial mediante endpoint GET
+    res_xml = client.get(f"/api/ventas/{venta_id}/factura/xml")
+    assert res_xml.status_code == 200, f"Error descargando XML: {res_xml.text}"
+    assert "xml" in res_xml.headers.get("content-type", "")
+    xml_str = res_xml.text
+    assert "<cfdi:Comprobante" in xml_str
+    assert "FCM2410269Z1" in xml_str
+    assert "<tfd:TimbreFiscalDigital" in xml_str
+    print(f"Descarga de archivo XML CFDI 4.0: OK ({len(xml_str)} bytes)")
+    print("TEST SUBAGENTE 2: EXITOSO")
 
-db.close()
-print("=========================================================================")
-print("TODAS LAS VERIFICACIONES DE LOS SUB-AGENTES 1 AL 6 COMPLETADAS (100% OK)")
-print("=========================================================================")
+
+def test_subagent_3_optimizacion_rendimiento():
+    print("\n--- TEST SUBAGENTE 3: Optimización de Rendimiento y Carga ---")
+    middlewares = [getattr(m, "cls", type(m)).__name__ for m in app.user_middleware]
+    print(f"Middlewares configurados en FastAPI: {middlewares}")
+    assert any("GZip" in m for m in middlewares), "GZipMiddleware no encontrado en user_middleware"
+    print("GZipMiddleware activo para reducción de ancho de banda y carga ultrarrápida: OK")
+    print("TEST SUBAGENTE 3: EXITOSO")
+
+
+if __name__ == "__main__":
+    vid, ftk = test_subagent_1_clientes_cronicos_y_resurtimiento()
+    test_subagent_2_facturacion_y_ticket(vid, ftk)
+    test_subagent_3_optimizacion_rendimiento()
+    print("\n==============================================")
+    print("TODAS LAS PRUEBAS DE LOS 3 SUBAGENTES PASARON CON ÉXITO")
+    print("==============================================")

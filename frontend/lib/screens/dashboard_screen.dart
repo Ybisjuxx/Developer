@@ -46,9 +46,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      final productos = await ApiService.getProductos();
-      final ventas = await ApiService.getVentas();
-      final medicos = await ApiService.getMedicos();
+      // Carga concurrente paralela para acelerar drásticamente el inicio del Tablero
+      final results = await Future.wait([
+        ApiService.getProductos(),
+        ApiService.getVentas(),
+        ApiService.getMedicos(),
+      ]);
+
+      final productos = results[0];
+      final ventas = results[1];
+      final medicos = results[2];
 
       int stockAcumulado = 0;
       final hoy = DateTime.now();

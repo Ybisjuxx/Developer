@@ -370,6 +370,18 @@ class ApiService {
     }
   }
 
+  static Future<String> descargarXmlFactura(int ventaId) async {
+    final uri = Uri.parse('$baseUrl/api/ventas/$ventaId/factura/xml');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      return utf8.decode(response.bodyBytes);
+    } else {
+      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+      throw Exception(errorData['detail'] ?? 'Error al descargar XML');
+    }
+  }
+
   static Future<Map<String, dynamic>?> buscarProductoPorCodigo(String codigoBarras) async {
     final uri = Uri.parse('$baseUrl/api/inventario/productos/buscar-codigo/${Uri.encodeComponent(codigoBarras.trim())}');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
@@ -530,6 +542,16 @@ class ApiService {
     final response = await http.delete(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw Exception('Error al desactivar cliente: ${response.statusCode}');
+    }
+  }
+
+  static Future<List<dynamic>> getClientesConAlertaResurtimiento() async {
+    final uri = Uri.parse('$baseUrl/api/clientes/alertas-resurtimiento');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    } else {
+      throw Exception('Error al obtener alertas de resurtimiento: ${response.statusCode}');
     }
   }
 
@@ -716,5 +738,3 @@ class ApiService {
     }
   }
 }
-
-

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/api_service.dart';
 
 class TicketImpresionDialog extends StatelessWidget {
   final Map<String, dynamic> ticket;
@@ -275,6 +276,12 @@ class TicketImpresionDialog extends StatelessWidget {
       actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       actions: [
         OutlinedButton.icon(
+          icon: const Icon(Icons.receipt_long, size: 18),
+          label: const Text('Facturar Ticket'),
+          style: OutlinedButton.styleFrom(foregroundColor: Colors.indigo.shade900),
+          onPressed: () => _abrirModalFacturaRapida(context),
+        ),
+        OutlinedButton.icon(
           icon: const Icon(Icons.copy, size: 18),
           label: const Text('Copiar Ticket'),
           onPressed: () {
@@ -298,6 +305,106 @@ class TicketImpresionDialog extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+
+  void _abrirModalFacturaRapida(BuildContext context) {
+    final rfcCtrl = TextEditingController(text: 'XAXX010101000');
+    final razonCtrl = TextEditingController(text: ticket['comprador_nombre'] ?? 'Público General');
+    final cpCtrl = TextEditingController(text: '44100');
+    final correoCtrl = TextEditingController();
+    const String regimen = '616 - Sin obligaciones fiscales';
+    const String usoCfdi = 'G03 - Gastos en general';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.receipt_long, color: Colors.indigo.shade800),
+              const SizedBox(width: 8),
+              const Text('Facturar Ticket (CFDI 4.0)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SizedBox(
+            width: 440,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Folio: ${ticket["folio_ticket"]}  •  Total: \$${ticket["total"]} MXN', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: rfcCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(labelText: 'RFC Receptor *', hintText: 'XAXX010101000', border: OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: razonCtrl,
+                    decoration: const InputDecoration(labelText: 'Razón Social / Nombre *', border: OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: cpCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'C.P. Fiscal *', hintText: '44100', border: OutlineInputBorder(), isDense: true),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: correoCtrl,
+                    decoration: const InputDecoration(labelText: 'Correo Electrónico (Opcional)', hintText: 'cliente@ejemplo.com', border: OutlineInputBorder(), isDense: true),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+            FilledButton.icon(
+              icon: const Icon(Icons.send),
+              label: const Text('Timbrar CFDI 4.0'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
+              onPressed: () async {
+                final rfcLimpio = rfcCtrl.text.replaceAll(RegExp(r'[^0-9A-Za-z]'), '').toUpperCase();
+                if (rfcLimpio.length < 12 || rfcLimpio.length > 13) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('El RFC debe contar con 12 o 13 caracteres.')),
+                  );
+                  return;
+                }
+                try {
+                  final res = await ApiService.generarFacturaVenta(ticket['id'], {
+                    'rfc_receptor': rfcLimpio,
+                    'razon_social_receptor': razonCtrl.text.trim(),
+                    'regimen_fiscal_receptor': regimen,
+                    'codigo_postal_receptor': cpCtrl.text.trim(),
+                    'uso_cfdi': usoCfdi,
+                    'correo_factura': correoCtrl.text.trim().isEmpty ? null : correoCtrl.text.trim(),
+                  });
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('¡Factura ${res["folio_factura"]} generada con éxito! UUID: ${res["uuid_fiscal"]}'),
+                        backgroundColor: Colors.indigo.shade900,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error al generar factura: $e'), backgroundColor: Colors.red.shade800),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

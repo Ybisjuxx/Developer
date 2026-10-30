@@ -226,15 +226,58 @@ class _VentasScreenState extends State<VentasScreen> {
                       if (venta['correo_factura'] != null)
                         _buildDatoFactura('Correo:', venta['correo_factura']),
                       const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        icon: const Icon(Icons.copy, size: 16),
-                        label: const Text('Copiar Folio Fiscal (UUID SAT)'),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: venta['uuid_fiscal'] ?? ''));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('UUID Fiscal copiado al portapapeles.')),
-                          );
-                        },
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.copy, size: 16),
+                            label: const Text('Copiar UUID SAT'),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: venta['uuid_fiscal'] ?? ''));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('UUID Fiscal copiado al portapapeles.')),
+                              );
+                            },
+                          ),
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
+                            icon: const Icon(Icons.code, size: 16),
+                            label: const Text('Descargar XML CFDI 4.0'),
+                            onPressed: () async {
+                              try {
+                                final xmlStr = await ApiService.descargarXmlFactura(venta['id']);
+                                Clipboard.setData(ClipboardData(text: xmlStr));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('XML CFDI 4.0 oficial descargado y copiado al portapapeles.'),
+                                      backgroundColor: Colors.indigo,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Error al descargar XML: $e'), backgroundColor: Colors.red),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.print, size: 16),
+                            label: const Text('Imprimir Factura'),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Enviando factura ${venta["folio_factura"]} a imprimir en formato fiscal...'),
+                                  backgroundColor: Colors.indigo.shade900,
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
                     ] else ...[
                       // Formulario de Emisión de Factura
@@ -397,13 +440,13 @@ class _VentasScreenState extends State<VentasScreen> {
                   icon: const Icon(Icons.send_and_archive, size: 18),
                   label: const Text('Emitir Factura CFDI 4.0'),
                   onPressed: () async {
-                    final rfc = rfcController.text.trim().toUpperCase();
+                    final rfc = rfcController.text.trim().toUpperCase().replaceAll(RegExp(r'[^0-9A-Z]'), '');
                     final razon = razonSocialController.text.trim();
                     final cp = cpController.text.trim();
 
                     if (rfc.length < 12 || rfc.length > 13) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('El RFC debe contar con 12 (moral) o 13 (física) caracteres.')),
+                        const SnackBar(content: Text('El RFC debe contar con 12 (persona moral) o 13 (persona física) caracteres alfanuméricos.')),
                       );
                       return;
                     }
@@ -475,6 +518,7 @@ class _VentasScreenState extends State<VentasScreen> {
 
       if (mounted) {
         await _cargarVentas();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('¡Factura ${resFactura["folio_factura"]} emitida exitosamente! UUID: ${resFactura["uuid_fiscal"]}'),

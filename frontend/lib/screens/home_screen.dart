@@ -459,21 +459,35 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _construirPantallaActual(int index) {
+    switch (index) {
+      case 0:
+        return DashboardScreen(onNavigate: _cambiarPestana);
+      case 1:
+        return PosScreen(onVentaCompletada: () => setState(() {}));
+      case 2:
+        return const ClientesScreen();
+      case 3:
+        return InventarioScreen(key: ValueKey('inv-$_inventarioSubTab'), tabInicial: _inventarioSubTab);
+      case 4:
+        return const VentasScreen();
+      case 5:
+        return const CajaScreen();
+      case 6:
+        return const DevolucionesScreen();
+      case 7:
+        return const MedicosScreen();
+      case 8:
+        return const EnfermedadesScreen();
+      case 9:
+        return const ConfiguracionScreen();
+      default:
+        return DashboardScreen(onNavigate: _cambiarPestana);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      DashboardScreen(onNavigate: _cambiarPestana),
-      PosScreen(onVentaCompletada: () => setState(() {})),
-      const ClientesScreen(),
-      InventarioScreen(key: ValueKey('inv-$_inventarioSubTab'), tabInicial: _inventarioSubTab),
-      const VentasScreen(),
-      const CajaScreen(),
-      const DevolucionesScreen(),
-      const MedicosScreen(),
-      const EnfermedadesScreen(),
-      const ConfiguracionScreen(),
-    ];
-
     final List<String> titles = const [
       'Tablero de Mando Farmacéutico',
       'Punto de Venta y Cobranza',
@@ -734,7 +748,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               if (isDesktop) const VerticalDivider(thickness: 1, width: 1),
               Expanded(
-                child: screens[_selectedIndex],
+                child: _construirPantallaActual(_selectedIndex),
               ),
             ],
           ),

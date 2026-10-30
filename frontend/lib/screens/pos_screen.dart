@@ -472,6 +472,34 @@ class _PosScreenState extends State<PosScreen> {
                                           style: TextStyle(fontSize: 10, color: Colors.green.shade900, fontWeight: FontWeight.bold),
                                         ),
                                       ),
+                                      if (c['alerta_resurtimiento_activa'] == true) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade200,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.amber.shade800),
+                                          ),
+                                          child: Text(
+                                            '🔔 Resurtir (${c['dias_para_resurtimiento'] ?? 0}d)',
+                                            style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ] else if (c['tiene_padecimientos_cronicos'] == true) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.shade100,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            '💊 Crónico',
+                                            style: TextStyle(fontSize: 9, color: Colors.blue.shade900, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                   subtitle: Wrap(
@@ -554,6 +582,30 @@ class _PosScreenState extends State<PosScreen> {
                                 : '📞 Teléfono para confirmar: ${candidatoSeleccionado!["telefono"] ?? "No registrado"}',
                             style: const TextStyle(fontSize: 12),
                           ),
+                          if (candidatoSeleccionado!['alerta_resurtimiento_activa'] == true) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.amber.shade800),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.notification_important, color: Colors.amber.shade900, size: 18),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      candidatoSeleccionado!['mensaje_alerta_resurtimiento'] ??
+                                          '🔔 Sugerir resurtimiento de tratamiento crónico al paciente.',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           Row(
                             children: [
@@ -1351,6 +1403,45 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                     ),
                   if (_clienteSeleccionado != null) ...[
+                    if (_clienteSeleccionado!['alerta_resurtimiento_activa'] == true) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade800, width: 1.5),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.notification_important, color: Colors.amber.shade900, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '🔔 AVISO AL CAJERO: RESURTIMIENTO',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber.shade900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _clienteSeleccionado!['mensaje_alerta_resurtimiento'] ??
+                                        'Sugerir al paciente el resurtimiento de su tratamiento.',
+                                    style: const TextStyle(fontSize: 11, color: Colors.black87),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

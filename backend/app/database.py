@@ -82,6 +82,16 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN apellido_paterno VARCHAR(100)")
                 if "apellido_materno" not in existing_clientes_cols:
                     conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN apellido_materno VARCHAR(100)")
+                if "ultima_visita" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN ultima_visita DATETIME")
+                if "tiene_padecimientos_cronicos" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN tiene_padecimientos_cronicos BOOLEAN DEFAULT 0")
+                if "dias_tratamiento" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN dias_tratamiento INTEGER DEFAULT 30")
+                if "fecha_proximo_resurtimiento" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN fecha_proximo_resurtimiento DATE")
+                if "medicamento_cronico_principal" not in existing_clientes_cols:
+                    conn.exec_driver_sql("ALTER TABLE clientes ADD COLUMN medicamento_cronico_principal VARCHAR(150)")
                 conn.commit()
 
             # 4. Columnas en tabla lotes (laboratorio_fabricante, forma_farmaceutica, dosificacion, fecha_ingreso, dosis_valor, dosis_unidad)

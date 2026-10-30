@@ -84,6 +84,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
     final notasCtrl = TextEditingController(text: clienteExistente?['notas_clinicas'] ?? '');
 
+    // Sub-Agente 1: Padecimientos Crónicos, Medicamento y Resurtimiento Preventivo
+    bool tienePadecimientosCronicos = clienteExistente?['tiene_padecimientos_cronicos'] ?? false;
+    final medicamentoCronicoCtrl = TextEditingController(
+      text: clienteExistente?['medicamento_cronico_principal'] ?? '',
+    );
+    final diasTratamientoCtrl = TextEditingController(
+      text: (clienteExistente?['dias_tratamiento'] ?? 30).toString(),
+    );
+    final String? ultimaVisitaStr = clienteExistente?['ultima_visita'] != null
+        ? clienteExistente!['ultima_visita'].toString().replaceFirst('T', ' ').substring(0, 16)
+        : null;
+
     // Sub-Agente 3 & 4: Sexo y Fecha de Nacimiento desglosada
     String? sexoSeleccionado = clienteExistente?['sexo'];
     DateTime? fechaNacParsed;
@@ -381,6 +393,82 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           prefixIcon: Icon(Icons.note_alt_outlined),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      // Sub-Agente 1: Padecimientos Crónicos y Resurtimiento
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: tienePadecimientosCronicos ? Colors.amber.shade50 : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: tienePadecimientosCronicos ? Colors.amber.shade400 : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Paciente con Padecimiento Crónico', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              subtitle: const Text('Activa alertas al cajero con 2 a 3 semanas de anticipación para recordarle su resurtimiento.', style: TextStyle(fontSize: 11)),
+                              value: tienePadecimientosCronicos,
+                              activeColor: Colors.amber.shade800,
+                              onChanged: (val) => setDialogState(() => tienePadecimientosCronicos = val),
+                            ),
+                            if (tienePadecimientosCronicos) ...[
+                              const Divider(),
+                              TextField(
+                                controller: medicamentoCronicoCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Medicamento Crónico Principal *',
+                                  hintText: 'Ej. Losartán 50mg, Metformina 850mg, Insulina...',
+                                  prefixIcon: Icon(Icons.medication),
+                                  isDense: true,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: diasTratamientoCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Días de Tratamiento (Suministro)',
+                                        hintText: '30',
+                                        suffixText: 'días',
+                                        prefixIcon: Icon(Icons.timelapse),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.amber.shade200),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Última Visita:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                          Text(
+                                            ultimaVisitaStr ?? 'Sin compras previas',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -434,6 +522,13 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       'fecha_nacimiento': fechaNacStr,
                       'sexo': sexoSeleccionado,
                       'notas_clinicas': notasCtrl.text.trim().isEmpty ? null : notasCtrl.text.trim(),
+                      'tiene_padecimientos_cronicos': tienePadecimientosCronicos,
+                      'medicamento_cronico_principal': tienePadecimientosCronicos && medicamentoCronicoCtrl.text.trim().isNotEmpty
+                          ? medicamentoCronicoCtrl.text.trim()
+                          : null,
+                      'dias_tratamiento': tienePadecimientosCronicos
+                          ? (int.tryParse(diasTratamientoCtrl.text.trim()) ?? 30)
+                          : 30,
                       'enfermedades_ids': enfSeleccionadas.toList(),
                     };
 
@@ -520,6 +615,60 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   _infoItem(Icons.wc, 'Sexo / Género', c['sexo'] ?? 'No especificado'),
                   _infoItem(Icons.cake, 'Fecha de Nacimiento', c['fecha_nacimiento'] ?? 'No especificada'),
                   const SizedBox(height: 12),
+                  // Sub-Agente 1: Seguimiento de Padecimientos Crónicos y Resurtimiento
+                  if (c['tiene_padecimientos_cronicos'] == true) ...[
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade50 : Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade700 : Colors.blue.shade300,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                c['alerta_resurtimiento_activa'] == true ? Icons.alarm_on : Icons.medication,
+                                color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade900 : Colors.blue.shade900,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Tratamiento Crónico: ${c["medicamento_cronico_principal"] ?? "Continuo"}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade900 : Colors.blue.shade900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Suministro: ${c["dias_tratamiento"] ?? 30} días  •  Última Visita: ${c["ultima_visita"] != null ? c["ultima_visita"].toString().replaceFirst("T", " ").substring(0, 16) : "Sin registrar"}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          if (c['fecha_proximo_resurtimiento'] != null)
+                            Text(
+                              'Próximo Resurtimiento Sugerido: ${c["fecha_proximo_resurtimiento"]}',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          if (c['alerta_resurtimiento_activa'] == true) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              c['mensaje_alerta_resurtimiento'] ?? '🔔 Alerta de resurtimiento activa.',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   const Text(
                     'Historial Clínico (Diagnósticos CIE-10):',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -795,6 +944,55 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             ),
                                           ),
                                         ),
+                                        if (c['alerta_resurtimiento_activa'] == true) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.shade100,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.amber.shade800),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.alarm_on, size: 12, color: Colors.amber.shade900),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '🔔 Resurtir (${c['dias_para_resurtimiento'] ?? 0}d)',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.amber.shade900,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ] else if (c['tiene_padecimientos_cronicos'] == true) ...[
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade50,
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.blue.shade300),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.medication, size: 12, color: Colors.blue.shade800),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '💊 Crónico',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.blue.shade800,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                     subtitle: Column(
