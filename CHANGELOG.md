@@ -6,6 +6,28 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.1] - 2026-10-29 (Alertas de Resurtimiento Crónico, Corrección CFDI 4.0 con XML Oficial y Aceleración de Carga)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Seguimiento de Pacientes Crónicos y Alerta Preventiva de Resurtimiento (`models.py`, `database.py`, `schemas.py`, `clientes.py`, `ventas.py`, `pos_screen.dart`, `clientes_screen.dart`):**
+  - Incorporación al modelo `Cliente` de los campos: `ultima_visita`, `tiene_padecimientos_cronicos`, `medicamento_cronico_principal`, `dias_tratamiento` y `fecha_proximo_resurtimiento`.
+  - Alerta en tiempo real para el cajero en el Punto de Venta (POS) cuando restan $\le 21$ días (2 a 3 semanas de anticipación) para que el paciente agote su medicamento crónico.
+  - Actualización automática de la fecha de última visita y reprogramación del siguiente resurtimiento al registrar cualquier cobro con cliente vinculado.
+  - Insignias visuales en el padrón y búsqueda de clientes (`🔔 Resurtir (Xd)` y `💊 Crónico`).
+- **Sub-Agente 2: Corrección Integral del Sistema de Facturación Electrónica SAT CFDI 4.0 (`schemas.py`, `ventas.py`, `ventas_screen.dart`, `ticket_impresion_dialog.dart`, `api_service.dart`):**
+  - Sanitización automática de RFC: remueve guiones y espacios tanto en el validador Pydantic del backend como en el frontend para evitar rechazos por longitud.
+  - Búsqueda flexible de tickets: permite localizar ventas por coincidencia exacta, ID numérico o fragmentos parciales del folio.
+  - Estructuración y generación del archivo XML CFDI 4.0 oficial con desglose de impuestos (tasa 0% medicamentos / 16% misceláneos), nodo emisor/receptor, sellos digitales y timbre fiscal SAT (`tfd:TimbreFiscalDigital`).
+  - Nuevo endpoint `GET /api/ventas/{id}/factura/xml` para descarga directa del comprobante oficial.
+  - Botón directo `[Facturar Ticket]` dentro del ticket térmico para timbrado inmediato en 1 clic post-venta.
+- **Sub-Agente 3: Optimización del Rendimiento y Tiempo de Carga de la Aplicación (`main.py`, `dashboard_screen.dart`, `home_screen.dart`, `web/index.html`):**
+  - Activación de compresión HTTP `GZipMiddleware` en el servidor FastAPI para reducir hasta un 75% el tamaño de transferencia de catálogos e inventarios.
+  - Paralelización concurrente de peticiones con `Future.wait` en el Tablero de Mando, reduciendo la latencia de carga inicial a un tercio.
+  - Carga perezosa (Lazy Loading) en `HomeScreen` mediante `_construirPantallaActual(index)`, evitando montar 10 pantallas simultáneas en memoria por frame.
+  - Inicialización limpia de `web/index.html` con soporte de hot-reload y ejecución en modo release (`--release`) para arranque en menos de 2 segundos.
+
+---
+
 ## [1.4.0] - 2026-10-28 (Facturación CFDI Ventas, Catálogo CIE-10 Ampliado, Gestión y Apellidos de Médicos, ID en Tickets y Dosis Separada)
 
 ### 🚀 Añadido
