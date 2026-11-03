@@ -84,7 +84,7 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
-  void _modalNuevoClienteRapido() {
+  Future<void> _modalNuevoClienteRapido() async {
     final nomCtrl = TextEditingController();
     final apePaternoCtrl = TextEditingController();
     final apeMaternoCtrl = TextEditingController();
@@ -97,7 +97,7 @@ class _PosScreenState extends State<PosScreen> {
     final mesCtrl = TextEditingController();
     final anioCtrl = TextEditingController();
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
@@ -307,12 +307,12 @@ class _PosScreenState extends State<PosScreen> {
   // =========================================================================
   // SUB-AGENTE 3: MODAL DE BÚSQUEDA Y CONFIRMACIÓN DE CLIENTE (TEL / FECHA NAC)
   // =========================================================================
-  void _abrirBuscadorYConfirmacionCliente() {
+  Future<void> _abrirBuscadorYConfirmacionCliente() async {
     final TextEditingController busquedaCtrl = TextEditingController();
     String query = '';
     Map<String, dynamic>? candidatoSeleccionado;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
