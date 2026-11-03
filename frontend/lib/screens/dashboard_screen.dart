@@ -360,8 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ],
                         ),
                       ),
-                    ),
-                  );
+                    );
 
                   // Últimas Ventas
                   final ventasCard = Card(
@@ -420,8 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ],
                         ),
                       ),
-                    ),
-                  );
+                    );
 
                   if (isDesktopSec) {
                     return Row(
