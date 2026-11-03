@@ -226,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             content: SizedBox(
               width: isWide ? 620 : double.maxFinite,
-              height: 520,
+              height: MediaQuery.of(context).size.height * 0.65,
               child: Column(
                 children: [
                   const Divider(height: 1),

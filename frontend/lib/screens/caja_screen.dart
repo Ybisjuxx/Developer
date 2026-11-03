@@ -505,26 +505,33 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
           const SizedBox(height: 16),
 
           // Tarjetas KPI del Turno
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _buildKpiCard('Fondo Inicial', '\$${turno["monto_apertura"]} MXN', Icons.account_balance_wallet, Colors.blue),
-              _buildKpiCard('Ventas Efectivo', '\$${turno["ventas_efectivo"]} MXN', Icons.payments, Colors.green),
-              _buildKpiCard('Ventas Tarjetas', '\$${turno["ventas_tarjeta"]} MXN', Icons.credit_card, Colors.purple),
-              _buildKpiCard('Transferencias', '\$${turno["ventas_transferencia"]} MXN', Icons.swap_horiz, Colors.orange),
-              _buildKpiCard('Total Vendido', '\$${turno["total_ventas"]} MXN ($totalTickets tickets)', Icons.receipt, Colors.teal),
-              _buildKpiCard('Efectivo Esperado', '\$${efectivoEsperado.toStringAsFixed(2)} MXN', Icons.savings, Colors.indigo, esDestacado: true),
-            ],
+          LayoutBuilder(
+            builder: (context, kConstraints) {
+              final double w = kConstraints.maxWidth;
+              final double cardWidth = w < 480 ? (w - 12) / 2 : (w < 800 ? (w - 24) / 3 : 210);
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildKpiCard('Fondo Inicial', '\$${turno["monto_apertura"]} MXN', Icons.account_balance_wallet, Colors.blue, cardWidth: cardWidth),
+                  _buildKpiCard('Ventas Efectivo', '\$${turno["ventas_efectivo"]} MXN', Icons.payments, Colors.green, cardWidth: cardWidth),
+                  _buildKpiCard('Ventas Tarjetas', '\$${turno["ventas_tarjeta"]} MXN', Icons.credit_card, Colors.purple, cardWidth: cardWidth),
+                  _buildKpiCard('Transferencias', '\$${turno["ventas_transferencia"]} MXN', Icons.swap_horiz, Colors.orange, cardWidth: cardWidth),
+                  _buildKpiCard('Total Vendido', '\$${turno["total_ventas"]} MXN ($totalTickets tickets)', Icons.receipt, Colors.teal, cardWidth: cardWidth),
+                  _buildKpiCard('Efectivo Esperado', '\$${efectivoEsperado.toStringAsFixed(2)} MXN', Icons.savings, Colors.indigo, esDestacado: true, cardWidth: cardWidth),
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildKpiCard(String titulo, String valor, IconData icono, MaterialColor color, {bool esDestacado = false}) {
+  Widget _buildKpiCard(String titulo, String valor, IconData icono, MaterialColor color, {bool esDestacado = false, double? cardWidth}) {
     return Container(
-      width: 210,
+      width: cardWidth ?? 210,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: esDestacado ? color.shade50 : Colors.white,

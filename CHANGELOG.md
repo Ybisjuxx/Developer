@@ -6,6 +6,30 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.3] - 2026-11-02 (Escáner de Código de Barras con Cámara y Modo Vertical/Portrait)
+
+### 📸 Lector de Código de Barras Móvil con Cámara (`mobile_scanner`)
+- **Escáner Óptico con Cámara en Punto de Venta (`pos_screen.dart`, `lector_codigo_barras_dialog.dart`):**
+  - Integración del paquete de escaneo por cámara de alta velocidad `mobile_scanner: ^7.5.0` con soporte automático Web/Android/iOS (`BarcodeDetector` y fallback WASM).
+  - Nuevo botón de cámara (`Icons.camera_alt`) situado en la barra de búsqueda de medicamentos del mostrador y en la búsqueda de tickets de facturación (`ventas_screen.dart`).
+  - Visor interactivo con retícula de enfoque táctil, botón de linterna (flash), alternancia de cámara frontal/trasera y modo de respaldo para ingreso manual si la cámara no enfoca.
+  - Al detectar el código de barras, busca el medicamento por coincidencia exacta, valida stock en tiempo real y lo agrega de inmediato al carrito con notificación emergente.
+
+### 📱 Optimización de Pantallas Verticales (Modo Portrait / Móvil Vertical)
+- **Eliminación de Contenedores y Alturas Rígidas:**
+  - Sustitución de alturas fijas en modales (búsqueda de clientes y chat de IA) por alturas elásticas (`MediaQuery * 0.65` / `0.70` con `maxHeight` seguro) para evitar desbordamientos cuando el teclado táctil se despliega.
+  - El Bottom Sheet del Ticket ahora incorpora `viewInsets.bottom` para elevarse dinámicamente sobre el teclado de la pantalla.
+- **Botones y Funciones Ocultas Recuperados en Inventario (`inventario_screen.dart`):**
+  - En la lista de lotes, el número de lote, stock y metadatos se reorganizan verticalmente en pantallas $< 500$px, asegurando que los botones de acción administrativa (**Ajustar Stock** y **Dar de Baja**) permanezcan 100% visibles y accesibles con el pulgar.
+  - En el listado de caducidades FEFO, las tarjetas adaptan sus acciones y badges para no desbordar lateralmente.
+  - El banner superior y el buscador con filtros de caducidades ahora usan disposición responsiva en dos niveles.
+- **Arqueo y Turno de Caja (`caja_screen.dart`):**
+  - Las tarjetas KPI del turno activo calculan dinámicamente su ancho con `(ancho - espacio) / 2` en celulares, formando una cuadrícula perfecta de 2 columnas que aprovecha el 100% del ancho vertical sin espacios muertos.
+- **Preservación Total en PC:**
+  - Cero afectación a la experiencia en monitores y computadoras: los selectores condicionales (`LayoutBuilder` y `constraints.maxWidth >= 850px`) garantizan que la versión de escritorio conserve su disposición amplia original de dos columnas y paneles extendidos.
+
+---
+
 ## [1.4.2] - 2026-11-02 (Optimizacion Responsiva para Moviles y Tablets Android)
 
 ### Optimización Móvil y Adaptabilidad Responsiva

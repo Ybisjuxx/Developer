@@ -270,15 +270,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
                             children: [
-                              const Icon(Icons.cake, size: 16, color: Colors.teal),
-                              const SizedBox(width: 6),
-                              const Text('Fecha de Nacimiento (Opcional):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              const Spacer(),
+                              const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.cake, size: 16, color: Colors.teal),
+                                  SizedBox(width: 6),
+                                  Text('Fecha de Nacimiento:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
                               TextButton.icon(
                                 icon: const Icon(Icons.calendar_month, color: Colors.teal, size: 16),
-                                label: const Text('Buscar en calendario', style: TextStyle(fontSize: 11)),
+                                label: const Text('Calendario', style: TextStyle(fontSize: 11)),
                                 onPressed: () async {
                                   final picked = await showDatePicker(
                                     context: context,

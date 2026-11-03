@@ -1174,11 +1174,14 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Divider(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         const Text(
-                          'Lotes en existencia (ordenados por fecha de caducidad para FEFO):',
+                          'Lotes en existencia (Prioridad FEFO):',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         if (!_usuarioTienePermisoInventario)
@@ -1212,9 +1215,10 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                               color: loteActivo ? Colors.grey.shade200 : Colors.red.shade200,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Column(
+                          child: LayoutBuilder(
+                            builder: (context, lConstraints) {
+                              final bool isNarrow = lConstraints.maxWidth < 500;
+                              final infoContent = Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
@@ -1265,29 +1269,55 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                                       ),
                                     ),
                                 ],
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${lote["stock_actual"]} pzas',
-                                style: TextStyle(
-                                  color: loteActivo ? Colors.teal.shade800 : Colors.grey,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Botones de acción administrativa (Sub-Agente 3)
-                              IconButton(
-                                icon: const Icon(Icons.tune, size: 20, color: Colors.teal),
-                                tooltip: 'Ajustar piezas de lote',
-                                onPressed: () => _dialogoAjustarPiezasLote(p, lote),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                                tooltip: 'Dar de baja lote',
-                                onPressed: loteActivo ? () => _dialogoDarDeBajaLote(p, lote) : null,
-                              ),
-                            ],
+                              );
+
+                              final actionsContent = Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${lote["stock_actual"]} pzas',
+                                    style: TextStyle(
+                                      color: loteActivo ? Colors.teal.shade800 : Colors.grey,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.tune, size: 20, color: Colors.teal),
+                                    tooltip: 'Ajustar piezas de lote',
+                                    onPressed: () => _dialogoAjustarPiezasLote(p, lote),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                    tooltip: 'Dar de baja lote',
+                                    onPressed: loteActivo ? () => _dialogoDarDeBajaLote(p, lote) : null,
+                                  ),
+                                ],
+                              );
+
+                              if (isNarrow) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    infoContent,
+                                    const SizedBox(height: 6),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: actionsContent,
+                                    ),
+                                  ],
+                                );
+                              } else {
+                                return Row(
+                                  children: [
+                                    Expanded(child: infoContent),
+                                    const SizedBox(width: 12),
+                                    actionsContent,
+                                  ],
+                                );
+                              }
+                            },
                           ),
                         );
                       }),
@@ -1364,76 +1394,99 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
               bottom: BorderSide(color: criticos > 0 ? Colors.red.shade200 : Colors.amber.shade200),
             ),
           ),
-          child: Row(
-            children: [
-              Icon(
-                criticos > 0 ? Icons.alarm_on : Icons.warning_amber_rounded,
-                color: criticos > 0 ? Colors.red.shade900 : Colors.orange.shade900,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Monitoreo Sanitario de Caducidades (Prioridad FEFO)',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: criticos > 0 ? Colors.red.shade900 : Colors.orange.shade900,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, bConstraints) {
+              final isNarrow = bConstraints.maxWidth < 650;
+              final iconAndText = Row(
+                children: [
+                  Icon(
+                    criticos > 0 ? Icons.alarm_on : Icons.warning_amber_rounded,
+                    color: criticos > 0 ? Colors.red.shade900 : Colors.orange.shade900,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Monitoreo Sanitario de Caducidades (Prioridad FEFO)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: criticos > 0 ? Colors.red.shade900 : Colors.orange.shade900,
+                          ),
+                        ),
+                        Text(
+                          '${_lotesCaducidades.length} lotes detectados ($piezasRiesgo piezas en anaquel). Surtir prioritariamente antes de caducar.',
+                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '${_lotesCaducidades.length} lotes detectados ($piezasRiesgo piezas en anaquel). Surtir prioritariamente antes de caducar.',
-                      style: const TextStyle(fontSize: 12, color: Colors.black87),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton.tonalIcon(
+                  ),
+                ],
+              );
+
+              final refreshBtn = FilledButton.tonalIcon(
                 onPressed: _cargarTodo,
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('Actualizar'),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    iconAndText,
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerRight, child: refreshBtn),
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(child: iconAndText),
+                    const SizedBox(width: 12),
+                    refreshBtn,
+                  ],
+                );
+              }
+            },
           ),
         ),
 
         // Filtros y Búsqueda de Lotes por Caducar
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: 'Filtrar por medicamento, sustancia o lote...',
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: _busquedaCaducidad.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => setState(() => _busquedaCaducidad = ''),
-                          )
-                        : null,
-                  ),
-                  onChanged: (val) => setState(() => _busquedaCaducidad = val.trim()),
+          child: LayoutBuilder(
+            builder: (context, fConstraints) {
+              final isNarrow = fConstraints.maxWidth < 650;
+              final searchField = TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Filtrar por medicamento, sustancia o lote...',
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _busquedaCaducidad.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _busquedaCaducidad = ''),
+                        )
+                      : null,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 6,
-                child: Wrap(
-                  spacing: 8,
+                onChanged: (val) => setState(() => _busquedaCaducidad = val.trim()),
+              );
+
+              final chips = SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
                     ChoiceChip(
                       label: Text('Todos (${_lotesCaducidades.length})'),
                       selected: _filtroCaducidad == 'TODOS',
                       onSelected: (_) => setState(() => _filtroCaducidad = 'TODOS'),
                     ),
+                    const SizedBox(width: 8),
                     ChoiceChip(
                       avatar: const Icon(Icons.alarm, color: Colors.red, size: 16),
                       label: Text('Críticos <= 30d ($criticos)'),
@@ -1441,6 +1494,7 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                       selectedColor: Colors.red.shade100,
                       onSelected: (_) => setState(() => _filtroCaducidad = 'CRITICA'),
                     ),
+                    const SizedBox(width: 8),
                     ChoiceChip(
                       avatar: const Icon(Icons.schedule, color: Colors.amber, size: 16),
                       label: Text('Preventivos ($preventivos)'),
@@ -1448,7 +1502,8 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                       selectedColor: Colors.amber.shade100,
                       onSelected: (_) => setState(() => _filtroCaducidad = 'PREVENTIVA'),
                     ),
-                    if (caducados > 0)
+                    if (caducados > 0) ...[
+                      const SizedBox(width: 8),
                       ChoiceChip(
                         avatar: const Icon(Icons.block, color: Colors.purple, size: 16),
                         label: Text('Caducados ($caducados)'),
@@ -1456,10 +1511,30 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                         selectedColor: Colors.purple.shade100,
                         onSelected: (_) => setState(() => _filtroCaducidad = 'CADUCADO'),
                       ),
+                    ],
                   ],
                 ),
-              ),
-            ],
+              );
+
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 8),
+                    chips,
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(flex: 4, child: searchField),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 6, child: chips),
+                  ],
+                );
+              }
+            },
           ),
         ),
         const Divider(height: 1),
@@ -1546,40 +1621,42 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Cabecera: Producto y Badge de Urgencia
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            lote['nombre_comercial'] ?? 'Medicamento',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          lote['nombre_comercial'] ?? 'Medicamento',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade200,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '${lote["grupo_farmacopea"] ?? "GRUPO_VI"}',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
+                          child: Text(
+                            '${lote["grupo_farmacopea"] ?? "GRUPO_VI"}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${lote["sustancia_activa"]} • ${lote["presentacion"]}',
-                        style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${lote["sustancia_activa"]} • ${lote["presentacion"]}',
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                    ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1626,52 +1703,79 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
             const SizedBox(height: 8),
 
             // Existencias y Acciones de Control
-            Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            LayoutBuilder(
+              builder: (context, cConstraints) {
+                final bool isNarrow = cConstraints.maxWidth < 650;
+                final infoRow = Row(
                   children: [
-                    Text('Existencia en anaquel:', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                    Text(
-                      '$stock piezas disponibles',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: stock > 0 ? Colors.teal.shade900 : Colors.red,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Existencia en anaquel:', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        Text(
+                          '$stock piezas disponibles',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: stock > 0 ? Colors.teal.shade900 : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Precio al público:', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        Text(
+                          '\$${lote["precio_venta"]} MXN',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                const SizedBox(width: 24),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Precio al público:', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                    Text(
-                      '\$${lote["precio_venta"]} MXN',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                  ],
-                ),
-                const Spacer(),
+                );
 
-                // Botones de acción rápida autorizada
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Ajustar Stock'),
-                  onPressed: () => _dialogoAjustarPiezasLote(productoPadre, loteAdaptado),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red.shade50,
-                    foregroundColor: Colors.red.shade800,
-                  ),
-                  icon: const Icon(Icons.delete_sweep, size: 18),
-                  label: const Text('Baja / Cuarentena'),
-                  onPressed: () => _dialogoDarDeBajaLote(productoPadre, loteAdaptado),
-                ),
-              ],
+                final actionBtns = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.tune, size: 16),
+                      label: const Text('Ajustar Stock', style: TextStyle(fontSize: 11)),
+                      onPressed: () => _dialogoAjustarPiezasLote(productoPadre, loteAdaptado),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade50,
+                        foregroundColor: Colors.red.shade800,
+                      ),
+                      icon: const Icon(Icons.delete_sweep, size: 16),
+                      label: const Text('Baja', style: TextStyle(fontSize: 11)),
+                      onPressed: () => _dialogoDarDeBajaLote(productoPadre, loteAdaptado),
+                    ),
+                  ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      infoRow,
+                      const SizedBox(height: 8),
+                      Align(alignment: Alignment.centerRight, child: actionBtns),
+                    ],
+                  );
+                } else {
+                  return Row(
+                    children: [
+                      infoRow,
+                      const Spacer(),
+                      actionBtns,
+                    ],
+                  );
+                }
+              },
             ),
           ],
         ),

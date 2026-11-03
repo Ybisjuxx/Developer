@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/medico.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/lector_codigo_barras_dialog.dart';
 import '../widgets/ticket_impresion_dialog.dart';
 
 class PosScreen extends StatefulWidget {
@@ -357,8 +358,8 @@ class _PosScreenState extends State<PosScreen> {
             ),
             content: Container(
               width: MediaQuery.of(context).size.width * 0.9,
-              constraints: const BoxConstraints(maxWidth: 560),
-              height: 500,
+              height: MediaQuery.of(context).size.height * 0.70,
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 540),
               child: Column(
                 children: [
                   TextField(
@@ -697,6 +698,17 @@ class _PosScreenState extends State<PosScreen> {
     }).toList();
   }
 
+  // Apertura de escáner de código de barras con la cámara del celular
+  Future<void> _abrirEscanerCamara() async {
+    final codigo = await LectorCodigoBarrasDialog.escanear(
+      context,
+      titulo: 'Escanear Medicamento para Cobro',
+    );
+    if (codigo != null && codigo.trim().isNotEmpty) {
+      _procesarEscaneoCodigoBarras(codigo.trim());
+    }
+  }
+
   // Soporte para pistola / escáner de código de barras
   void _procesarEscaneoCodigoBarras(String valor) {
     final codigo = valor.trim();
@@ -940,33 +952,38 @@ class _PosScreenState extends State<PosScreen> {
       builder: (bottomSheetContext) {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
-            return Container(
-              height: MediaQuery.of(sheetContext).size.height * 0.88,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
               ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 10, bottom: 6),
-                    width: 44,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade400,
-                      borderRadius: BorderRadius.circular(3),
+              child: Container(
+                height: MediaQuery.of(sheetContext).size.height * 0.90,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(top: 10, bottom: 6),
+                      width: 44,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade400,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _construirTicketWidget(
-                      enBottomSheet: true,
-                      onActualizar: () {
-                        setSheetState(() {});
-                        setState(() {});
-                      },
+                    Expanded(
+                      child: _construirTicketWidget(
+                        enBottomSheet: true,
+                        onActualizar: () {
+                          setSheetState(() {});
+                          setState(() {});
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -1633,15 +1650,24 @@ class _PosScreenState extends State<PosScreen> {
                             ? 'Buscar por nombre o fórmula...'
                             : 'Buscar por nombre, sustancia activa o escanea código de barras...',
                         prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _busquedaController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_busquedaController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
                                 onPressed: () {
                                   _busquedaController.clear();
                                   setState(() {});
                                 },
-                              )
-                            : const Icon(Icons.qr_code_scanner, color: Colors.grey),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.camera_alt, color: Colors.teal),
+                              tooltip: 'Escanear código de barras con la cámara',
+                              onPressed: _abrirEscanerCamara,
+                            ),
+                          ],
+                        ),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
@@ -1734,139 +1760,159 @@ class _PosScreenState extends State<PosScreen> {
                           ],
                         ),
                       )
-                    : GridView.builder(
-                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: isMobile ? 185 : 260,
-                          childAspectRatio: isMobile ? 0.74 : 0.86,
-                          crossAxisSpacing: isMobile ? 8 : 12,
-                          mainAxisSpacing: isMobile ? 8 : 12,
-                        ),
-                        itemCount: productosVisibles.length,
-                        itemBuilder: (context, index) {
-                          final p = productosVisibles[index];
-                          final int stock = p['stock_total'] ?? 0;
-                          final bool reqReceta = p['requiere_receta'] == true;
-                          final int enCarrito = _cantidadEnCarrito(p['id']);
+                    : LayoutBuilder(
+                        builder: (context, gConstraints) {
+                          final double gWidth = gConstraints.maxWidth;
+                          final bool isSmallPhone = gWidth < 420;
+                          final double maxExtent = isSmallPhone ? 175 : (isMobile ? 190 : 260);
+                          final double aspectRatio = isSmallPhone ? 0.67 : (isMobile ? 0.72 : 0.86);
 
-                          return Card(
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: enCarrito > 0
-                                    ? Colors.teal.shade400
-                                    : Colors.grey.shade200,
-                                width: enCarrito > 0 ? 2 : 1,
-                              ),
+                          return GridView.builder(
+                            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: maxExtent,
+                              childAspectRatio: aspectRatio,
+                              crossAxisSpacing: isMobile ? 8 : 12,
+                              mainAxisSpacing: isMobile ? 8 : 12,
                             ),
-                            child: InkWell(
-                              onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                              child: Padding(
-                                padding: const EdgeInsets.all(10.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Barra Superior: Clasificación y Stock
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: reqReceta ? Colors.amber.shade100 : Colors.teal.shade50,
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            p['grupo_farmacopea'] ?? 'GRUPO_VI',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: reqReceta ? Colors.amber.shade900 : Colors.teal.shade900,
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          'Stock: $stock',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                            color: stock > 0 ? Colors.green.shade800 : Colors.red,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
+                            itemCount: productosVisibles.length,
+                            itemBuilder: (context, index) {
+                              final p = productosVisibles[index];
+                              final int stock = p['stock_total'] ?? 0;
+                              final bool reqReceta = p['requiere_receta'] == true;
+                              final int enCarrito = _cantidadEnCarrito(p['id']);
 
-                                    // Nombre comercial
-                                    Text(
-                                      p['nombre_comercial'],
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
-                                    ),
-                                    // Sustancia activa
-                                    Text(
-                                      p['sustancia_activa'],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                                    ),
-                                    const Spacer(),
-
-                                    // Presentación y Laboratorio
-                                    Text(
-                                      p['presentacion'],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
-                                    ),
-                                    Text(
-                                      p['laboratorio'],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(fontSize: 9, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
-                                    ),
-                                    const SizedBox(height: 4),
-
-                                    // Precio y Botón de Añadir con Badge
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          '\$${p["precio_venta"]} MXN',
-                                          style: TextStyle(
-                                            fontSize: isMobile ? 12 : 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.teal.shade900,
-                                          ),
-                                        ),
-                                        if (enCarrito > 0)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: Colors.teal.shade800,
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Text(
-                                              '🛒 $enCarrito',
-                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                            ),
-                                          )
-                                        else
-                                          FilledButton.tonal(
-                                            style: FilledButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6),
-                                              minimumSize: const Size(32, 28),
-                                            ),
-                                            onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                            child: const Icon(Icons.add_shopping_cart, size: 14),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
+                              return Card(
+                                clipBehavior: Clip.antiAlias,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: enCarrito > 0
+                                        ? Colors.teal.shade400
+                                        : Colors.grey.shade200,
+                                    width: enCarrito > 0 ? 2 : 1,
+                                  ),
                                 ),
-                              ),
-                            ),
+                                child: InkWell(
+                                  onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(9.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Barra Superior: Clasificación y Stock
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: reqReceta ? Colors.amber.shade100 : Colors.teal.shade50,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                p['grupo_farmacopea'] ?? 'GRUPO_VI',
+                                                style: TextStyle(
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: reqReceta ? Colors.amber.shade900 : Colors.teal.shade900,
+                                                ),
+                                              ),
+                                            ),
+                                            Text(
+                                              'Stock: $stock',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: stock > 0 ? Colors.green.shade800 : Colors.red,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+
+                                        // Nombre comercial y sustancia
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              p['nombre_comercial'],
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
+                                            ),
+                                            Text(
+                                              p['sustancia_activa'],
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                            ),
+                                          ],
+                                        ),
+
+                                        // Presentación y Laboratorio
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              p['presentacion'],
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
+                                            ),
+                                            Text(
+                                              p['laboratorio'],
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontSize: 9, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                                            ),
+                                          ],
+                                        ),
+
+                                        // Precio y Botón de Añadir con Badge
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                '\$${p["precio_venta"]} MXN',
+                                                style: TextStyle(
+                                                  fontSize: isMobile ? 11 : 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.teal.shade900,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (enCarrito > 0)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.teal.shade800,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  '🛒 $enCarrito',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                ),
+                                              )
+                                            else
+                                              FilledButton.tonal(
+                                                style: FilledButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                                                  minimumSize: const Size(32, 28),
+                                                ),
+                                                onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                                child: const Icon(Icons.add_shopping_cart, size: 14),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         },
                       ),

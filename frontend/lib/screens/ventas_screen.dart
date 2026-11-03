@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/lector_codigo_barras_dialog.dart';
 import '../widgets/ticket_impresion_dialog.dart';
 
 class VentasScreen extends StatefulWidget {
@@ -407,7 +408,10 @@ class _VentasScreenState extends State<VentasScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text('IVA (Medicamentos Tasa 0% / Misceláneos 16%):', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                const Expanded(
+                                  child: Text('IVA (Medicamentos Tasa 0% / Misceláneos 16%):', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                                ),
+                                const SizedBox(width: 6),
                                 const Text('\$0.00 MXN (Tasa 0%)', style: TextStyle(fontSize: 11, color: Colors.black54)),
                               ],
                             ),
@@ -800,8 +804,11 @@ class _VentasScreenState extends State<VentasScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Encabezado
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Text(
                   'Historial de Ventas, Tickets y Facturación',
@@ -828,7 +835,20 @@ class _VentasScreenState extends State<VentasScreen> {
                         controller: _ticketSearchController,
                         decoration: InputDecoration(
                           hintText: isNarrow ? 'Folio ticket (TK-...)...' : 'Folio de ticket (ej: TK-...)...',
-                          prefixIcon: const Icon(Icons.qr_code_scanner, size: 20),
+                          prefixIcon: IconButton(
+                            icon: const Icon(Icons.camera_alt, color: Colors.indigo, size: 20),
+                            tooltip: 'Escanear QR o código del ticket',
+                            onPressed: () async {
+                              final cod = await LectorCodigoBarrasDialog.escanear(
+                                context,
+                                titulo: 'Escanear Ticket para Facturar',
+                              );
+                              if (cod != null && cod.trim().isNotEmpty) {
+                                _ticketSearchController.text = cod.trim();
+                                _buscarTicketParaFacturar(cod.trim());
+                              }
+                            },
+                          ),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           filled: true,
                           fillColor: Colors.white,
