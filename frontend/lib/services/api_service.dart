@@ -7,11 +7,14 @@ import '../models/medico.dart';
 class ApiService {
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://127.0.0.1:8000';
+      if (Uri.base.host == 'localhost' || Uri.base.host == '127.0.0.1') {
+        return 'http://127.0.0.1:8000';
+      }
+      return 'https://developer-80fs.onrender.com';
     }
     try {
       if (Platform.isAndroid) {
-        return 'http://10.0.2.2:8000';
+        return 'https://developer-80fs.onrender.com';
       }
     } catch (_) {}
     return 'http://127.0.0.1:8000';
