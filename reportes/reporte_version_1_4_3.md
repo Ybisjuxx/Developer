@@ -47,3 +47,4 @@ Atender la retroalimentación de uso en smartphones Android en **orientación ve
 ## 🚀 Despliegue
 - **Web App (GitHub Pages):** `https://ybisjuxx.github.io/Developer/`
 - **Backend API (Render Cloud):** `https://developer-80fs.onrender.com`
+
