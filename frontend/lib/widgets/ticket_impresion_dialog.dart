@@ -275,7 +275,6 @@ class TicketImpresionDialog extends StatelessWidget {
         ),
       ),
       actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      actionsOverflowButtonSpacing: 8,
       actions: [
         OutlinedButton.icon(
           icon: const Icon(Icons.receipt_long, size: 18),
