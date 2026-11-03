@@ -33,6 +33,7 @@ class _PosScreenState extends State<PosScreen> {
   String _metodoPago = 'EFECTIVO';
   Medico? _medicoSeleccionado;
   bool _procesandoVenta = false;
+  bool _ticketSheetAbierto = false;
 
   double get _descuento {
     if (_clienteSeleccionado != null) {
@@ -107,8 +108,9 @@ class _PosScreenState extends State<PosScreen> {
               Text('Registro Exprés de Cliente'),
             ],
           ),
-          content: SizedBox(
-            width: 440,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 440),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -353,8 +355,9 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 560,
+            content: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              constraints: const BoxConstraints(maxWidth: 560),
               height: 500,
               child: Column(
                 children: [
@@ -903,6 +906,11 @@ class _PosScreenState extends State<PosScreen> {
       _cargarDatos();
       widget.onVentaCompletada();
 
+      if (_ticketSheetAbierto && mounted) {
+        Navigator.of(context).pop();
+        _ticketSheetAbierto = false;
+      }
+
       // Abrir modal térmico realista con opción de imprimir
       TicketImpresionDialog.mostrar(context, ticket);
     } catch (e) {
@@ -923,6 +931,627 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
+  void _abrirTicketBottomSheet() {
+    _ticketSheetAbierto = true;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                  Expanded(
+                    child: _construirTicketWidget(
+                      enBottomSheet: true,
+                      onActualizar: () {
+                        setSheetState(() {});
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      _ticketSheetAbierto = false;
+    });
+  }
+
+  Widget _construirBarraResumenCarritoMobile() {
+    final int cantidadTotal = _carrito.fold<int>(0, (sum, item) => sum + (item['cantidad'] as int));
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            offset: const Offset(0, -3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Badge(
+              isLabelVisible: _carrito.isNotEmpty,
+              label: Text('$cantidadTotal'),
+              backgroundColor: Colors.teal.shade800,
+              child: const Icon(Icons.shopping_cart, color: Colors.teal, size: 26),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_carrito.length} ${_carrito.length == 1 ? "artículo" : "artículos"}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  ),
+                  Text(
+                    '\$${_total.toStringAsFixed(2)} MXN',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.teal.shade900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: _carrito.isEmpty ? Colors.grey.shade400 : Colors.teal.shade800,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+              onPressed: _carrito.isEmpty ? null : _abrirTicketBottomSheet,
+              icon: const Icon(Icons.receipt_long, size: 18),
+              label: const Text('Ver Ticket / Cobrar', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _construirTicketWidget({bool enBottomSheet = false, VoidCallback? onActualizar}) {
+    void refrescar() {
+      if (onActualizar != null) {
+        onActualizar();
+      } else {
+        setState(() {});
+      }
+    }
+
+    return Container(
+      color: Colors.grey.shade50,
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long, color: Colors.teal),
+              const SizedBox(width: 8),
+              Text(
+                'Ticket de Venta',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              if (_carrito.isNotEmpty)
+                TextButton(
+                  onPressed: () {
+                    _carrito.clear();
+                    refrescar();
+                  },
+                  child: const Text('Vaciar', style: TextStyle(color: Colors.red, fontSize: 12)),
+                ),
+              if (enBottomSheet)
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cerrar ticket',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Sub-Agente 3: Barra Buscadora y Confirmación de Clientes por Teléfono / Fecha de Nacimiento
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.person, color: Colors.teal, size: 16),
+                  SizedBox(width: 4),
+                  Text('Cliente / Lealtad:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Row(
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.search, size: 14),
+                    label: const Text('Buscar (Tel)', style: TextStyle(fontSize: 11)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: const Size(40, 24),
+                    ),
+                    onPressed: () async {
+                      await _abrirBuscadorYConfirmacionCliente();
+                      refrescar();
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  TextButton.icon(
+                    icon: const Icon(Icons.person_add, size: 14),
+                    label: const Text('Nuevo', style: TextStyle(fontSize: 11)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      minimumSize: const Size(40, 24),
+                    ),
+                    onPressed: () async {
+                      await _modalNuevoClienteRapido();
+                      refrescar();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (_clienteSeleccionado == null)
+            InkWell(
+              onTap: () async {
+                await _abrirBuscadorYConfirmacionCliente();
+                refrescar();
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 12,
+                      backgroundColor: Colors.blueGrey,
+                      child: Icon(Icons.person_outline, size: 14, color: Colors.white),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('👤 Público General', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text('Toca para buscar por teléfono o nombre...', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.search, size: 18, color: Colors.teal),
+                      tooltip: 'Buscar cliente por teléfono o nombre',
+                      onPressed: () async {
+                        await _abrirBuscadorYConfirmacionCliente();
+                        refrescar();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.teal.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.teal.shade300),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Colors.teal.shade700,
+                    child: const Icon(Icons.person, size: 15, color: Colors.white),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '⭐️ ${_clienteSeleccionado!["nombre"]} ${_clienteSeleccionado!["apellido"]}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            if (_clienteSeleccionado!['telefono'] != null)
+                              Text('📞 ${_clienteSeleccionado!["telefono"]}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                            if (_clienteSeleccionado!['fecha_nacimiento'] != null)
+                              Text('🎂 ${_clienteSeleccionado!["fecha_nacimiento"]}', style: const TextStyle(fontSize: 10, color: Colors.purple)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.teal),
+                    tooltip: 'Cambiar cliente',
+                    onPressed: () async {
+                      await _abrirBuscadorYConfirmacionCliente();
+                      refrescar();
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                    tooltip: 'Quitar cliente (Público General)',
+                    onPressed: () {
+                      _clienteSeleccionado = null;
+                      _compradorController.text = 'Público General';
+                      refrescar();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          if (_clienteSeleccionado != null) ...[
+            if (_clienteSeleccionado!['alerta_resurtimiento_activa'] == true) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade800, width: 1.5),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.notification_important, color: Colors.amber.shade900, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '🔔 AVISO AL CAJERO: RESURTIMIENTO',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade900,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _clienteSeleccionado!['mensaje_alerta_resurtimiento'] ??
+                                'Sugerir al paciente el resurtimiento de su tratamiento.',
+                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.loyalty, color: Colors.green, size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Beneficio: ${_clienteSeleccionado!["descuento_porcentaje"]}% de Descuento aplicado',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_clienteSeleccionado!['enfermedades'] != null && (_clienteSeleccionado!['enfermedades'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: (_clienteSeleccionado!['enfermedades'] as List).map((enf) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade100,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '🩺 ${enf["codigo_cie"]}',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+
+          // Si requiere receta, selector de médico
+          if (_requiereMedico) ...[
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                border: Border.all(color: Colors.amber.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning, size: 16, color: Colors.amber.shade900),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Medicamento Controlado / Antibiótico',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.amber.shade900),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<Medico>(
+                    initialValue: _medicoSeleccionado,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Médico que Prescribe (Cédula Vigente) *',
+                      isDense: true,
+                    ),
+                    items: _medicos.map((m) {
+                      return DropdownMenuItem(
+                        value: m,
+                        child: Text('Dr. ${m.nombreCompleto} (Céd: ${m.cedulaProfesional})', overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      _medicoSeleccionado = val;
+                      refrescar();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          // Lista del Carrito
+          Expanded(
+            child: _carrito.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.add_shopping_cart, size: 48, color: Colors.grey.shade400),
+                        const SizedBox(height: 8),
+                        const Text('Selecciona productos del catálogo'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'O escanea el código de barras en la búsqueda',
+                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: _carrito.length,
+                    separatorBuilder: (_, __) => const Divider(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = _carrito[index];
+                      final p = item['producto'];
+                      final cant = item['cantidad'] as int;
+                      final sub = (p['precio_venta'] as num) * cant;
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p['nombre_comercial'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('\$${p["precio_venta"]} c/u', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline, size: 20),
+                            onPressed: () {
+                              _cambiarCantidad(index, -1);
+                              refrescar();
+                            },
+                          ),
+                          Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline, size: 20),
+                            onPressed: () {
+                              _cambiarCantidad(index, 1);
+                              refrescar();
+                            },
+                          ),
+                          SizedBox(
+                            width: 70,
+                            child: Text(
+                              '\$$sub',
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+
+          // Método de Pago y Totales
+          const Divider(height: 16),
+
+          // Selector de Método de Pago
+          Row(
+            children: [
+              const Text('Método de Pago: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              DropdownButton<String>(
+                value: _metodoPago,
+                isDense: true,
+                underline: const SizedBox(),
+                items: const [
+                  DropdownMenuItem(value: 'EFECTIVO', child: Text('💵 Efectivo')),
+                  DropdownMenuItem(value: 'TARJETA', child: Text('💳 Tarjeta')),
+                  DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('🏦 Transferencia')),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    _metodoPago = val;
+                    refrescar();
+                  }
+                },
+              ),
+            ],
+          ),
+
+          // Si es efectivo, input de Paga con y cálculo de cambio
+          if (_metodoPago == 'EFECTIVO' && _carrito.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _montoRecibidoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Paga con (\$ MXN)',
+                      isDense: true,
+                      prefixIcon: Icon(Icons.attach_money, size: 18),
+                    ),
+                    onChanged: (_) => refrescar(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
+                  onPressed: () {
+                    _montoRecibidoController.text = _total.toStringAsFixed(2);
+                    refrescar();
+                  },
+                  child: const Text('Exacto', style: TextStyle(fontSize: 11)),
+                ),
+              ],
+            ),
+            if (_cambio > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Cambio a entregar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text('\$${_cambio.toStringAsFixed(2)} MXN', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                ],
+              ),
+            ],
+          ],
+
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Subtotal:', style: TextStyle(fontSize: 13, color: Colors.blueGrey)),
+              Text(
+                '\$${_subtotal.toStringAsFixed(2)} MXN',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          if (_descuento > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Desc. Lealtad (${_clienteSeleccionado!["descuento_porcentaje"]}%):',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                ),
+                Text(
+                  '-\$${_descuento.toStringAsFixed(2)} MXN',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Total a Cobrar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text(
+                '\$${_total.toStringAsFixed(2)} MXN',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.teal.shade800,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            onPressed: _procesandoVenta
+                ? null
+                : () async {
+                    await _cobrarVenta();
+                    refrescar();
+                  },
+            icon: _procesandoVenta
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.payments),
+            label: Text(_procesandoVenta ? 'Despachando FEFO...' : 'Cobrar e Imprimir Ticket'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -931,792 +1560,342 @@ class _PosScreenState extends State<PosScreen> {
 
     final productosVisibles = _productosFiltrados;
 
-    return Scaffold(
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // =================================================================
-          // SECCIÓN IZQUIERDA: CATÁLOGO Y BÚSQUEDA RÁPIDA DE MOSTRADOR
-          // =================================================================
-          Expanded(
-            flex: 3,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Encabezado y Contador de Inventario
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.point_of_sale, color: Colors.teal.shade800),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Despacho y Cobro en Mostrador',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.teal.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.teal.shade200),
-                            ),
-                            child: Text(
-                              '${productosVisibles.length} de ${_productos.length} medicamentos',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal.shade900,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.refresh),
-                            onPressed: _cargarDatos,
-                            tooltip: 'Recargar stock',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isMobile = constraints.maxWidth < 850;
 
-                  // Barra de Búsqueda Inteligente + Lector de Código de Barras
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _busquedaController,
-                          focusNode: _busquedaFocus,
-                          decoration: InputDecoration(
-                            hintText: 'Buscar por nombre, sustancia activa o escanea código de barras...',
-                            prefixIcon: const Icon(Icons.search),
-                            suffixIcon: _busquedaController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear),
-                                    onPressed: () {
-                                      _busquedaController.clear();
-                                      setState(() {});
-                                    },
-                                  )
-                                : const Icon(Icons.qr_code_scanner, color: Colors.grey),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                          ),
-                          onChanged: (_) => setState(() {}),
-                          onSubmitted: _procesarEscaneoCodigoBarras,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Chips de Filtro Rápido por Clasificación Sanitaria
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        ChoiceChip(
-                          label: const Text('Todos'),
-                          selected: _filtroGrupo == 'TODOS',
-                          onSelected: (val) => setState(() => _filtroGrupo = 'TODOS'),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('Venta Libre (Grupo VI)'),
-                          selected: _filtroGrupo == 'GRUPO_VI',
-                          selectedColor: Colors.teal.shade100,
-                          onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_VI'),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('Antibióticos (Grupo IV)'),
-                          selected: _filtroGrupo == 'GRUPO_IV',
-                          selectedColor: Colors.amber.shade100,
-                          onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_IV'),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('Controlados (Grupo I-III)'),
-                          selected: _filtroGrupo == 'CONTROLADOS',
-                          selectedColor: Colors.red.shade100,
-                          onSelected: (val) => setState(() => _filtroGrupo = 'CONTROLADOS'),
-                        ),
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          label: const Text('Crónicos (Grupo V)'),
-                          selected: _filtroGrupo == 'GRUPO_V',
-                          selectedColor: Colors.purple.shade100,
-                          onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_V'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Solo con Stock'),
-                          selected: _soloConStock,
-                          onSelected: (val) => setState(() => _soloConStock = val),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Grilla de Medicamentos
-                  Expanded(
-                    child: productosVisibles.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search_off, size: 56, color: Colors.grey.shade400),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No se encontraron medicamentos para "${_busquedaController.text.trim()}"',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Verifica la ortografía o limpia los filtros de búsqueda.',
-                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                                ),
-                                const SizedBox(height: 14),
-                                FilledButton.tonal(
-                                  onPressed: () {
-                                    _busquedaController.clear();
-                                    setState(() {
-                                      _filtroGrupo = 'TODOS';
-                                      _soloConStock = false;
-                                    });
-                                  },
-                                  child: const Text('Limpiar Filtros y Ver Todos'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : GridView.builder(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 260,
-                              childAspectRatio: 0.86,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            itemCount: productosVisibles.length,
-                            itemBuilder: (context, index) {
-                              final p = productosVisibles[index];
-                              final int stock = p['stock_total'] ?? 0;
-                              final bool reqReceta = p['requiere_receta'] == true;
-                              final int enCarrito = _cantidadEnCarrito(p['id']);
-
-                              return Card(
-                                clipBehavior: Clip.antiAlias,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: enCarrito > 0
-                                        ? Colors.teal.shade400
-                                        : Colors.grey.shade200,
-                                    width: enCarrito > 0 ? 2 : 1,
-                                  ),
-                                ),
-                                child: InkWell(
-                                  onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        // Barra Superior: Clasificación y Stock
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: reqReceta ? Colors.amber.shade100 : Colors.teal.shade50,
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                p['grupo_farmacopea'] ?? 'GRUPO_VI',
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: reqReceta ? Colors.amber.shade900 : Colors.teal.shade900,
-                                                ),
-                                              ),
-                                            ),
-                                            Text(
-                                              'Stock: $stock',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: stock > 0 ? Colors.green.shade800 : Colors.red,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-
-                                        // Nombre comercial
-                                        Text(
-                                          p['nombre_comercial'],
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                        ),
-                                        // Sustancia activa
-                                        Text(
-                                          p['sustancia_activa'],
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                        ),
-                                        const Spacer(),
-
-                                        // Presentación y Laboratorio
-                                        Text(
-                                          p['presentacion'],
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                                        ),
-                                        Text(
-                                          p['laboratorio'],
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 10, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
-                                        ),
-                                        const SizedBox(height: 6),
-
-                                        // Precio y Botón de Añadir con Badge
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              '\$${p["precio_venta"]} MXN',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.teal.shade900,
-                                              ),
-                                            ),
-                                            if (enCarrito > 0)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.teal.shade800,
-                                                  borderRadius: BorderRadius.circular(12),
-                                                ),
-                                                child: Text(
-                                                  '🛒 $enCarrito',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                                                ),
-                                              )
-                                            else
-                                              FilledButton.tonal(
-                                                style: FilledButton.styleFrom(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                                  minimumSize: const Size(36, 32),
-                                                ),
-                                                onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                                child: const Icon(Icons.add_shopping_cart, size: 16),
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const VerticalDivider(width: 1),
-
-          // =================================================================
-          // SECCIÓN DERECHA: TICKET DE VENTA, DESPACHO Y COBRO
-          // =================================================================
-          SizedBox(
-            width: 370,
-            child: Container(
-              color: Colors.grey.shade50,
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        final Widget catalogoWidget = Padding(
+          padding: EdgeInsets.all(isMobile ? 10.0 : 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Encabezado y Contador de Inventario
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.receipt_long, color: Colors.teal),
+                      Icon(Icons.point_of_sale, color: Colors.teal.shade800),
                       const SizedBox(width: 8),
                       Text(
-                        'Ticket de Venta',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        isMobile ? 'Despacho POS' : 'Despacho y Cobro en Mostrador',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: isMobile ? 18 : 22,
+                            ),
                       ),
-                      const Spacer(),
-                      if (_carrito.isNotEmpty)
-                        TextButton(
-                          onPressed: () => setState(() => _carrito.clear()),
-                          child: const Text('Vaciar', style: TextStyle(color: Colors.red, fontSize: 12)),
-                        ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-
-                  // Sub-Agente 3: Barra Buscadora y Confirmación de Clientes por Teléfono / Fecha de Nacimiento
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.person, color: Colors.teal, size: 16),
-                          SizedBox(width: 4),
-                          Text('Cliente / Lealtad:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          TextButton.icon(
-                            icon: const Icon(Icons.search, size: 14),
-                            label: const Text('Buscar (Tel)', style: TextStyle(fontSize: 11)),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              minimumSize: const Size(40, 24),
-                            ),
-                            onPressed: _abrirBuscadorYConfirmacionCliente,
-                          ),
-                          const SizedBox(width: 4),
-                          TextButton.icon(
-                            icon: const Icon(Icons.person_add, size: 14),
-                            label: const Text('Nuevo', style: TextStyle(fontSize: 11)),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              minimumSize: const Size(40, 24),
-                            ),
-                            onPressed: _modalNuevoClienteRapido,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  if (_clienteSeleccionado == null)
-                    InkWell(
-                      onTap: _abrirBuscadorYConfirmacionCliente,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 12,
-                              backgroundColor: Colors.blueGrey,
-                              child: Icon(Icons.person_outline, size: 14, color: Colors.white),
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('👤 Público General', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  Text('Toca para buscar por teléfono o nombre...', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.search, size: 18, color: Colors.teal),
-                              tooltip: 'Buscar cliente por teléfono o nombre',
-                              onPressed: _abrirBuscadorYConfirmacionCliente,
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.teal.shade300),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: Colors.teal.shade700,
-                            child: const Icon(Icons.person, size: 15, color: Colors.white),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '⭐️ ${_clienteSeleccionado!["nombre"]} ${_clienteSeleccionado!["apellido"]}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Wrap(
-                                  spacing: 6,
-                                  children: [
-                                    if (_clienteSeleccionado!['telefono'] != null)
-                                      Text('📞 ${_clienteSeleccionado!["telefono"]}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
-                                    if (_clienteSeleccionado!['fecha_nacimiento'] != null)
-                                      Text('🎂 ${_clienteSeleccionado!["fecha_nacimiento"]}', style: const TextStyle(fontSize: 10, color: Colors.purple)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.teal),
-                            tooltip: 'Cambiar cliente',
-                            onPressed: _abrirBuscadorYConfirmacionCliente,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
-                            tooltip: 'Quitar cliente (Público General)',
-                            onPressed: () {
-                              setState(() {
-                                _clienteSeleccionado = null;
-                                _compradorController.text = 'Público General';
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (_clienteSeleccionado != null) ...[
-                    if (_clienteSeleccionado!['alerta_resurtimiento_activa'] == true) ...[
-                      const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.amber.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.shade800, width: 1.5),
+                          color: Colors.teal.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.teal.shade200),
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.notification_important, color: Colors.amber.shade900, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '🔔 AVISO AL CAJERO: RESURTIMIENTO',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.amber.shade900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _clienteSeleccionado!['mensaje_alerta_resurtimiento'] ??
-                                        'Sugerir al paciente el resurtimiento de su tratamiento.',
-                                    style: const TextStyle(fontSize: 11, color: Colors.black87),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade300),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.loyalty, color: Colors.green, size: 14),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'Beneficio: ${_clienteSeleccionado!["descuento_porcentaje"]}% de Descuento aplicado',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade900),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_clienteSeleccionado!['enfermedades'] != null && (_clienteSeleccionado!['enfermedades'] as List).isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: (_clienteSeleccionado!['enfermedades'] as List).map((enf) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: Colors.teal.shade100,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '🩺 ${enf["codigo_cie"]}',
-                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-
-                  // Si requiere receta, selector de médico
-                  if (_requiereMedico) ...[
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        border: Border.all(color: Colors.amber.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.warning, size: 16, color: Colors.amber.shade900),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Medicamento Controlado / Antibiótico',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.amber.shade900),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          DropdownButtonFormField<Medico>(
-                            initialValue: _medicoSeleccionado,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Médico que Prescribe (Cédula Vigente) *',
-                              isDense: true,
-                            ),
-                            items: _medicos.map((m) {
-                              return DropdownMenuItem(
-                                value: m,
-                                child: Text('Dr. ${m.nombreCompleto} (Céd: ${m.cedulaProfesional})'),
-                              );
-                            }).toList(),
-                            onChanged: (val) => setState(() => _medicoSeleccionado = val),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-
-                  // Lista del Carrito
-                  Expanded(
-                    child: _carrito.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_shopping_cart, size: 48, color: Colors.grey.shade400),
-                                const SizedBox(height: 8),
-                                const Text('Selecciona productos del catálogo'),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'O escanea el código de barras en la búsqueda',
-                                  style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: _carrito.length,
-                            separatorBuilder: (_, __) => const Divider(height: 10),
-                            itemBuilder: (context, index) {
-                              final item = _carrito[index];
-                              final p = item['producto'];
-                              final cant = item['cantidad'] as int;
-                              final sub = (p['precio_venta'] as num) * cant;
-
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(p['nombre_comercial'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        Text('\$${p["precio_venta"]} c/u', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.remove_circle_outline, size: 20),
-                                    onPressed: () => _cambiarCantidad(index, -1),
-                                  ),
-                                  Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle_outline, size: 20),
-                                    onPressed: () => _cambiarCantidad(index, 1),
-                                  ),
-                                  SizedBox(
-                                    width: 70,
-                                    child: Text(
-                                      '\$$sub',
-                                      textAlign: TextAlign.end,
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                  ),
-
-                  // Método de Pago y Totales
-                  const Divider(height: 16),
-
-                  // Selector de Método de Pago
-                  Row(
-                    children: [
-                      const Text('Método de Pago: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      const Spacer(),
-                      DropdownButton<String>(
-                        value: _metodoPago,
-                        isDense: true,
-                        underline: const SizedBox(),
-                        items: const [
-                          DropdownMenuItem(value: 'EFECTIVO', child: Text('💵 Efectivo')),
-                          DropdownMenuItem(value: 'TARJETA', child: Text('💳 Tarjeta')),
-                          DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('🏦 Transferencia')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) setState(() => _metodoPago = val);
-                        },
-                      ),
-                    ],
-                  ),
-
-                  // Si es efectivo, input de Paga con y cálculo de cambio
-                  if (_metodoPago == 'EFECTIVO' && _carrito.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _montoRecibidoController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'Paga con (\$ MXN)',
-                              isDense: true,
-                              prefixIcon: Icon(Icons.attach_money, size: 18),
-                            ),
-                            onChanged: (_) => setState(() {}),
+                        child: Text(
+                          '${productosVisibles.length} de ${_productos.length} medicamentos',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.teal.shade900,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10)),
-                          onPressed: () {
-                            _montoRecibidoController.text = _total.toStringAsFixed(2);
-                            setState(() {});
-                          },
-                          child: const Text('Exacto', style: TextStyle(fontSize: 11)),
-                        ),
-                      ],
-                    ),
-                    if (_cambio > 0) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Cambio a entregar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-                          Text('\$${_cambio.toStringAsFixed(2)} MXN', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
-                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _cargarDatos,
+                        tooltip: 'Recargar stock',
                       ),
                     ],
-                  ],
-
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Subtotal:', style: TextStyle(fontSize: 13, color: Colors.blueGrey)),
-                      Text(
-                        '\$${_subtotal.toStringAsFixed(2)} MXN',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  if (_descuento > 0) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Desc. Lealtad (${_clienteSeleccionado!["descuento_porcentaje"]}%):',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800),
-                        ),
-                        Text(
-                          '-\$${_descuento.toStringAsFixed(2)} MXN',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade800),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total a Cobrar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      Text(
-                        '\$${_total.toStringAsFixed(2)} MXN',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.teal.shade800,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: _procesandoVenta ? null : _cobrarVenta,
-                    icon: _procesandoVenta
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.payments),
-                    label: Text(_procesandoVenta ? 'Despachando FEFO...' : 'Cobrar e Imprimir Ticket'),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+
+              // Barra de Búsqueda Inteligente + Lector de Código de Barras
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _busquedaController,
+                      focusNode: _busquedaFocus,
+                      decoration: InputDecoration(
+                        hintText: isMobile
+                            ? 'Buscar por nombre o fórmula...'
+                            : 'Buscar por nombre, sustancia activa o escanea código de barras...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: _busquedaController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _busquedaController.clear();
+                                  setState(() {});
+                                },
+                              )
+                            : const Icon(Icons.qr_code_scanner, color: Colors.grey),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: _procesarEscaneoCodigoBarras,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Chips de Filtro Rápido por Clasificación Sanitaria
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Todos'),
+                      selected: _filtroGrupo == 'TODOS',
+                      onSelected: (val) => setState(() => _filtroGrupo = 'TODOS'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Venta Libre (Grupo VI)'),
+                      selected: _filtroGrupo == 'GRUPO_VI',
+                      selectedColor: Colors.teal.shade100,
+                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_VI'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Antibióticos (Grupo IV)'),
+                      selected: _filtroGrupo == 'GRUPO_IV',
+                      selectedColor: Colors.amber.shade100,
+                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_IV'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Controlados (Grupo I-III)'),
+                      selected: _filtroGrupo == 'CONTROLADOS',
+                      selectedColor: Colors.red.shade100,
+                      onSelected: (val) => setState(() => _filtroGrupo = 'CONTROLADOS'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Crónicos (Grupo V)'),
+                      selected: _filtroGrupo == 'GRUPO_V',
+                      selectedColor: Colors.purple.shade100,
+                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_V'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Solo con Stock'),
+                      selected: _soloConStock,
+                      onSelected: (val) => setState(() => _soloConStock = val),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Grilla de Medicamentos
+              Expanded(
+                child: productosVisibles.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off, size: 56, color: Colors.grey.shade400),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No se encontraron medicamentos para "${_busquedaController.text.trim()}"',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Verifica la ortografía o limpia los filtros de búsqueda.',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            ),
+                            const SizedBox(height: 14),
+                            FilledButton.tonal(
+                              onPressed: () {
+                                _busquedaController.clear();
+                                setState(() {
+                                  _filtroGrupo = 'TODOS';
+                                  _soloConStock = false;
+                                });
+                              },
+                              child: const Text('Limpiar Filtros y Ver Todos'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: isMobile ? 185 : 260,
+                          childAspectRatio: isMobile ? 0.74 : 0.86,
+                          crossAxisSpacing: isMobile ? 8 : 12,
+                          mainAxisSpacing: isMobile ? 8 : 12,
+                        ),
+                        itemCount: productosVisibles.length,
+                        itemBuilder: (context, index) {
+                          final p = productosVisibles[index];
+                          final int stock = p['stock_total'] ?? 0;
+                          final bool reqReceta = p['requiere_receta'] == true;
+                          final int enCarrito = _cantidadEnCarrito(p['id']);
+
+                          return Card(
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: enCarrito > 0
+                                    ? Colors.teal.shade400
+                                    : Colors.grey.shade200,
+                                width: enCarrito > 0 ? 2 : 1,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(10.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Barra Superior: Clasificación y Stock
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: reqReceta ? Colors.amber.shade100 : Colors.teal.shade50,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            p['grupo_farmacopea'] ?? 'GRUPO_VI',
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                              color: reqReceta ? Colors.amber.shade900 : Colors.teal.shade900,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          'Stock: $stock',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: stock > 0 ? Colors.green.shade800 : Colors.red,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+
+                                    // Nombre comercial
+                                    Text(
+                                      p['nombre_comercial'],
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
+                                    ),
+                                    // Sustancia activa
+                                    Text(
+                                      p['sustancia_activa'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                    ),
+                                    const Spacer(),
+
+                                    // Presentación y Laboratorio
+                                    Text(
+                                      p['presentacion'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
+                                    ),
+                                    Text(
+                                      p['laboratorio'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 9, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                                    ),
+                                    const SizedBox(height: 4),
+
+                                    // Precio y Botón de Añadir con Badge
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '\$${p["precio_venta"]} MXN',
+                                          style: TextStyle(
+                                            fontSize: isMobile ? 12 : 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.teal.shade900,
+                                          ),
+                                        ),
+                                        if (enCarrito > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: Colors.teal.shade800,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '🛒 $enCarrito',
+                                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                            ),
+                                          )
+                                        else
+                                          FilledButton.tonal(
+                                            style: FilledButton.styleFrom(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                                              minimumSize: const Size(32, 28),
+                                            ),
+                                            onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                            child: const Icon(Icons.add_shopping_cart, size: 14),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+
+        if (isMobile) {
+          return Scaffold(
+            body: catalogoWidget,
+            bottomNavigationBar: _construirBarraResumenCarritoMobile(),
+          );
+        } else {
+          return Scaffold(
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: catalogoWidget),
+                const VerticalDivider(width: 1),
+                SizedBox(
+                  width: 370,
+                  child: _construirTicketWidget(),
+                ),
+              ],
+            ),
+          );
+        }
+      },
     );
   }
 }

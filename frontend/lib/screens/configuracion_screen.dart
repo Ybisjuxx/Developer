@@ -79,8 +79,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> with SingleTi
                   Text(esEdicion ? 'Editar Usuario' : 'Registrar Nuevo Usuario'),
                 ],
               ),
-              content: SizedBox(
-                width: 480,
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 480),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

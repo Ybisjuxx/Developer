@@ -6,6 +6,34 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.2] - 2026-11-02 (Optimizacion Responsiva para Moviles y Tablets Android)
+
+### Optimización Móvil y Adaptabilidad Responsiva
+- **Punto de Venta Mostrador Móvil (pos_screen.dart):**
+  - Deteccion de ancho viewport (isMobile < 850px) con LayoutBuilder.
+  - En móviles, el catálogo de medicamentos ocupa el 100% con rejilla fluida adaptada.
+  - Barra inferior fija flotante con resumen de carrito (ítems y total en tiempo real).
+  - Apertura táctil de ticket completo mediante bottom sheet interactivo al 88% de pantalla para cobro y selección de cliente en 1 toque.
+  - Preservación íntegra de la disposición dual de escritorio (>= 850px).
+- **Tablero de Mando (dashboard_screen.dart):**
+  - Encabezado fluido con Wrap para evitar desbordamiento de botones y títulos.
+  - Métricas KPI adaptadas a 2 columnas con proporciones dinámicas.
+  - Gráfico de barras mes a mes y KPIs anuales desplazables horizontalmente de forma táctil.
+  - Sección de Alertas FEFO y Últimas Ventas convertida a Column vertical en móviles.
+- **Inventario y Caducidades (inventario_screen.dart):**
+  - Pestañas con desplazamiento horizontal (isScrollable: true) y textos concisos.
+  - Botón 'Registrar Lote' como FloatingActionButton flotante en móviles.
+- **Historial de Ventas y Facturación (ventas_screen.dart):**
+  - Módulo CFDI 4.0 adaptativo que apila campos en pantallas pequeñas sin desbordamiento.
+  - Folios, badges y botones de acción reorganizados con Wrap responsivo.
+- **Diálogos Universales en Toda la Suite:**
+  - Sustitución de anchos fijos de 380px a 580px por límites elásticos (width: 90%, maxWidth: ...).
+- **Barra de Navegación Global (home_screen.dart):**
+  - Rediseño responsivo de AppBar en móviles con acceso directo a IA y usuario.
+  - Barra inferior con 5 destinos y acceso directo al Drawer lateral.
+
+---
+
 ## [1.4.1] - 2026-10-29 (Alertas de Resurtimiento Crónico, Corrección CFDI 4.0 con XML Oficial y Aceleración de Carga)
 
 ### 🚀 Añadido

@@ -131,8 +131,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   Text(esEdicion ? 'Editar Cliente' : 'Registrar Nuevo Cliente'),
                 ],
               ),
-              content: SizedBox(
-                width: 580,
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 580),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -602,8 +603,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
               ),
             ],
           ),
-          content: SizedBox(
-            width: 480,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -777,29 +779,32 @@ class _ClientesScreenState extends State<ClientesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              runSpacing: 12,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.people_alt, color: Theme.of(context).primaryColor, size: 28),
-                          const SizedBox(width: 10),
-                          const Text(
-                            'Padrón de Clientes e Historial Clínico',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Base de datos de clientes frecuentes, descuentos de lealtad y vinculación con catálogo de enfermedades CIE-10.',
-                        style: TextStyle(color: Colors.blueGrey, fontSize: 13),
-                      ),
-                    ],
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.people_alt, color: Theme.of(context).primaryColor, size: 28),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Padrón de Clientes',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Historial clínico CIE-10, descuentos de lealtad y alertas.',
+                      style: TextStyle(color: Colors.blueGrey, fontSize: 13),
+                    ),
+                  ],
                 ),
                 ElevatedButton.icon(
                   onPressed: () => _abrirFormularioCliente(),

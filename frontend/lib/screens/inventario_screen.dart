@@ -113,8 +113,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
               ),
             ],
           ),
-          content: SizedBox(
-            width: 440,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,8 +203,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
         builder: (ctx) => AlertDialog(
           icon: const Icon(Icons.delete_forever, color: Colors.red, size: 44),
           title: Text('Dar de Baja Lote ${lote["numero_lote"]}'),
-          content: SizedBox(
-            width: 440,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,8 +300,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
               ),
             ],
           ),
-          content: SizedBox(
-            width: 480,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -528,8 +531,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                 const Text('Alta de Producto y Lote FEFO', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
-            content: SizedBox(
-              width: 580,
+            content: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              constraints: const BoxConstraints(maxWidth: 580),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1040,62 +1044,85 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(56),
-        child: Container(
-          color: Colors.teal.shade50,
-          child: Row(
-            children: [
-              Expanded(
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: Colors.teal.shade900,
-                  indicatorColor: Colors.teal.shade800,
-                  indicatorWeight: 3,
-                  tabs: [
-                    const Tab(icon: Icon(Icons.inventory_2), text: 'Catálogo y Todos los Lotes'),
-                    Tab(
-                      icon: Badge(
-                        isLabelVisible: _lotesCaducidades.isNotEmpty,
-                        label: Text('${_lotesCaducidades.length}'),
-                        backgroundColor: Colors.red.shade700,
-                        child: const Icon(Icons.warning_amber_rounded),
-                      ),
-                      text: 'Lotes por Caducar (Alertas FEFO)',
-                    ),
-                    const Tab(icon: Icon(Icons.history_edu), text: 'Kardex y Auditoría de Movimientos'),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isMobile = constraints.maxWidth < 800;
+
+        return Scaffold(
+          floatingActionButton: isMobile
+              ? FloatingActionButton.extended(
                   onPressed: _mostrarDialogoNuevoLote,
+                  backgroundColor: Colors.teal.shade800,
+                  foregroundColor: Colors.white,
                   icon: const Icon(Icons.add),
                   label: const Text('Registrar Lote'),
-                ),
+                )
+              : null,
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(56),
+            child: Container(
+              color: Colors.teal.shade50,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelColor: Colors.teal.shade900,
+                      indicatorColor: Colors.teal.shade800,
+                      indicatorWeight: 3,
+                      tabs: [
+                        Tab(
+                          icon: const Icon(Icons.inventory_2),
+                          text: isMobile ? 'Catálogo y Lotes' : 'Catálogo y Todos los Lotes',
+                        ),
+                        Tab(
+                          icon: Badge(
+                            isLabelVisible: _lotesCaducidades.isNotEmpty,
+                            label: Text('${_lotesCaducidades.length}'),
+                            backgroundColor: Colors.red.shade700,
+                            child: const Icon(Icons.warning_amber_rounded),
+                          ),
+                          text: isMobile ? 'Alertas FEFO' : 'Lotes por Caducar (Alertas FEFO)',
+                        ),
+                        Tab(
+                          icon: const Icon(Icons.history_edu),
+                          text: isMobile ? 'Kardex' : 'Kardex y Auditoría de Movimientos',
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+                        onPressed: _mostrarDialogoNuevoLote,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Registrar Lote'),
+                      ),
+                    ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(child: Text('Error: $_error'))
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Pestaña 1: Catálogo y Lotes
-                    _buildListaProductos(),
-                    // Pestaña 2: Sub-Agente 1 - Lotes Próximos a Caducar Separados
-                    _buildListaLotesPorCaducar(),
-                    // Pestaña 3: Kardex Inmutable con Comentarios
-                    _buildListaKardex(),
-                  ],
-                ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? Center(child: Text('Error: $_error'))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        // Pestaña 1: Catálogo y Lotes
+                        _buildListaProductos(),
+                        // Pestaña 2: Sub-Agente 1 - Lotes Próximos a Caducar Separados
+                        _buildListaLotesPorCaducar(),
+                        // Pestaña 3: Kardex Inmutable con Comentarios
+                        _buildListaKardex(),
+                      ],
+                    ),
+        );
+      },
     );
   }
 

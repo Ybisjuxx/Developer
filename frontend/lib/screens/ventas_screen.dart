@@ -151,8 +151,9 @@ class _VentasScreenState extends State<VentasScreen> {
                 ),
               ],
             ),
-            content: SizedBox(
-              width: 520,
+            content: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              constraints: const BoxConstraints(maxWidth: 520),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -574,8 +575,9 @@ class _VentasScreenState extends State<VentasScreen> {
                   Text('Devolución: ${venta["folio_ticket"]}', style: const TextStyle(fontSize: 16)),
                 ],
               ),
-              content: SizedBox(
-                width: 440,
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -815,66 +817,101 @@ class _VentasScreenState extends State<VentasScreen> {
             const SizedBox(height: 12),
 
             // Sub-Agente 1: Apartado de Automatización de Facturación por Folio de Ticket
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.indigo.shade50.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.indigo.shade200),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.indigo.shade100,
-                    child: Icon(Icons.receipt_long, color: Colors.indigo.shade900),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Módulo de Facturación Electrónica (CFDI 4.0)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            LayoutBuilder(
+              builder: (context, vConstraints) {
+                final isNarrow = vConstraints.maxWidth < 750;
+
+                final searchRow = Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ticketSearchController,
+                        decoration: InputDecoration(
+                          hintText: isNarrow ? 'Folio ticket (TK-...)...' : 'Folio de ticket (ej: TK-...)...',
+                          prefixIcon: const Icon(Icons.qr_code_scanner, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
+                          suffixIcon: _buscandoTicket
+                              ? const Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                )
+                              : null,
                         ),
-                        Text(
-                          'Automatización: Si el cliente solicita su factura, ingrese su folio de ticket (ej: TK-20261028-A1B2C3) para emitirla al instante.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 280,
-                    child: TextField(
-                      controller: _ticketSearchController,
-                      decoration: InputDecoration(
-                        hintText: 'Folio de ticket (ej: TK-...)...',
-                        prefixIcon: const Icon(Icons.qr_code_scanner, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                        filled: true,
-                        fillColor: Colors.white,
-                        isDense: true,
-                        suffixIcon: _buscandoTicket
-                            ? const Padding(
-                                padding: EdgeInsets.all(10),
-                                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                              )
-                            : null,
+                        onSubmitted: (val) => _buscarTicketParaFacturar(val),
                       ),
-                      onSubmitted: (val) => _buscarTicketParaFacturar(val),
                     ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
+                      onPressed: _buscandoTicket ? null : () => _buscarTicketParaFacturar(_ticketSearchController.text),
+                      icon: const Icon(Icons.request_quote_outlined, size: 18),
+                      label: const Text('Facturar'),
+                    ),
+                  ],
+                );
+
+                return Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.indigo.shade50.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.indigo.shade200),
                   ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(backgroundColor: Colors.indigo.shade800),
-                    onPressed: _buscandoTicket ? null : () => _buscarTicketParaFacturar(_ticketSearchController.text),
-                    icon: const Icon(Icons.request_quote_outlined, size: 18),
-                    label: const Text('Facturar'),
-                  ),
-                ],
-              ),
+                  child: isNarrow
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: Colors.indigo.shade100,
+                                  radius: 16,
+                                  child: Icon(Icons.receipt_long, color: Colors.indigo.shade900, size: 18),
+                                ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Facturación Electrónica (CFDI 4.0)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            searchRow,
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor: Colors.indigo.shade100,
+                              child: Icon(Icons.receipt_long, color: Colors.indigo.shade900),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Módulo de Facturación Electrónica (CFDI 4.0)',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  Text(
+                                    'Automatización: Si el cliente solicita factura, ingrese el folio (ej: TK-...) para emitirla.',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SizedBox(width: 360, child: searchRow),
+                          ],
+                        ),
+                );
+              },
             ),
             const SizedBox(height: 14),
 
@@ -905,13 +942,15 @@ class _VentasScreenState extends State<VentasScreen> {
                                         color: estaFacturada ? Colors.indigo.shade800 : Colors.teal,
                                       ),
                                     ),
-                                    title: Row(
+                                    title: Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
                                       children: [
                                         Text(
                                           'Folio: ${v["folio_ticket"]}',
                                           style: const TextStyle(fontWeight: FontWeight.bold),
                                         ),
-                                        const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
@@ -928,8 +967,7 @@ class _VentasScreenState extends State<VentasScreen> {
                                             ),
                                           ),
                                         ),
-                                        if (estaFacturada) ...[
-                                          const SizedBox(width: 8),
+                                        if (estaFacturada)
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -946,7 +984,6 @@ class _VentasScreenState extends State<VentasScreen> {
                                               ),
                                             ),
                                           ),
-                                        ],
                                       ],
                                     ),
                                     subtitle: Text(
@@ -967,15 +1004,16 @@ class _VentasScreenState extends State<VentasScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.end,
+                                            Wrap(
+                                              alignment: WrapAlignment.end,
+                                              spacing: 8,
+                                              runSpacing: 8,
                                               children: [
                                                 OutlinedButton.icon(
                                                   icon: const Icon(Icons.print, size: 16),
                                                   label: const Text('Ver Ticket Térmico', style: TextStyle(fontSize: 12)),
                                                   onPressed: () => TicketImpresionDialog.mostrar(context, v),
                                                 ),
-                                                const SizedBox(width: 8),
                                                 // Sub-Agente 1: Botón Facturar o Ver Factura
                                                 FilledButton.tonalIcon(
                                                   icon: Icon(estaFacturada ? Icons.description : Icons.request_quote_outlined, size: 16),
@@ -989,7 +1027,6 @@ class _VentasScreenState extends State<VentasScreen> {
                                                   ),
                                                   onPressed: () => _abrirModalFacturacion(v),
                                                 ),
-                                                const SizedBox(width: 8),
                                                 if (estado != 'DEVUELTA')
                                                   FilledButton.tonalIcon(
                                                     icon: const Icon(Icons.replay, size: 16),

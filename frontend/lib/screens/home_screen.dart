@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0; // Iniciar en el Tablero de Mando por defecto
   int _inventarioSubTab = 0; // 0: Catálogo, 1: Lotes por Caducar, 2: Kardex
   final AuthService _auth = AuthService();
@@ -60,8 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
             Text('Cambiar Usuario / Rol'),
           ],
         ),
-        content: SizedBox(
-          width: 360,
+        content: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxWidth: 360),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,6 +510,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final isDesktop = constraints.maxWidth >= 820;
 
         return Scaffold(
+          key: _scaffoldKey,
           // Sub-Agente 4: Drawer siempre accesible en móviles y pantallas reducidas
           drawer: Drawer(
             child: ListView(
@@ -556,108 +559,161 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Colors.teal.shade900,
             foregroundColor: Colors.white,
             elevation: 2,
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.tealAccent.shade700,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.local_pharmacy, color: Colors.black87, size: 22),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'FarmaControl',
-                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 18),
-                ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade800,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.teal.shade700),
-                    ),
-                    child: Text(
-                      titles[_selectedIndex],
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: Colors.tealAccent, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-
-                // Sub-Agente 5: Botón Destacado de Consulta con IA
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.tealAccent.shade700,
-                    foregroundColor: Colors.black87,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  onPressed: _abrirChatConsultaIa,
-                  icon: const Icon(Icons.smart_toy, size: 18),
-                  label: const Text(
-                    'Consulta IA',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // Chip de Usuario / Rol con botón para cambiar
-                InkWell(
-                  onTap: _mostrarSelectorUsuario,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade800,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.tealAccent.shade400.withValues(alpha: 0.5)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircleAvatar(
-                          radius: 9,
-                          backgroundColor: _obtenerColorRol(user.rol),
-                          child: const Icon(Icons.person, size: 12, color: Colors.white),
+            title: isDesktop
+                ? Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.tealAccent.shade700,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        const SizedBox(width: 6),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 110),
+                        child: const Icon(Icons.local_pharmacy, color: Colors.black87, size: 22),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'FarmaControl',
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade800,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.teal.shade700),
+                          ),
                           child: Text(
-                            user.nombreCompleto,
+                            titles[_selectedIndex],
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                            style: const TextStyle(fontSize: 12, color: Colors.tealAccent, fontWeight: FontWeight.w500),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                      ),
+                      const Spacer(),
 
-                // Chip indicador del servidor backend
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade900.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.greenAccent),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+                      // Sub-Agente 5: Botón Destacado de Consulta con IA
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.tealAccent.shade700,
+                          foregroundColor: Colors.black87,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: _abrirChatConsultaIa,
+                        icon: const Icon(Icons.smart_toy, size: 18),
+                        label: const Text(
+                          'Consulta IA',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Chip de Usuario / Rol con botón para cambiar
+                      InkWell(
+                        onTap: _mostrarSelectorUsuario,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.shade800,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.tealAccent.shade400.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 9,
+                                backgroundColor: _obtenerColorRol(user.rol),
+                                child: const Icon(Icons.person, size: 12, color: Colors.white),
+                              ),
+                              const SizedBox(width: 6),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 110),
+                                child: Text(
+                                  user.nombreCompleto,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Chip indicador del servidor backend
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade900.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.greenAccent),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
+                            SizedBox(width: 5),
+                            Text('Online', style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
                     children: [
-                      CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
-                      SizedBox(width: 5),
-                      Text('Online', style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
+                      Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.tealAccent.shade700,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(Icons.local_pharmacy, color: Colors.black87, size: 18),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'FarmaControl',
+                        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5, fontSize: 16),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          titles[_selectedIndex],
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: Colors.tealAccent, fontWeight: FontWeight.w500),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ],
-            ),
+            actions: isDesktop
+                ? null
+                : [
+                    IconButton(
+                      icon: const Icon(Icons.smart_toy, color: Colors.tealAccent, size: 20),
+                      tooltip: 'Consulta IA Farmacéutica',
+                      onPressed: _abrirChatConsultaIa,
+                    ),
+                    InkWell(
+                      onTap: _mostrarSelectorUsuario,
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: _obtenerColorRol(user.rol),
+                          child: const Icon(Icons.person, size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(right: 12, left: 4),
+                      child: Center(
+                        child: CircleAvatar(radius: 4, backgroundColor: Colors.greenAccent),
+                      ),
+                    ),
+                  ],
           ),
           body: Row(
             children: [
@@ -755,10 +811,10 @@ class _HomeScreenState extends State<HomeScreen> {
           bottomNavigationBar: isDesktop
               ? null
               : NavigationBar(
-                  selectedIndex: _selectedIndex >= 5 ? 0 : _selectedIndex,
+                  selectedIndex: _selectedIndex >= 4 ? 4 : _selectedIndex,
                   onDestinationSelected: (idx) {
                     if (idx == 4) {
-                      Scaffold.of(context).openDrawer();
+                      _scaffoldKey.currentState?.openDrawer();
                     } else {
                       _cambiarPestana(idx);
                     }

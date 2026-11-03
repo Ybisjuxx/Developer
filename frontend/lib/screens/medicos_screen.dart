@@ -73,8 +73,9 @@ class _MedicosScreenState extends State<MedicosScreen> {
             const Text('Baja o Eliminación de Médico'),
           ],
         ),
-        content: SizedBox(
-          width: 460,
+        content: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxWidth: 460),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

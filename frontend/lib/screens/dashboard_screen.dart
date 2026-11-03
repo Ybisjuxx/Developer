@@ -166,8 +166,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Encabezado de Bienvenida y Acciones Rápidas
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 12,
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,13 +208,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final isWide = constraints.maxWidth > 800;
+                  final isSmall = constraints.maxWidth < 450;
                   return GridView.count(
                     crossAxisCount: isWide ? 4 : 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: isWide ? 1.6 : 1.3,
+                    crossAxisSpacing: isSmall ? 10 : 16,
+                    mainAxisSpacing: isSmall ? 10 : 16,
+                    childAspectRatio: isWide ? 1.6 : (isSmall ? 1.15 : 1.3),
                     children: [
                       _buildMetricCard(
                         title: 'Stock Total',
@@ -259,13 +263,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 24),
 
               // Sección de Alertas FEFO y Últimas Ventas
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Lotes Próximos a Vencer (Prioridad FEFO) - SUB-AGENTE 1
-                  Expanded(
-                    flex: 5,
-                    child: Card(
+              LayoutBuilder(
+                builder: (context, secConstraints) {
+                  final isDesktopSec = secConstraints.maxWidth >= 850;
+
+                  final fefoCard = Card(
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: Padding(
@@ -359,13 +361,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
+                  );
 
                   // Últimas Ventas
-                  Expanded(
-                    flex: 4,
-                    child: Card(
+                  final ventasCard = Card(
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: Padding(
@@ -422,8 +421,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  );
+
+                  if (isDesktopSec) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 5, child: fefoCard),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 4, child: ventasCard),
+                      ],
+                    );
+                  } else {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        fefoCard,
+                        const SizedBox(height: 16),
+                        ventasCard,
+                      ],
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -460,10 +479,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Cabecera con selector de año
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -491,6 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 // Selector de Año
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('Año: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     Container(
@@ -531,43 +555,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 16),
 
             // Mini Tarjetas de Métricas del Año
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 700;
-                return Row(
-                  children: [
-                    _buildKpiResumen(
-                      'Ingreso Total Anual',
-                      '\$${totalAnual.toStringAsFixed(2)} MXN',
-                      Icons.account_balance_wallet_outlined,
-                      Colors.teal,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildKpiResumen(
-                      'Promedio Mensual',
-                      '\$${promedioMensual.toStringAsFixed(2)} MXN',
-                      Icons.trending_up,
-                      Colors.indigo,
-                    ),
-                    const SizedBox(width: 12),
-                    _buildKpiResumen(
-                      'Mes con Mayor Venta',
-                      mesMayor,
-                      Icons.emoji_events_outlined,
-                      Colors.amber.shade800,
-                    ),
-                    if (isWide) ...[
-                      const SizedBox(width: 12),
-                      _buildKpiResumen(
-                        'Tickets Emitidos',
-                        '$ticketsAnuales tickets',
-                        Icons.receipt,
-                        Colors.purple,
-                      ),
-                    ],
-                  ],
-                );
-              },
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildKpiResumen(
+                    'Ingreso Total Anual',
+                    '\$${totalAnual.toStringAsFixed(2)} MXN',
+                    Icons.account_balance_wallet_outlined,
+                    Colors.teal,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildKpiResumen(
+                    'Promedio Mensual',
+                    '\$${promedioMensual.toStringAsFixed(2)} MXN',
+                    Icons.trending_up,
+                    Colors.indigo,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildKpiResumen(
+                    'Mes con Mayor Venta',
+                    mesMayor,
+                    Icons.emoji_events_outlined,
+                    Colors.amber.shade800,
+                  ),
+                  const SizedBox(width: 12),
+                  _buildKpiResumen(
+                    'Tickets Emitidos',
+                    '$ticketsAnuales tickets',
+                    Icons.receipt,
+                    Colors.purple,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -583,19 +603,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('No hay datos disponibles para este año.')),
               )
             else
-              Container(
-                padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8, right: 8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  children: [
-                    // Área de barras (12 columnas)
-                    SizedBox(
-                      height: 190,
-                      child: Row(
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 540),
+                  padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8, right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Column(
+                    children: [
+                      // Área de barras (12 columnas)
+                      SizedBox(
+                        height: 190,
+                        width: 520,
+                        child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: List.generate(meses.length, (index) {
                           final m = meses[index];
@@ -756,6 +780,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -763,44 +788,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildKpiResumen(String titulo, String valor, IconData icono, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: color.withValues(alpha: 0.15),
-              radius: 16,
-              child: Icon(icono, color: color, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    titulo,
-                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    valor,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade900),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+    return Container(
+      constraints: const BoxConstraints(minWidth: 165),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withValues(alpha: 0.15),
+            radius: 16,
+            child: Icon(icono, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                titulo,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 2),
+              Text(
+                valor,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey.shade900),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

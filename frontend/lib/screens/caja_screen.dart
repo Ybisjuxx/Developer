@@ -137,8 +137,9 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                   const Text('Arqueo de Caja y Corte Z'),
                 ],
               ),
-              content: SizedBox(
-                width: 440,
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -425,42 +426,39 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
               gradient: LinearGradient(colors: [Colors.teal.shade800, Colors.teal.shade600]),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  backgroundColor: Colors.white24,
-                  child: Icon(Icons.storefront, color: Colors.white),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Turno Abierto #${turno["id"]}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            child: LayoutBuilder(
+              builder: (context, bConstraints) {
+                final isNarrow = bConstraints.maxWidth < 650;
+
+                final infoColumn = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Turno Abierto #${turno["id"]}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.greenAccent,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Text('ACTIVO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        'Cajero: ${turno["cajero_nombre"]} | Apertura: ${turno["fecha_apertura"].toString().replaceFirst("T", " ").substring(0, 16)}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                FilledButton.icon(
+                          child: const Text('ACTIVO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Cajero: ${turno["cajero_nombre"]} | Apertura: ${turno["fecha_apertura"].toString().replaceFirst("T", " ").substring(0, 16)}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                );
+
+                final corteBtn = FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.amber.shade900,
                     foregroundColor: Colors.white,
@@ -468,8 +466,40 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                   icon: const Icon(Icons.calculate, size: 18),
                   label: const Text('Corte Z / Arqueo'),
                   onPressed: _mostrarDialogoCierre,
-                ),
-              ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: Colors.white24,
+                            child: Icon(Icons.storefront, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: infoColumn),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      corteBtn,
+                    ],
+                  );
+                } else {
+                  return Row(
+                    children: [
+                      const CircleAvatar(
+                        backgroundColor: Colors.white24,
+                        child: Icon(Icons.storefront, color: Colors.white),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(child: infoColumn),
+                      corteBtn,
+                    ],
+                  );
+                }
+              },
             ),
           ),
           const SizedBox(height: 16),

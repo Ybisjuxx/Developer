@@ -162,8 +162,9 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
               const Text('Registrar Diagnóstico CIE-10'),
             ],
           ),
-          content: SizedBox(
-            width: 520,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

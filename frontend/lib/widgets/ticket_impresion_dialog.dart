@@ -106,7 +106,8 @@ class TicketImpresionDialog extends StatelessWidget {
       ),
       content: SingleChildScrollView(
         child: Container(
-          width: 380,
+          width: MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxWidth: 380),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: const Color(0xFFFFFDF8), // Color papel térmico
@@ -274,6 +275,7 @@ class TicketImpresionDialog extends StatelessWidget {
         ),
       ),
       actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      actionsOverflowButtonSpacing: 8,
       actions: [
         OutlinedButton.icon(
           icon: const Icon(Icons.receipt_long, size: 18),
@@ -328,8 +330,9 @@ class TicketImpresionDialog extends StatelessWidget {
               const Text('Facturar Ticket (CFDI 4.0)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ],
           ),
-          content: SizedBox(
-            width: 440,
+          content: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 440),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
