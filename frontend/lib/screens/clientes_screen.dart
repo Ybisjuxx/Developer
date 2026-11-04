@@ -106,7 +106,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
     final mesCtrl = TextEditingController(text: fechaNacParsed != null ? fechaNacParsed.month.toString().padLeft(2, '0') : '');
     final anioCtrl = TextEditingController(text: fechaNacParsed != null ? fechaNacParsed.year.toString() : '');
 
-    // Diagnósticos CIE-10 seleccionados
+    // Diagnósticos CIE-11 seleccionados
     final Set<int> enfSeleccionadas = {};
     if (clienteExistente != null && clienteExistente['enfermedades'] != null) {
       for (var enf in clienteExistente['enfermedades']) {
@@ -340,13 +340,13 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Historial Clínico - Diagnósticos CIE-10 Vinculados:',
+                        'Historial Clínico - Diagnósticos CIE-11 Vinculados:',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const SizedBox(height: 6),
                       if (_enfermedadesDisponibles.isEmpty)
                         const Text(
-                          'No hay enfermedades registradas en el catálogo local. Puede darlas de alta desde el módulo CIE-10.',
+                          'No hay enfermedades registradas en el catálogo local. Puede darlas de alta desde el módulo CIE-11.',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         )
                       else
@@ -679,7 +679,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     const SizedBox(height: 12),
                   ],
                   const Text(
-                    'Historial Clínico (Diagnósticos CIE-10):',
+                    'Historial Clínico (Diagnósticos CIE-11):',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 6),
@@ -808,7 +808,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      'Historial clínico CIE-10, descuentos de lealtad y alertas.',
+                      'Historial clínico CIE-11, descuentos de lealtad y alertas.',
                       style: TextStyle(color: Colors.blueGrey, fontSize: 13),
                     ),
                   ],

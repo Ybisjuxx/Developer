@@ -499,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'Corte de Caja y Turnos (Arqueo)',
       'Devoluciones y Mermas Sanitarias',
       'Directorio de Médicos',
-      'Catálogo de Diagnósticos CIE-10',
+      'Catálogo de Diagnósticos CIE-11',
       'Configuración del Sistema y Usuarios',
     ];
 
@@ -544,13 +544,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 _drawerItem(0, Icons.dashboard, 'Tablero de Mando'),
                 _drawerItem(1, Icons.point_of_sale, 'Punto de Venta (Cobrar)'),
-                _drawerItem(2, Icons.people_alt, 'Padrón de Clientes CIE-10'),
+                _drawerItem(2, Icons.people_alt, 'Padrón de Clientes CIE-11'),
                 _drawerItem(3, Icons.inventory_2, 'Inventario y Caducidades FEFO'),
                 _drawerItem(4, Icons.receipt_long, 'Historial de Ventas'),
                 _drawerItem(5, Icons.calculate, 'Corte de Caja (Arqueo)'),
                 _drawerItem(6, Icons.assignment_return, 'Devoluciones y Mermas'),
                 _drawerItem(7, Icons.medical_information, 'Directorio Médico'),
-                _drawerItem(8, Icons.healing, 'Catálogo CIE-10'),
+                _drawerItem(8, Icons.healing, 'Catálogo CIE-11'),
                 _drawerItem(9, Icons.settings, 'Configuración y Usuarios'),
               ],
             ),
@@ -787,7 +787,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 NavigationRailDestination(
                                   icon: Icon(Icons.healing_outlined),
                                   selectedIcon: Icon(Icons.healing),
-                                  label: Text('CIE-10'),
+                                  label: Text('CIE-11'),
                                 ),
                                 NavigationRailDestination(
                                   icon: Icon(Icons.settings_outlined),

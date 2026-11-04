@@ -87,24 +87,25 @@ def seed_database():
             db.add_all([m1, m2])
             db.commit()
 
-        # 4. Sembrar Enfermedades (CIE-10)
+        # 4. Sembrar Enfermedades (CIE-11)
         if db.query(Enfermedad).count() == 0:
-            print("Sembrando enfermedades CIE-10...")
+            print("Sembrando enfermedades CIE-11...")
             enfermedades = [
-                Enfermedad(codigo_cie="J00", descripcion="Rinofaringitis aguda (resfriado común)", categoria="Infecciones respiratorias", comentarios_especiales="Evaluar si requiere sintomático"),
-                Enfermedad(codigo_cie="A09", descripcion="Gastroenteritis y colitis de origen infeccioso", categoria="Infecciones gastrointestinales", comentarios_especiales="Priorizar hidratación oral"),
-                Enfermedad(codigo_cie="I10", descripcion="Hipertensión esencial (primaria)", categoria="Cardiovascular", comentarios_especiales="Monitoreo de presión arterial"),
-                Enfermedad(codigo_cie="E11", descripcion="Diabetes mellitus tipo 2", categoria="Endocrino y metabólico", comentarios_especiales="Verificar apego a hipoglucemiantes orales"),
+                Enfermedad(codigo_cie="CA00", descripcion="Rinofaringitis aguda (resfriado común)", categoria="Infecciones respiratorias", comentarios_especiales="CIE-11. Evaluar si requiere sintomático"),
+                Enfermedad(codigo_cie="1A40", descripcion="Gastroenteritis y colitis de origen infeccioso", categoria="Infecciones gastrointestinales", comentarios_especiales="CIE-11. Priorizar hidratación oral"),
+                Enfermedad(codigo_cie="BA00", descripcion="Hipertensión esencial (primaria)", categoria="Cardiovascular", comentarios_especiales="CIE-11. Monitoreo de presión arterial"),
+                Enfermedad(codigo_cie="5A11", descripcion="Diabetes mellitus tipo 2", categoria="Endocrino y metabólico", comentarios_especiales="CIE-11. Verificar apego a hipoglucemiantes orales"),
+                Enfermedad(codigo_cie="CA23", descripcion="Asma bronquial", categoria="Enfermedades respiratorias crónicas", comentarios_especiales="CIE-11. Control con corticoide inhalado"),
             ]
             db.add_all(enfermedades)
             db.commit()
 
-        # 4.1 Sembrar Clientes Registrados con Historial Clínico (Diagnósticos CIE)
+        # 4.1 Sembrar Clientes Registrados con Historial Clínico (Diagnósticos CIE-11)
         if db.query(Cliente).count() == 0:
-            print("Sembrando clientes de lealtad con historial clínico (CIE-10)...")
-            cie_i10 = db.query(Enfermedad).filter(Enfermedad.codigo_cie == "I10").first()
-            cie_e11 = db.query(Enfermedad).filter(Enfermedad.codigo_cie == "E11").first()
-            cie_j45 = db.query(Enfermedad).filter(Enfermedad.codigo_cie == "J45").first()
+            print("Sembrando clientes de lealtad con historial clínico (CIE-11)...")
+            cie_ba00 = db.query(Enfermedad).filter(Enfermedad.codigo_cie.in_(["BA00", "I10"])).first()
+            cie_5a11 = db.query(Enfermedad).filter(Enfermedad.codigo_cie.in_(["5A11", "E11"])).first()
+            cie_ca23 = db.query(Enfermedad).filter(Enfermedad.codigo_cie.in_(["CA23", "J45"])).first()
 
             c1 = Cliente(
                 nombre="Roberto",
@@ -120,10 +121,10 @@ def seed_database():
                 notas_clinicas="Paciente con hipertensión y diabetes en control. Monitorear cifras tensionales.",
                 activo=True,
             )
-            if cie_i10:
-                c1.enfermedades.append(cie_i10)
-            if cie_e11:
-                c1.enfermedades.append(cie_e11)
+            if cie_ba00:
+                c1.enfermedades.append(cie_ba00)
+            if cie_5a11:
+                c1.enfermedades.append(cie_5a11)
 
             c2 = Cliente(
                 nombre="María Elena",
@@ -139,8 +140,8 @@ def seed_database():
                 notas_clinicas="Alergia a betalactámicos. Diagnóstico de Asma bronquial.",
                 activo=True,
             )
-            if cie_j45:
-                c2.enfermedades.append(cie_j45)
+            if cie_ca23:
+                c2.enfermedades.append(cie_ca23)
 
             c3 = Cliente(
                 nombre="Carlos",

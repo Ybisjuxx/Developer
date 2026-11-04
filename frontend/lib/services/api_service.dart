@@ -400,7 +400,7 @@ class ApiService {
   }
 
   // =========================================================================
-  // ENFERMEDADES (CIE-10)
+  // ENFERMEDADES (CIE-11)
   // =========================================================================
   static Future<List<dynamic>> getEnfermedades({String? buscar}) async {
     final uri = Uri.parse('$baseUrl/api/enfermedades/').replace(

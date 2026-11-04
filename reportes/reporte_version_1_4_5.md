@@ -61,3 +61,4 @@ Homologar la experiencia de auditoría y consulta del **Kardex Inmutable** con e
 ## 🚀 Despliegue y Acceso
 - **Web App:** [https://ybisjuxx.github.io/Developer/](https://ybisjuxx.github.io/Developer/)
 - **Backend API:** [https://developer-80fs.onrender.com](https://developer-80fs.onrender.com)
+

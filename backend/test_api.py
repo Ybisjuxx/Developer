@@ -117,13 +117,13 @@ def test_endpoints():
     assert res_kardex.status_code == 200
     print(f"[OK] Kardex verificado con {len(res_kardex.json())} movimientos auditados.")
 
-    # 9. Test Catálogo CIE-10 (Búsqueda e Importación Dinámica)
-    print("\n[TEST] 9. Probando Catálogo Oficial CIE-10 y Registro Dinámico...")
+    # 9. Test Catálogo CIE-11 (Búsqueda e Importación Dinámica)
+    print("\n[TEST] 9. Probando Catálogo Oficial CIE-11 y Registro Dinámico...")
     res_cie = client.get("/api/enfermedades/catalogo-cie/buscar?q=asma")
-    assert res_cie.status_code == 200, f"Error en búsqueda CIE: {res_cie.text}"
+    assert res_cie.status_code == 200, f"Error en búsqueda CIE-11: {res_cie.text}"
     cie_items = res_cie.json()
-    assert len(cie_items) > 0, "No se encontraron diagnósticos CIE para 'asma'"
-    print(f"[OK] Búsqueda CIE exitosa: {len(cie_items)} diagnósticos devueltos (ej: {cie_items[0]['codigo_cie']} - {cie_items[0]['descripcion']})")
+    assert len(cie_items) > 0, "No se encontraron diagnósticos CIE-11 para 'asma'"
+    print(f"[OK] Búsqueda CIE-11 exitosa: {len(cie_items)} diagnósticos devueltos (ej: {cie_items[0]['codigo_cie']} - {cie_items[0]['descripcion']})")
 
     # Importar diagnóstico con 1 clic
     item_a_importar = cie_items[0]
@@ -134,8 +134,8 @@ def test_endpoints():
         "comentarios_especiales": item_a_importar["comentarios_especiales"],
         "activo": True
     })
-    assert res_import.status_code in [200, 201], f"Error al importar CIE: {res_import.text}"
-    print(f"[OK] Diagnóstico {item_a_importar['codigo_cie']} importado a base de datos de farmacia.")
+    assert res_import.status_code in [200, 201], f"Error al importar CIE-11: {res_import.text}"
+    print(f"[OK] Diagnóstico CIE-11 {item_a_importar['codigo_cie']} importado a base de datos de farmacia.")
 
     # 10. Test Sub-Agente 1: Base de Datos de Clientes e Historial Clínico CIE
     print("\n[TEST] 10. Probando Sub-Agente 1: Clientes e Historial Clínico CIE...")
@@ -384,19 +384,19 @@ def test_endpoints():
     assert res_get_fac.json()["uuid_fiscal"] == factura_data["uuid_fiscal"]
     print(f"[OK] Consulta de factura generada validada exitosamente.")
 
-    # 24. Test Sub-Agente 2: Catálogo CIE-10 Enriquecido y Búsqueda Normalizada Inteligente
-    print("\n[TEST] 24. Probando Sub-Agente 2: Consulta Ampliada CIE-10 (Búsqueda sin acentos y multitérmino)...")
+    # 24. Test Sub-Agente 2: Catálogo CIE-11 Enriquecido y Búsqueda Normalizada Inteligente
+    print("\n[TEST] 24. Probando Sub-Agente 2: Consulta Ampliada CIE-11 (Búsqueda sin acentos y multitérmino)...")
     res_cie_hipert = client.get("/api/enfermedades/catalogo-cie/buscar?q=hipertension%20arterial")
-    assert res_cie_hipert.status_code == 200, f"Error en búsqueda CIE: {res_cie_hipert.text}"
+    assert res_cie_hipert.status_code == 200, f"Error en búsqueda CIE-11: {res_cie_hipert.text}"
     cie_resultados = res_cie_hipert.json()
     assert len(cie_resultados) > 0, "Debe encontrar resultados para 'hipertension arterial'"
-    assert any("I10" in r["codigo_cie"] for r in cie_resultados)
-    print(f"[OK] Búsqueda CIE inteligente exitosa: 'hipertension arterial' retornó {len(cie_resultados)} diagnósticos (Top: {cie_resultados[0]['codigo_cie']} - {cie_resultados[0]['descripcion']})")
+    assert any("BA00" in r["codigo_cie"] for r in cie_resultados)
+    print(f"[OK] Búsqueda CIE-11 inteligente exitosa: 'hipertension arterial' retornó {len(cie_resultados)} diagnósticos (Top: {cie_resultados[0]['codigo_cie']} - {cie_resultados[0]['descripcion']})")
 
     res_cie_resp = client.get("/api/enfermedades/catalogo-cie/buscar?q=resfriado")
     assert res_cie_resp.status_code == 200
-    assert any("J00" in r["codigo_cie"] for r in res_cie_resp.json())
-    print(f"[OK] Búsqueda CIE por síntoma común: 'resfriado' localizó J00 (Rinofaringitis aguda).")
+    assert any("CA00" in r["codigo_cie"] for r in res_cie_resp.json())
+    print(f"[OK] Búsqueda CIE-11 por síntoma común: 'resfriado' localizó CA00 (Rinofaringitis aguda).")
 
     # 25. Test Sub-Agente 3: Médico con Apellidos Desglosados (Paterno y Materno)
     print("\n[TEST] 25. Probando Sub-Agente 3: Alta de Médico con Apellidos Paterno y Materno...")

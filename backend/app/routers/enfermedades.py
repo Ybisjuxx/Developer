@@ -7,17 +7,17 @@ from ..database import get_db
 from ..models import Enfermedad
 from ..schemas import EnfermedadCreate, EnfermedadOut, EnfermedadUpdate
 
-router = APIRouter(prefix="/api/enfermedades", tags=["Enfermedades (CIE)"])
+router = APIRouter(prefix="/api/enfermedades", tags=["Enfermedades (CIE-11)"])
 
 
 @router.get("/catalogo-cie/buscar", response_model=List[Dict[str, Any]])
 def buscar_catalogo_cie(
-    q: str = Query(..., min_length=1, description="Código CIE o nombre de la patología a consultar"),
+    q: str = Query(..., min_length=1, description="Código CIE-11 o nombre de la patología a consultar"),
     limit: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """
-    Busca diagnósticos en el Catálogo Oficial CIE-10 (híbrido local + API externa NIH/WHO).
+    Busca diagnósticos en el Catálogo Oficial CIE-11 (híbrido local + API externa oficial NIH/OMS).
     Verifica automáticamente contra la base de datos de la farmacia para indicar
     si el diagnóstico ya se encuentra registrado o está listo para incorporarse.
     """
@@ -57,7 +57,7 @@ def buscar_catalogo_cie(
 @router.post("/catalogo-cie/importar", response_model=EnfermedadOut, status_code=status.HTTP_201_CREATED)
 def importar_desde_catalogo_cie(enf_in: EnfermedadCreate, db: Session = Depends(get_db)):
     """
-    Importa un diagnóstico desde el Catálogo CIE a la base de datos de la farmacia con 1 clic.
+    Importa un diagnóstico desde el Catálogo CIE-11 a la base de datos de la farmacia con 1 clic.
     Si ya existe, retorna el registro existente sin duplicar ni arrojar error.
     """
     codigo_limpio = enf_in.codigo_cie.strip().upper()

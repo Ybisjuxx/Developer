@@ -6,6 +6,19 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.6] - 2026-11-03 (Migración y Conexión Oficial con CIE-11 de la OMS)
+
+### 🏥 Catálogo de Diagnósticos y Enfermedades CIE-11 (`catalogo_cie.py`, `enfermedades.py`, `enfermedades_screen.dart`)
+- **Conexión en Vivo con la API Oficial ICD-11 (NIH / OMS):**
+  - Sustitución de ICD-10 por el motor de búsqueda en tiempo real de ICD-11 (`https://clinicaltables.nlm.nih.gov/api/icd11_codes/v3/search`).
+  - Resolución bilingüe con soporte semántico para términos médicos en español.
+- **Catálogo Enriquecido Local CIE-11 para Farmacia y Consulta:**
+  - Más de 100 patologías frecuentes bajo la linearización MMS de CIE-11 (ej. `5A11` Diabetes tipo 2, `BA00` Hipertensión esencial, `CA23` Asma, `CA00` Resfriado común, `RA01` COVID-19, `1A40` Gastroenteritis).
+- **Actualización Total de la Suite y Módulos de Clientes:**
+  - Módulo de diagnósticos, modales de alta, padrón de clientes crónicos y barra de navegación adaptados a la nomenclatura oficial CIE-11.
+
+---
+
 ## [1.4.5] - 2026-11-03 (Búsqueda por Rango de Fechas, Multicriterio y Escáner en Kardex Inmutable)
 
 ### 📊 Kardex Inmutable y Auditoría (`inventario_screen.dart`, `api_service.dart`)

@@ -18,7 +18,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
   String? _errorLocales;
   final _searchLocalController = TextEditingController();
 
-  // Pestaña 2: Catálogo CIE-10 (API / Global)
+  // Pestaña 2: Catálogo CIE-11 (API / Global)
   List<dynamic> _catalogoResultados = [];
   bool _isLoadingCatalogo = false;
   String? _errorCatalogo;
@@ -159,7 +159,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
             children: [
               Icon(Icons.medical_services_outlined, color: Colors.teal.shade800),
               const SizedBox(width: 8),
-              const Text('Registrar Diagnóstico CIE-10'),
+              const Text('Registrar Diagnóstico CIE-11'),
             ],
           ),
           content: Container(
@@ -177,7 +177,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                           controller: codigoController,
                           textCapitalization: TextCapitalization.characters,
                           decoration: const InputDecoration(
-                            labelText: 'Código CIE-10 * (ej: J00, A09, E11, I10)',
+                            labelText: 'Código CIE-11 * (ej: 5A11, BA00, CA23, CA00)',
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.tag),
                           ),
@@ -283,7 +283,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Catálogo de Diagnósticos y Enfermedades CIE-10'),
+        title: const Text('Catálogo de Diagnósticos y Enfermedades CIE-11'),
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.teal.shade900,
@@ -296,7 +296,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
             ),
             const Tab(
               icon: Icon(Icons.public),
-              text: 'Catálogo Oficial CIE-10 (Búsqueda Global y API)',
+              text: 'Catálogo Oficial CIE-11 (Búsqueda Global y API)',
             ),
           ],
         ),
@@ -318,7 +318,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                       child: TextField(
                         controller: _searchLocalController,
                         decoration: InputDecoration(
-                          hintText: 'Filtrar por código CIE o descripción (ej: J00, Diabetes, Asma)...',
+                          hintText: 'Filtrar por código CIE-11 o descripción (ej: 5A11, BA00, Diabetes, Asma)...',
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: _searchLocalController.text.isNotEmpty
                               ? IconButton(
@@ -379,7 +379,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                         onPressed: () {
                                           _tabController.animateTo(1);
                                         },
-                                        child: const Text('Buscar en Catálogo Global CIE-10'),
+                                        child: const Text('Buscar en Catálogo Global CIE-11'),
                                       ),
                                     ],
                                   ),
@@ -455,7 +455,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
           ),
 
           // =================================================================
-          // PESTAÑA 2: CATÁLOGO OFICIAL CIE-10 (BÚSQUEDA GLOBAL Y EN LÍNEA)
+          // PESTAÑA 2: CATÁLOGO OFICIAL CIE-11 (BÚSQUEDA GLOBAL Y EN LÍNEA)
           // =================================================================
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -471,12 +471,12 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade800),
+                      Icon(Icons.verified, color: Colors.blue.shade800),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Catálogo oficial de Clasificación Internacional de Enfermedades (CIE-10 / OMS). '
-                          'Busca cualquier condición y agrégala a tu farmacia con un solo clic.',
+                          'Catálogo oficial de Clasificación Internacional de Enfermedades 11.ª Revisión (CIE-11 / OMS). '
+                          'Conectado a la API oficial de terminología médica global (NIH/OMS). Busca cualquier condición y agrégala a tu farmacia.',
                           style: TextStyle(color: Colors.blue.shade900, fontSize: 13),
                         ),
                       ),
@@ -490,7 +490,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                       child: TextField(
                         controller: _searchCatalogoController,
                         decoration: InputDecoration(
-                          hintText: 'Escribe un diagnóstico, síntoma o código (ej: Neumonía, Asma, Gastritis, I10, J00)...',
+                          hintText: 'Escribe un diagnóstico, síntoma o código CIE-11 (ej: Neumonía, Asma, 5A11, BA00, CA23)...',
                           prefixIcon: const Icon(Icons.travel_explore),
                           suffixIcon: _searchCatalogoController.text.isNotEmpty
                               ? IconButton(
@@ -535,7 +535,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                       Icon(Icons.menu_book, size: 50, color: Colors.grey.shade400),
                                       const SizedBox(height: 12),
                                       Text(
-                                        'Ingresa un término para consultar el catálogo CIE-10',
+                                        'Ingresa un término o código para consultar el catálogo oficial CIE-11',
                                         style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                                       ),
                                     ],
