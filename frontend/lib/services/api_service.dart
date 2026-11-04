@@ -294,8 +294,8 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> getKardex() async {
-    final uri = Uri.parse('$baseUrl/api/inventario/kardex');
+  static Future<List<dynamic>> getKardex({int limit = 300}) async {
+    final uri = Uri.parse('$baseUrl/api/inventario/kardex?limit=$limit');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));

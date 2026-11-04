@@ -6,6 +6,25 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.5] - 2026-11-03 (Búsqueda por Rango de Fechas, Multicriterio y Escáner en Kardex Inmutable)
+
+### 📊 Kardex Inmutable y Auditoría (`inventario_screen.dart`, `api_service.dart`)
+- **Filtro Avanzado por Rango de Fechas y Preajustes Rápidos:**
+  - Selector con calendario interactivo (`showDateRangePicker`) para acotar fechas específicas de movimientos en almacén y mostrador.
+  - Atajos temporales en un solo clic: `Todo el Historial`, `Hoy`, `Últimos 7 días`, `Este mes`, con botón dinámico de `Limpiar filtros`.
+- **Buscador Multicriterio y Escáner con Cámara:**
+  - Búsqueda en tiempo real por nombre de medicamento, lote (`numero_lote`), laboratorio, tipo de movimiento, motivo, folio o usuario auditor.
+  - Botón táctil de escáner con cámara (`Icons.camera_alt`) para enfocar códigos de barras físicos y filtrar de inmediato su historial de movimientos.
+- **Filtros por Tipo de Movimiento:**
+  - Selector dinámico por chips: `Todos`, `Entradas (+)`, `Salidas (-)`, `Ajustes y Bajas`, más el filtro sanitario `⚠️ Solo Irregulares`.
+- **Tarjetas Enriquecidas con Resolución Automática y Resumen KPI:**
+  - Resolución automática de lote a nombre comercial del fármaco y número de lote oficial (evita IDs numéricos abstractos).
+  - Estampado legible de fecha y hora `📅 dd/mm/aaaa hh:mm` en cada movimiento.
+  - Barra resumen KPI con balance de piezas ingresadas, egresadas y recuento de anomalías del período.
+  - Petición ampliada de hasta 300 movimientos en `ApiService.getKardex({limit = 300})`.
+
+---
+
 ## [1.4.4] - 2026-11-03 (Búsqueda y Clasificación COFEPRIS en Lotes y Filtro de Fechas en Devoluciones)
 
 ### 🔍 Catálogo General de Lotes e Inventario (`inventario_screen.dart`)
