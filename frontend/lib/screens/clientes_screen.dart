@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../widgets/lector_codigo_barras_dialog.dart';
 
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
@@ -11,6 +12,8 @@ class ClientesScreen extends StatefulWidget {
 class _ClientesScreenState extends State<ClientesScreen> {
   List<dynamic> _clientes = [];
   List<dynamic> _enfermedadesDisponibles = [];
+  List<dynamic> _productosInventario = [];
+  String _filtroResurtimiento = 'TODOS';
   bool _isLoading = true;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
@@ -38,12 +41,14 @@ class _ClientesScreenState extends State<ClientesScreen> {
         buscar: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
       );
       final enfFuture = ApiService.getEnfermedades();
+      final productosFuture = ApiService.getProductos();
 
-      final results = await Future.wait([clientesFuture, enfFuture]);
+      final results = await Future.wait([clientesFuture, enfFuture, productosFuture]);
       if (mounted) {
         setState(() {
           _clientes = results[0];
           _enfermedadesDisponibles = results[1];
+          _productosInventario = results[2];
           _isLoading = false;
         });
       }
@@ -56,6 +61,33 @@ class _ClientesScreenState extends State<ClientesScreen> {
       }
     }
   }
+
+  List<dynamic> get _clientesFiltrados {
+    return _clientes.where((c) {
+      final bool esCronico = c['tiene_padecimientos_cronicos'] == true;
+      final int? dias = c['dias_para_resurtimiento'] as int?;
+      final bool alerta = c['alerta_resurtimiento_activa'] == true;
+
+      switch (_filtroResurtimiento) {
+        case 'ALERTAS':
+          return alerta;
+        case 'VENCIDOS':
+          return esCronico && dias != null && dias < 0;
+        case 'AL_DIA':
+          return esCronico && dias != null && dias > 21;
+        case 'CRONICOS':
+          return esCronico;
+        case 'TODOS':
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  int get _countAlertas => _clientes.where((c) => c['alerta_resurtimiento_activa'] == true).length;
+  int get _countVencidos => _clientes.where((c) => c['tiene_padecimientos_cronicos'] == true && (c['dias_para_resurtimiento'] ?? 0) < 0).length;
+  int get _countAlDia => _clientes.where((c) => c['tiene_padecimientos_cronicos'] == true && (c['dias_para_resurtimiento'] ?? 0) > 21).length;
+  int get _countCronicos => _clientes.where((c) => c['tiene_padecimientos_cronicos'] == true).length;
 
   void _abrirFormularioCliente({Map<String, dynamic>? clienteExistente}) {
     final bool esEdicion = clienteExistente != null;
@@ -86,12 +118,33 @@ class _ClientesScreenState extends State<ClientesScreen> {
 
     // Sub-Agente 1: Padecimientos Crónicos, Medicamento y Resurtimiento Preventivo
     bool tienePadecimientosCronicos = clienteExistente?['tiene_padecimientos_cronicos'] ?? false;
-    final medicamentoCronicoCtrl = TextEditingController(
-      text: clienteExistente?['medicamento_cronico_principal'] ?? '',
-    );
-    final diasTratamientoCtrl = TextEditingController(
-      text: (clienteExistente?['dias_tratamiento'] ?? 30).toString(),
-    );
+    final List<String> medicamentosList = [];
+    if (clienteExistente?['medicamento_cronico_principal'] != null) {
+      final raw = clienteExistente!['medicamento_cronico_principal'].toString();
+      for (var item in raw.split(',')) {
+        final trimmed = item.trim();
+        if (trimmed.isNotEmpty && !medicamentosList.contains(trimmed)) {
+          medicamentosList.add(trimmed);
+        }
+      }
+    }
+    final buscarMedCtrl = TextEditingController();
+    List<dynamic> sugerenciasInventario = [];
+
+    int diasTratamiento = clienteExistente?['dias_tratamiento'] ?? 30;
+    final diasTratamientoCtrl = TextEditingController(text: diasTratamiento.toString());
+    int semanasAnticipacion = 3; // 1, 2, 3 o 4 semanas
+
+    DateTime? fechaProximoResurtimiento;
+    if (clienteExistente?['fecha_proximo_resurtimiento'] != null) {
+      fechaProximoResurtimiento = DateTime.tryParse(clienteExistente!['fecha_proximo_resurtimiento'].toString());
+    } else if (clienteExistente?['ultima_visita'] != null) {
+      final uVisita = DateTime.tryParse(clienteExistente!['ultima_visita'].toString());
+      fechaProximoResurtimiento = uVisita?.add(Duration(days: diasTratamiento));
+    } else {
+      fechaProximoResurtimiento = DateTime.now().add(Duration(days: diasTratamiento));
+    }
+
     final String? ultimaVisitaStr = clienteExistente?['ultima_visita'] != null
         ? clienteExistente!['ultima_visita'].toString().replaceFirst('T', ' ').substring(0, 16)
         : null;
@@ -250,7 +303,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       const SizedBox(height: 12),
                       // Sub-Agente 4: Sexo / Género en fila completa con isExpanded y TextOverflow.ellipsis
                       DropdownButtonFormField<String>(
-                        value: sexoSeleccionado,
+                        initialValue: sexoSeleccionado,
                         isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Sexo / Género (Opcional)',
@@ -402,7 +455,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Sub-Agente 1: Padecimientos Crónicos y Resurtimiento
+                      // Sub-Agente 1: Padecimientos Crónicos, Inventario y Resurtimiento Preventivo
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -418,60 +471,447 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
                               title: const Text('Paciente con Padecimiento Crónico', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: const Text('Activa alertas al cajero con 2 a 3 semanas de anticipación para recordarle su resurtimiento.', style: TextStyle(fontSize: 11)),
+                              subtitle: const Text(
+                                'Activa recordatorios inteligentes con semanas de anticipación y vincula medicamentos de nuestro inventario.',
+                                style: TextStyle(fontSize: 11),
+                              ),
                               value: tienePadecimientosCronicos,
-                              activeColor: Colors.amber.shade800,
+                              activeThumbColor: Colors.amber.shade800,
                               onChanged: (val) => setDialogState(() => tienePadecimientosCronicos = val),
                             ),
                             if (tienePadecimientosCronicos) ...[
                               const Divider(),
-                              TextField(
-                                controller: medicamentoCronicoCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Medicamento Crónico Principal *',
-                                  hintText: 'Ej. Losartán 50mg, Metformina 850mg, Insulina...',
-                                  prefixIcon: Icon(Icons.medication),
-                                  isDense: true,
-                                ),
+                              // 1. Buscador conectado al Inventario con Escáner de Cámara
+                              const Row(
+                                children: [
+                                  Icon(Icons.inventory_2_outlined, size: 16, color: Colors.teal),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Buscar Medicamentos en Inventario:',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: buscarMedCtrl,
+                                      onChanged: (val) {
+                                        setDialogState(() {
+                                          final q = val.trim().toLowerCase();
+                                          if (q.length >= 2) {
+                                            sugerenciasInventario = _productosInventario.where((p) {
+                                              final nom = (p['nombre_comercial'] ?? '').toString().toLowerCase();
+                                              final sust = (p['sustancia_activa'] ?? '').toString().toLowerCase();
+                                              final cod = (p['codigo_barras'] ?? '').toString().toLowerCase();
+                                              return nom.contains(q) || sust.contains(q) || cod.contains(q);
+                                            }).take(5).toList();
+                                          } else {
+                                            sugerenciasInventario = [];
+                                          }
+                                        });
+                                      },
+                                      decoration: InputDecoration(
+                                        labelText: 'Buscar medicamento o fórmula...',
+                                        hintText: 'Ej. Losartán, Metformina, Insulina, 750100...',
+                                        prefixIcon: const Icon(Icons.search, size: 20),
+                                        suffixIcon: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: const Icon(Icons.qr_code_scanner, color: Colors.teal),
+                                              tooltip: 'Escanear código de barras con la cámara',
+                                              onPressed: () async {
+                                                final cod = await LectorCodigoBarrasDialog.escanear(
+                                                  context,
+                                                  titulo: 'Escanear Medicamento para Resurtimiento',
+                                                );
+                                                if (cod != null && cod.trim().isNotEmpty) {
+                                                  final q = cod.trim().toLowerCase();
+                                                  final match = _productosInventario.firstWhere(
+                                                    (p) => (p['codigo_barras'] ?? '').toString().toLowerCase() == q,
+                                                    orElse: () => null,
+                                                  );
+                                                  setDialogState(() {
+                                                    if (match != null) {
+                                                      final nom = (match['nombre_comercial'] ?? '').toString().trim();
+                                                      final pres = (match['presentacion'] ?? '').toString().trim();
+                                                      final medItem = pres.isNotEmpty ? '$nom ($pres)' : nom;
+                                                      if (!medicamentosList.contains(medItem)) {
+                                                        medicamentosList.add(medItem);
+                                                      }
+                                                      buscarMedCtrl.clear();
+                                                      sugerenciasInventario = [];
+                                                    } else {
+                                                      buscarMedCtrl.text = cod.trim();
+                                                      sugerenciasInventario = _productosInventario.where((p) {
+                                                        final c = (p['codigo_barras'] ?? '').toString().toLowerCase();
+                                                        return c.contains(q);
+                                                      }).take(5).toList();
+                                                    }
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.add_circle, color: Colors.teal),
+                                              tooltip: 'Agregar medicamento ingresado',
+                                              onPressed: () {
+                                                final txt = buscarMedCtrl.text.trim();
+                                                if (txt.isNotEmpty) {
+                                                  setDialogState(() {
+                                                    if (!medicamentosList.contains(txt)) {
+                                                      medicamentosList.add(txt);
+                                                    }
+                                                    buscarMedCtrl.clear();
+                                                    sugerenciasInventario = [];
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (sugerenciasInventario.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.teal.shade300),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4, offset: const Offset(0, 2)),
+                                    ],
+                                  ),
+                                  constraints: const BoxConstraints(maxHeight: 180),
+                                  child: ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: sugerenciasInventario.length,
+                                    separatorBuilder: (_, _) => const Divider(height: 1),
+                                    itemBuilder: (ctx, i) {
+                                      final p = sugerenciasInventario[i];
+                                      final stock = (p['stock_total'] ?? 0) as int;
+                                      final nom = (p['nombre_comercial'] ?? '').toString().trim();
+                                      final pres = (p['presentacion'] ?? '').toString().trim();
+                                      final sust = (p['sustancia_activa'] ?? '').toString().trim();
+                                      final lab = (p['laboratorio'] ?? '').toString().trim();
+                                      return ListTile(
+                                        dense: true,
+                                        leading: const Icon(Icons.medication, color: Colors.teal, size: 20),
+                                        title: Text(nom, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        subtitle: Text('$sust • $pres${lab.isNotEmpty ? " ($lab)" : ""}', style: const TextStyle(fontSize: 10)),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: stock > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(color: stock > 0 ? Colors.green.shade300 : Colors.red.shade300),
+                                              ),
+                                              child: Text(
+                                                'Stock: $stock',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: stock > 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Icon(Icons.add_circle_outline, color: Colors.teal, size: 18),
+                                          ],
+                                        ),
+                                        onTap: () {
+                                          setDialogState(() {
+                                            final medItem = pres.isNotEmpty ? '$nom ($pres)' : nom;
+                                            if (!medicamentosList.contains(medItem)) {
+                                              medicamentosList.add(medItem);
+                                            }
+                                            buscarMedCtrl.clear();
+                                            sugerenciasInventario = [];
+                                          });
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              // Lista de Medicamentos Crónicos Agregados
+                              const Text(
+                                'Lista de Medicamentos que Requieren Resurtimiento:',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                              ),
+                              const SizedBox(height: 4),
+                              if (medicamentosList.isEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.orange.shade200),
+                                  ),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.info_outline, size: 14, color: Colors.orange),
+                                      SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'No hay medicamentos asignados todavía. Busque en inventario arriba o use la cámara.',
+                                          style: TextStyle(fontSize: 11, color: Colors.brown),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: medicamentosList.map((m) {
+                                    return Chip(
+                                      avatar: const Icon(Icons.medication, size: 14, color: Colors.white),
+                                      backgroundColor: Colors.teal.shade700,
+                                      label: Text(m, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      deleteIcon: const Icon(Icons.close, color: Colors.white, size: 14),
+                                      onDeleted: () {
+                                        setDialogState(() {
+                                          medicamentosList.remove(m);
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                              const SizedBox(height: 12),
+                              // 2. Duración del Suministro / Tratamiento
+                              const Text(
+                                'Duración del Suministro / Tratamiento (Días):',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [15, 30, 60, 90].map((diasPreset) {
+                                  final int currDias = int.tryParse(diasTratamientoCtrl.text.trim()) ?? 30;
+                                  final bool sel = currDias == diasPreset;
+                                  return ChoiceChip(
+                                    label: Text(
+                                      diasPreset == 30 ? '30 días (1 mes)' : (diasPreset == 60 ? '60 días (2 m)' : (diasPreset == 90 ? '90 días (3 m)' : '$diasPreset días')),
+                                      style: TextStyle(fontSize: 11, fontWeight: sel ? FontWeight.bold : FontWeight.normal, color: sel ? Colors.teal.shade900 : Colors.black87),
+                                    ),
+                                    selected: sel,
+                                    selectedColor: Colors.teal.shade100,
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setDialogState(() {
+                                          diasTratamientoCtrl.text = diasPreset.toString();
+                                          final base = clienteExistente?['ultima_visita'] != null
+                                              ? (DateTime.tryParse(clienteExistente!['ultima_visita'].toString()) ?? DateTime.now())
+                                              : DateTime.now();
+                                          fechaProximoResurtimiento = base.add(Duration(days: diasPreset));
+                                        });
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 6),
                               Row(
                                 children: [
                                   Expanded(
                                     child: TextField(
                                       controller: diasTratamientoCtrl,
                                       keyboardType: TextInputType.number,
+                                      onChanged: (val) {
+                                        final d = int.tryParse(val.trim());
+                                        if (d != null && d > 0) {
+                                          setDialogState(() {
+                                            final base = clienteExistente?['ultima_visita'] != null
+                                                ? (DateTime.tryParse(clienteExistente!['ultima_visita'].toString()) ?? DateTime.now())
+                                                : DateTime.now();
+                                            fechaProximoResurtimiento = base.add(Duration(days: d));
+                                          });
+                                        }
+                                      },
                                       decoration: const InputDecoration(
-                                        labelText: 'Días de Tratamiento (Suministro)',
+                                        labelText: 'Días de Tratamiento Personalizados',
                                         hintText: '30',
                                         suffixText: 'días',
-                                        prefixIcon: Icon(Icons.timelapse),
+                                        prefixIcon: Icon(Icons.timelapse, size: 18),
                                         isDense: true,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.amber.shade200),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Última Visita:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                        Text(
+                                          ultimaVisitaStr ?? 'Sin compras previas',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              // 3. Anticipación de Alerta (Semanas de Anticipación)
+                              const Text(
+                                'Anticipación para Alerta al Cajero y Recordatorio al Paciente:',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                              ),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [1, 2, 3, 4].map((sem) {
+                                  final bool sel = semanasAnticipacion == sem;
+                                  return ChoiceChip(
+                                    label: Text(
+                                      sem == 1 ? '1 semana (7d antes)' : (sem == 3 ? '3 semanas (21d - Recomendado)' : '$sem semanas (${sem * 7}d antes)'),
+                                      style: TextStyle(fontSize: 11, fontWeight: sel ? FontWeight.bold : FontWeight.normal, color: sel ? Colors.amber.shade900 : Colors.black87),
+                                    ),
+                                    selected: sel,
+                                    selectedColor: Colors.amber.shade200,
+                                    onSelected: (val) {
+                                      if (val) {
+                                        setDialogState(() {
+                                          semanasAnticipacion = sem;
+                                        });
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 10),
+                              // 4. Fecha Meta de Próximo Resurtimiento y Resumen
+                              Row(
+                                children: [
                                   Expanded(
                                     child: Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.amber.shade200),
+                                        border: Border.all(color: Colors.amber.shade300),
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                      child: Row(
                                         children: [
-                                          const Text('Última Visita:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                                          Text(
-                                            ultimaVisitaStr ?? 'Sin compras previas',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                          const Icon(Icons.event, color: Colors.teal, size: 20),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text('Fecha Meta de Resurtimiento:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                                Text(
+                                                  fechaProximoResurtimiento != null
+                                                      ? '${fechaProximoResurtimiento!.day.toString().padLeft(2, '0')}/${fechaProximoResurtimiento!.month.toString().padLeft(2, '0')}/${fechaProximoResurtimiento!.year}'
+                                                      : 'Sin fecha asignada',
+                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          TextButton.icon(
+                                            icon: const Icon(Icons.edit_calendar, size: 16),
+                                            label: const Text('Cambiar', style: TextStyle(fontSize: 11)),
+                                            onPressed: () async {
+                                              final picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: fechaProximoResurtimiento ?? DateTime.now().add(const Duration(days: 30)),
+                                                firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                                                lastDate: DateTime.now().add(const Duration(days: 730)),
+                                              );
+                                              if (picked != null) {
+                                                setDialogState(() {
+                                                  fechaProximoResurtimiento = picked;
+                                                });
+                                              }
+                                            },
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Dynamic summary preview
+                              Builder(
+                                builder: (ctx) {
+                                  if (fechaProximoResurtimiento == null) return const SizedBox.shrink();
+                                  final now = DateTime.now();
+                                  final today = DateTime(now.year, now.month, now.day);
+                                  final target = DateTime(fechaProximoResurtimiento!.year, fechaProximoResurtimiento!.month, fechaProximoResurtimiento!.day);
+                                  final diasRestantes = target.difference(today).inDays;
+                                  final fechaAlerta = target.subtract(Duration(days: semanasAnticipacion * 7));
+                                  final bool alertaActiva = today.isAfter(fechaAlerta) || today.isAtSameMomentAs(fechaAlerta);
+
+                                  return Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: diasRestantes < 0
+                                          ? Colors.red.shade50
+                                          : (alertaActiva ? Colors.amber.shade100 : Colors.teal.shade50),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: diasRestantes < 0
+                                            ? Colors.red.shade400
+                                            : (alertaActiva ? Colors.amber.shade700 : Colors.teal.shade300),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          diasRestantes < 0
+                                              ? Icons.error
+                                              : (alertaActiva ? Icons.notifications_active : Icons.check_circle),
+                                          color: diasRestantes < 0
+                                              ? Colors.red.shade800
+                                              : (alertaActiva ? Colors.amber.shade900 : Colors.teal.shade800),
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            diasRestantes < 0
+                                                ? '🚨 ¡Tratamiento vencido hace ${diasRestantes.abs()} días! Alerta de resurtimiento prioritaria activa en mostrador.'
+                                                : (alertaActiva
+                                                    ? '🔔 Alerta activa hoy: Restan $diasRestantes días de tratamiento (~${((diasRestantes + 6) ~/ 7)} sem). Se notificará al cajero en el POS.'
+                                                    : '🟢 Tratamiento al día: Restan $diasRestantes días. La alerta iniciará el ${fechaAlerta.day.toString().padLeft(2, '0')}/${fechaAlerta.month.toString().padLeft(2, '0')}/${fechaAlerta.year} ($semanasAnticipacion sem antes).'),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: diasRestantes < 0
+                                                  ? Colors.red.shade900
+                                                  : (alertaActiva ? Colors.amber.shade900 : Colors.teal.shade900),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ],
@@ -518,7 +958,21 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       fechaNacStr = "${a.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}";
                     }
 
-                    final payload = {
+                    final String? medFinal = tienePadecimientosCronicos && medicamentosList.isNotEmpty
+                        ? medicamentosList.join(', ')
+                        : (tienePadecimientosCronicos && buscarMedCtrl.text.trim().isNotEmpty
+                            ? buscarMedCtrl.text.trim()
+                            : null);
+
+                    final int diasSuministro = tienePadecimientosCronicos
+                        ? (int.tryParse(diasTratamientoCtrl.text.trim()) ?? 30)
+                        : 30;
+
+                    final String? fechaMetaStr = tienePadecimientosCronicos && fechaProximoResurtimiento != null
+                        ? "${fechaProximoResurtimiento!.year.toString().padLeft(4, '0')}-${fechaProximoResurtimiento!.month.toString().padLeft(2, '0')}-${fechaProximoResurtimiento!.day.toString().padLeft(2, '0')}"
+                        : null;
+
+                    final Map<String, dynamic> payload = {
                       'nombre': nom,
                       'apellido': apCompleto,
                       'apellido_paterno': pat.isNotEmpty ? pat : null,
@@ -531,12 +985,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       'sexo': sexoSeleccionado,
                       'notas_clinicas': notasCtrl.text.trim().isEmpty ? null : notasCtrl.text.trim(),
                       'tiene_padecimientos_cronicos': tienePadecimientosCronicos,
-                      'medicamento_cronico_principal': tienePadecimientosCronicos && medicamentoCronicoCtrl.text.trim().isNotEmpty
-                          ? medicamentoCronicoCtrl.text.trim()
-                          : null,
-                      'dias_tratamiento': tienePadecimientosCronicos
-                          ? (int.tryParse(diasTratamientoCtrl.text.trim()) ?? 30)
-                          : 30,
+                      'medicamento_cronico_principal': medFinal,
+                      'dias_tratamiento': diasSuministro,
+                      'fecha_proximo_resurtimiento': fechaMetaStr,
                       'enfermedades_ids': enfSeleccionadas.toList(),
                     };
 
@@ -626,55 +1077,101 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   const SizedBox(height: 12),
                   // Sub-Agente 1: Seguimiento de Padecimientos Crónicos y Resurtimiento
                   if (c['tiene_padecimientos_cronicos'] == true) ...[
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade50 : Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade700 : Colors.blue.shade300,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    Builder(
+                      builder: (ctx) {
+                        final int? dias = c['dias_para_resurtimiento'] as int?;
+                        final bool alerta = c['alerta_resurtimiento_activa'] == true;
+                        final bool vencido = dias != null && dias < 0;
+                        final String medStr = c['medicamento_cronico_principal'] ?? 'Tratamiento crónico';
+                        final medsList = medStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+
+                        Color headerColor = Colors.teal.shade50;
+                        Color borderColor = Colors.teal.shade300;
+                        Color textColor = Colors.teal.shade900;
+                        IconData icon = Icons.check_circle_outline;
+                        String statusTitle = '🟢 Tratamiento al Día';
+
+                        if (vencido) {
+                          headerColor = Colors.red.shade50;
+                          borderColor = Colors.red.shade400;
+                          textColor = Colors.red.shade900;
+                          icon = Icons.error_outline;
+                          statusTitle = '🚨 Resurtimiento Vencido hace ${dias.abs()} días';
+                        } else if (alerta) {
+                          headerColor = Colors.amber.shade50;
+                          borderColor = Colors.amber.shade600;
+                          textColor = Colors.amber.shade900;
+                          icon = Icons.alarm_on;
+                          statusTitle = '⚠️ Alerta de Resurtimiento Activa (${dias ?? 0} días restantes)';
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: headerColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                c['alerta_resurtimiento_activa'] == true ? Icons.alarm_on : Icons.medication,
-                                color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade900 : Colors.blue.shade900,
-                                size: 18,
+                              Row(
+                                children: [
+                                  Icon(icon, color: textColor, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      statusTitle,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: textColor),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(height: 8),
+                              const Text('Medicamentos Crónicos Prescritos:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                              const SizedBox(height: 4),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: medsList.map((m) {
+                                  return Chip(
+                                    avatar: const Icon(Icons.medication, size: 14, color: Colors.white),
+                                    backgroundColor: Colors.teal.shade700,
+                                    label: Text(m, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  );
+                                }).toList(),
+                              ),
+                              const SizedBox(height: 8),
                               Text(
-                                'Tratamiento Crónico: ${c["medicamento_cronico_principal"] ?? "Continuo"}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: c['alerta_resurtimiento_activa'] == true ? Colors.amber.shade900 : Colors.blue.shade900,
-                                ),
+                                'Suministro: ${c["dias_tratamiento"] ?? 30} días  •  Última Visita: ${c["ultima_visita"] != null ? c["ultima_visita"].toString().replaceFirst("T", " ").substring(0, 16) : "Sin registrar"}',
+                                style: const TextStyle(fontSize: 11),
                               ),
+                              if (c['fecha_proximo_resurtimiento'] != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Fecha Meta de Resurtimiento: ${c["fecha_proximo_resurtimiento"]}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                              if (c['mensaje_alerta_resurtimiento'] != null) ...[
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: borderColor),
+                                  ),
+                                  child: Text(
+                                    c['mensaje_alerta_resurtimiento'],
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Suministro: ${c["dias_tratamiento"] ?? 30} días  •  Última Visita: ${c["ultima_visita"] != null ? c["ultima_visita"].toString().replaceFirst("T", " ").substring(0, 16) : "Sin registrar"}',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          if (c['fecha_proximo_resurtimiento'] != null)
-                            Text(
-                              'Próximo Resurtimiento Sugerido: ${c["fecha_proximo_resurtimiento"]}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          if (c['alerta_resurtimiento_activa'] == true) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              c['mensaje_alerta_resurtimiento'] ?? '🔔 Alerta de resurtimiento activa.',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
-                            ),
-                          ],
-                        ],
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -868,7 +1365,89 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            // Filtros rápidos de Pacientes y Resurtimiento
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                FilterChip(
+                  avatar: const Icon(Icons.people_outline, size: 16),
+                  label: Text('Todos (${_clientes.length})'),
+                  selected: _filtroResurtimiento == 'TODOS',
+                  selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.18),
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _filtroResurtimiento == 'TODOS' ? FontWeight.bold : FontWeight.normal,
+                    color: _filtroResurtimiento == 'TODOS' ? Theme.of(context).primaryColor : Colors.black87,
+                  ),
+                  onSelected: (val) {
+                    if (val) setState(() => _filtroResurtimiento = 'TODOS');
+                  },
+                ),
+                FilterChip(
+                  avatar: Icon(Icons.alarm_on, size: 16, color: Colors.amber.shade900),
+                  label: Text('⚠️ Próximos a Resurtir ($_countAlertas)'),
+                  selected: _filtroResurtimiento == 'ALERTAS',
+                  selectedColor: Colors.amber.shade100,
+                  checkmarkColor: Colors.amber.shade900,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _filtroResurtimiento == 'ALERTAS' ? FontWeight.bold : FontWeight.normal,
+                    color: _filtroResurtimiento == 'ALERTAS' ? Colors.amber.shade900 : Colors.black87,
+                  ),
+                  onSelected: (val) {
+                    setState(() => _filtroResurtimiento = val ? 'ALERTAS' : 'TODOS');
+                  },
+                ),
+                FilterChip(
+                  avatar: Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red.shade900),
+                  label: Text('🚨 Resurtimiento Vencido ($_countVencidos)'),
+                  selected: _filtroResurtimiento == 'VENCIDOS',
+                  selectedColor: Colors.red.shade100,
+                  checkmarkColor: Colors.red.shade900,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _filtroResurtimiento == 'VENCIDOS' ? FontWeight.bold : FontWeight.normal,
+                    color: _filtroResurtimiento == 'VENCIDOS' ? Colors.red.shade900 : Colors.black87,
+                  ),
+                  onSelected: (val) {
+                    setState(() => _filtroResurtimiento = val ? 'VENCIDOS' : 'TODOS');
+                  },
+                ),
+                FilterChip(
+                  avatar: Icon(Icons.check_circle_outline, size: 16, color: Colors.teal.shade800),
+                  label: Text('🟢 Tratamiento al Día ($_countAlDia)'),
+                  selected: _filtroResurtimiento == 'AL_DIA',
+                  selectedColor: Colors.teal.shade100,
+                  checkmarkColor: Colors.teal.shade900,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _filtroResurtimiento == 'AL_DIA' ? FontWeight.bold : FontWeight.normal,
+                    color: _filtroResurtimiento == 'AL_DIA' ? Colors.teal.shade900 : Colors.black87,
+                  ),
+                  onSelected: (val) {
+                    setState(() => _filtroResurtimiento = val ? 'AL_DIA' : 'TODOS');
+                  },
+                ),
+                FilterChip(
+                  avatar: Icon(Icons.medication_outlined, size: 16, color: Colors.blue.shade900),
+                  label: Text('💊 Crónicos Totales ($_countCronicos)'),
+                  selected: _filtroResurtimiento == 'CRONICOS',
+                  selectedColor: Colors.blue.shade100,
+                  checkmarkColor: Colors.blue.shade900,
+                  labelStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: _filtroResurtimiento == 'CRONICOS' ? FontWeight.bold : FontWeight.normal,
+                    color: _filtroResurtimiento == 'CRONICOS' ? Colors.blue.shade900 : Colors.black87,
+                  ),
+                  onSelected: (val) {
+                    setState(() => _filtroResurtimiento = val ? 'CRONICOS' : 'TODOS');
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -888,32 +1467,44 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             ],
                           ),
                         )
-                      : _clientes.isEmpty
+                      : _clientesFiltrados.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(Icons.person_off_outlined, size: 48, color: Colors.grey.shade400),
                                   const SizedBox(height: 12),
-                                  const Text(
-                                    'No se encontraron clientes registrados con ese criterio.',
-                                    style: TextStyle(fontSize: 15, color: Colors.grey),
+                                  Text(
+                                    _clientes.isNotEmpty
+                                        ? 'No se encontraron clientes con el filtro "$_filtroResurtimiento".'
+                                        : 'No se encontraron clientes registrados con ese criterio.',
+                                    style: const TextStyle(fontSize: 15, color: Colors.grey),
                                   ),
                                   const SizedBox(height: 12),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _abrirFormularioCliente(),
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('Registrar Primer Cliente'),
-                                  ),
+                                  if (_clientes.isNotEmpty && _filtroResurtimiento != 'TODOS')
+                                    ElevatedButton(
+                                      onPressed: () => setState(() => _filtroResurtimiento = 'TODOS'),
+                                      child: const Text('Ver Todos los Clientes'),
+                                    )
+                                  else
+                                    ElevatedButton.icon(
+                                      onPressed: () => _abrirFormularioCliente(),
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Registrar Primer Cliente'),
+                                    ),
                                 ],
                               ),
                             )
                           : ListView.builder(
-                              itemCount: _clientes.length,
+                              itemCount: _clientesFiltrados.length,
                               itemBuilder: (context, index) {
-                                final c = _clientes[index];
+                                final c = _clientesFiltrados[index];
                                 final List enfermedades = c['enfermedades'] ?? [];
                                 final double descuento = (c['descuento_porcentaje'] ?? 5.0).toDouble();
+                                final bool esCronico = c['tiene_padecimientos_cronicos'] == true;
+                                final int? dias = c['dias_para_resurtimiento'] as int?;
+                                final bool alerta = c['alerta_resurtimiento_activa'] == true;
+                                final bool vencido = esCronico && dias != null && dias < 0;
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 10),
@@ -956,54 +1547,79 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             ),
                                           ),
                                         ),
-                                        if (c['alerta_resurtimiento_activa'] == true) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.amber.shade100,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: Colors.amber.shade800),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.alarm_on, size: 12, color: Colors.amber.shade900),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '🔔 Resurtir (${c['dias_para_resurtimiento'] ?? 0}d)',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.amber.shade900,
-                                                    fontWeight: FontWeight.bold,
+                                        if (esCronico) ...[
+                                          if (vencido)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.red.shade100,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: Colors.red.shade800),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.warning, size: 12, color: Colors.red.shade900),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '🚨 Vencido hace ${dias.abs()}d',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.red.shade900,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ] else if (c['tiene_padecimientos_cronicos'] == true) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.blue.shade50,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: Colors.blue.shade300),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.medication, size: 12, color: Colors.blue.shade800),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '💊 Crónico',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.blue.shade800,
-                                                    fontWeight: FontWeight.bold,
+                                                ],
+                                              ),
+                                            )
+                                          else if (alerta)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.shade100,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: Colors.amber.shade800),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.alarm_on, size: 12, color: Colors.amber.shade900),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '⚠️ Resurtir en ${dias ?? 0}d (~${((dias ?? 0) + 6) ~/ 7} sem)',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.amber.shade900,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.teal.shade50,
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: Colors.teal.shade300),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.check_circle_outline, size: 12, color: Colors.teal.shade800),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '🟢 Al día (${dias ?? 0}d)',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Colors.teal.shade800,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
-                                          ),
                                         ],
                                       ],
                                     ),
@@ -1063,6 +1679,57 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               ),
                                           ],
                                         ),
+                                        if (esCronico && c['medicamento_cronico_principal'] != null) ...[
+                                          const SizedBox(height: 4),
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 4,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.teal.shade50,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: Colors.teal.shade200),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.medication, size: 12, color: Colors.teal),
+                                                    const SizedBox(width: 4),
+                                                    Flexible(
+                                                      child: Text(
+                                                        'Rx: ${c["medicamento_cronico_principal"]}',
+                                                        style: TextStyle(fontSize: 11, color: Colors.teal.shade900, fontWeight: FontWeight.w600),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              if (c['fecha_proximo_resurtimiento'] != null)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey.shade100,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(color: Colors.grey.shade300),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.event, size: 12, color: Colors.blueGrey),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        'Próx. Resurtido: ${c["fecha_proximo_resurtimiento"]}',
+                                                        style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.w600),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
                                         const SizedBox(height: 6),
                                         if (enfermedades.isNotEmpty)
                                           Wrap(

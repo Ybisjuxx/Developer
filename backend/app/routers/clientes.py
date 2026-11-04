@@ -37,9 +37,10 @@ def crear_cliente(cli_in: ClienteCreate, db: Session = Depends(get_db)):
     nuevo_cliente = Cliente(**datos)
 
     # Sub-Agente 1: Calcular fecha estimada de resurtimiento si tiene padecimiento crónico
-    if nuevo_cliente.tiene_padecimientos_cronicos and nuevo_cliente.ultima_visita and not nuevo_cliente.fecha_proximo_resurtimiento:
+    if nuevo_cliente.tiene_padecimientos_cronicos and not nuevo_cliente.fecha_proximo_resurtimiento:
         dias = nuevo_cliente.dias_tratamiento or 30
-        nuevo_cliente.fecha_proximo_resurtimiento = nuevo_cliente.ultima_visita.date() + datetime.timedelta(days=dias)
+        base_f = nuevo_cliente.ultima_visita.date() if nuevo_cliente.ultima_visita else datetime.date.today()
+        nuevo_cliente.fecha_proximo_resurtimiento = base_f + datetime.timedelta(days=dias)
 
     if cli_in.enfermedades_ids:
         enfermedades = db.query(Enfermedad).filter(Enfermedad.id.in_(cli_in.enfermedades_ids)).all()
@@ -116,9 +117,10 @@ def actualizar_cliente(cliente_id: int, cli_in: ClienteUpdate, db: Session = Dep
         cliente.apellido = f"{paterno} {materno}".strip()
 
     # Recalcular fecha de resurtimiento si corresponde
-    if cliente.tiene_padecimientos_cronicos and cliente.ultima_visita and not cliente.fecha_proximo_resurtimiento:
+    if cliente.tiene_padecimientos_cronicos and not cliente.fecha_proximo_resurtimiento:
         dias = cliente.dias_tratamiento or 30
-        cliente.fecha_proximo_resurtimiento = cliente.ultima_visita.date() + datetime.timedelta(days=dias)
+        base_f = cliente.ultima_visita.date() if cliente.ultima_visita else datetime.date.today()
+        cliente.fecha_proximo_resurtimiento = base_f + datetime.timedelta(days=dias)
 
     if cli_in.enfermedades_ids is not None:
         enfermedades = db.query(Enfermedad).filter(Enfermedad.id.in_(cli_in.enfermedades_ids)).all()

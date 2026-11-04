@@ -43,6 +43,10 @@ fefarmex_web_app/
 incientiva_web/
 personal_finance_app/
 social_media_editor/
+hermes3d_office/
+.hermes/
+.env.*
+!.env.example
 
 
 # Node / JS

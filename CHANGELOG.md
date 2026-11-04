@@ -6,6 +6,41 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.7] - 2026-11-03 (Seguimiento de Pacientes Crónicos, Búsqueda en Inventario y Recordatorios con Anticipación Semanal)
+
+### 👥 Módulo de Clientes y Resurtimiento Preventivo (`clientes_screen.dart`, `models.py`, `routers/clientes.py`)
+- **Búsqueda e Integración Directa con el Inventario de la Farmacia:**
+  - Conexión interactiva con el catálogo en existencia (`ApiService.getProductos()`): autocompletado en vivo por nombre comercial, sustancia activa, presentación o código de barras mientras se escribe.
+  - Indicador de stock en tiempo real (`Stock: X pzas`) y detalles de presentación/laboratorio en las sugerencias del buscador.
+  - **Escáner Óptico de Código de Barras con Cámara (`LectorCodigoBarrasDialog`):** botón táctil en el buscador para escanear cajas físicas de medicamentos y agregarlas de inmediato al tratamiento crónico del paciente.
+  - **Gestión Multi-Medicamento:** posibilidad de agregar múltiples medicamentos crónicos a una lista de resurtimiento visual con chips interactivos y botón de eliminación individual.
+  - Soporte para agregar medicamentos personalizados en caso de fármacos aún no registrados en el catálogo.
+- **Configuración Enriquecida de Recordatorios y Semanas de Anticipación:**
+  - **Duración del Tratamiento / Suministro:** selectores rápidos tipo preset (`15 días`, `30 días [1 mes]`, `60 días [2 meses]`, `90 días [3 meses]`) y campo numérico para días personalizados.
+  - **Anticipación del Recordatorio (Semanas de Anticipación):** configuración explícita para definir con cuántas semanas de anticipación avisar al mostrador y al paciente (`1 semana [7d]`, `2 semanas [14d]`, `3 semanas [21d - Estándar]`, `4 semanas [28d - 1 mes]`).
+  - **Fecha Meta de Próximo Resurtimiento:** selección con calendario interactivo (`showDatePicker`) o cálculo automático instantáneo según los días de tratamiento programados.
+  - **Panel de Resumen Informativo en Vivo:** cálculo dinámico que muestra fecha estimada de agotamiento, días restantes y la fecha exacta en la que se activará la alerta preventiva.
+- **Filtros Rápidos en el Listado de Clientes:**
+  - Barra de chips interactivos con recuento en vivo:
+    - `Todos (N)`
+    - `⚠️ Próximos a Resurtir (N)` (alertas preventivas activas en la ventana de anticipación)
+    - `🚨 Resurtimiento Vencido (N)` (tratamientos que sobrepasaron su fecha límite)
+    - `🟢 Tratamiento al Día (N)` (pacientes crónicos con suministro vigente)
+    - `💊 Crónicos Totales (N)` (padrón completo de pacientes con padecimientos crónicos)
+- **Badges Visuales y Tarjetas Enriquecidas:**
+  - Badges con colorimetría y estados en mostrador:
+    - 🚨 `Vencido hace Xd` (Rojo)
+    - ⚠️ `Resurtir en Xd (~Y sem)` (Ámbar)
+    - 🟢 `Al día (Xd restantes)` (Verde / Teal)
+  - Despliegue de los medicamentos prescritos (`Rx: [Medicamentos]`) y fecha meta programada (`📅 Próx. Resurtido: dd/mm/aaaa`) directamente en la tarjeta de cliente.
+  - Modal de Expediente Clínico (`_verDetallesCliente`) con desglose de medicamentos crónicos en chips individuales, estado de suministro y aviso preventivo para atención en caja.
+- **Backend Robusto y Persistencia:**
+  - Soporte de campo ampliado `medicamento_cronico_principal` (Text) en `Cliente` para almacenar listas extensas de medicamentos crónicos.
+  - Cálculo de `alerta_resurtimiento_activa` ampliado hasta 4 semanas de anticipación (28 días) y formateo de semanas restantes en `mensaje_alerta_resurtimiento`.
+  - Recálculo automático de fecha meta de resurtimiento si no es provista de forma manual.
+
+---
+
 ## [1.4.6] - 2026-11-03 (Migración y Conexión Oficial con CIE-11 de la OMS)
 
 ### 🏥 Catálogo de Diagnósticos y Enfermedades CIE-11 (`catalogo_cie.py`, `enfermedades.py`, `enfermedades_screen.dart`)

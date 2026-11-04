@@ -43,12 +43,12 @@ class Cliente(Base):
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
-    # Sub-Agente 1: Seguimiento de Pacientes Crónicos y Resurtimiento Preventivo (2-3 semanas de anticipación)
+    # Sub-Agente 1: Seguimiento de Pacientes Crónicos y Resurtimiento Preventivo (semanas de anticipación)
     ultima_visita = Column(DateTime, nullable=True)
     tiene_padecimientos_cronicos = Column(Boolean, default=False, nullable=False)
     dias_tratamiento = Column(Integer, default=30, nullable=False)
     fecha_proximo_resurtimiento = Column(Date, nullable=True)
-    medicamento_cronico_principal = Column(String(150), nullable=True)
+    medicamento_cronico_principal = Column(Text, nullable=True)
 
     enfermedades = relationship("Enfermedad", secondary=cliente_enfermedades, backref="clientes")
     ventas = relationship("Venta", back_populates="cliente")
@@ -62,22 +62,23 @@ class Cliente(Base):
 
     @property
     def alerta_resurtimiento_activa(self) -> bool:
-        """Determina si debe alertarse al cajero para recordarle resurtir con 2 a 3 semanas de anticipación."""
+        """Determina si debe alertarse al cajero para recordarle resurtir con semanas de anticipación."""
         if not self.tiene_padecimientos_cronicos:
             return False
 
         hoy = datetime.date.today()
         fecha_meta = self.fecha_proximo_resurtimiento
-        if not fecha_meta and self.ultima_visita:
+        if not fecha_meta:
             dias = self.dias_tratamiento or 30
-            fecha_meta = self.ultima_visita.date() + datetime.timedelta(days=dias)
+            base = self.ultima_visita.date() if self.ultima_visita else (self.created_at.date() if self.created_at else hoy)
+            fecha_meta = base + datetime.timedelta(days=dias)
 
         if not fecha_meta:
             return False
 
         dias_restantes = (fecha_meta - hoy).days
-        # Alerta con 2 a 3 semanas de anticipación (21 días o menos, o vencido)
-        return dias_restantes <= 21
+        # Alerta activa con hasta 4 semanas de anticipación (28 días o menos, o vencido)
+        return dias_restantes <= 28
 
     @property
     def dias_para_resurtimiento(self) -> Optional[int]:
@@ -85,9 +86,10 @@ class Cliente(Base):
             return None
         hoy = datetime.date.today()
         fecha_meta = self.fecha_proximo_resurtimiento
-        if not fecha_meta and self.ultima_visita:
+        if not fecha_meta:
             dias = self.dias_tratamiento or 30
-            fecha_meta = self.ultima_visita.date() + datetime.timedelta(days=dias)
+            base = self.ultima_visita.date() if self.ultima_visita else (self.created_at.date() if self.created_at else hoy)
+            fecha_meta = base + datetime.timedelta(days=dias)
         if not fecha_meta:
             return None
         return (fecha_meta - hoy).days
@@ -99,16 +101,19 @@ class Cliente(Base):
 
         dias = self.dias_para_resurtimiento
         med = self.medicamento_cronico_principal or "su tratamiento crónico"
-        f_visita = self.ultima_visita.strftime("%d/%m/%Y") if self.ultima_visita else "previa"
+        f_visita = self.ultima_visita.strftime("%d/%m/%Y") if self.ultima_visita else None
+        visita_info = f" (Última visita: {f_visita})" if f_visita else ""
 
         if dias is None:
-            return f"Recordar al paciente resurtir {med} (Última visita: {f_visita})."
+            return f"Recordar al paciente resurtir {med}{visita_info}."
         elif dias > 0:
-            return f"🔔 Recordatorio de resurtimiento: Le restan {dias} días de {med}. Sugerir resurtir con anticipación (Última visita: {f_visita})."
+            semanas = (dias + 6) // 7
+            sem_txt = f" (~{semanas} {'semana' if semanas == 1 else 'semanas'} de anticipación)" if dias >= 7 else ""
+            return f"🔔 Recordatorio de resurtimiento: Le restan {dias} días de {med}{sem_txt}. Sugerir resurtir con anticipación{visita_info}."
         elif dias == 0:
-            return f"⚠️ ¡Atención! Hoy termina el tratamiento de {med} del paciente (Última visita: {f_visita}). Ofrecer resurtido inmediato."
+            return f"⚠️ ¡Atención! Hoy termina el tratamiento de {med} del paciente{visita_info}. Ofrecer resurtido inmediato."
         else:
-            return f"🚨 ¡Tratamiento vencido! Debió resurtir {med} hace {abs(dias)} días (Última visita: {f_visita})."
+            return f"🚨 ¡Tratamiento vencido! Debió resurtir {med} hace {abs(dias)} días{visita_info}."
 
 
 class Usuario(Base):
