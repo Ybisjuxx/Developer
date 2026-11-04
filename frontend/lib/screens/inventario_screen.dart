@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/lector_codigo_barras_dialog.dart';
 
 class InventarioScreen extends StatefulWidget {
   final int tabInicial;
@@ -22,6 +23,11 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   String _filtroCaducidad = 'TODOS';
   String _busquedaCaducidad = '';
 
+  // Búsqueda y Categorización por Grupo Terapéutico COFEPRIS (Catálogo de Lotes)
+  final TextEditingController _busquedaLotesController = TextEditingController();
+  String _filtroGrupoLotes = 'TODOS';
+  bool _soloConStockLotes = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,7 +39,83 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   @override
   void dispose() {
     _tabController.dispose();
+    _busquedaLotesController.dispose();
     super.dispose();
+  }
+
+  // Escaneo óptico de medicamento para búsqueda inmediata en almacén
+  Future<void> _escanearCodigoParaInventario() async {
+    final cod = await LectorCodigoBarrasDialog.escanear(
+      context,
+      titulo: 'Escanear Medicamento para Inventario',
+    );
+    if (cod != null && cod.trim().isNotEmpty) {
+      setState(() {
+        _busquedaLotesController.text = cod.trim();
+      });
+    }
+  }
+
+  // Filtrado reactivo del catálogo de lotes por texto y grupo terapéutico COFEPRIS
+  List<dynamic> get _productosFiltrados {
+    final query = _busquedaLotesController.text.trim().toLowerCase();
+
+    return _productos.where((p) {
+      // 1. Filtro por disponibilidad de stock
+      final int stock = p['stock_total'] ?? 0;
+      if (_soloConStockLotes && stock <= 0) {
+        return false;
+      }
+
+      // 2. Filtro por Grupo Farmacopea / Terapéutico COFEPRIS (similar al mostrador POS)
+      if (_filtroGrupoLotes != 'TODOS') {
+        final grupo = (p['grupo_farmacopea'] ?? 'GRUPO_VI').toString().toUpperCase();
+        if (_filtroGrupoLotes == 'CONTROLADOS') {
+          if (!grupo.contains('GRUPO_I') && !grupo.contains('GRUPO_II') && !grupo.contains('GRUPO_III') && !grupo.contains('CONTROLADO')) {
+            return false;
+          }
+        } else if (_filtroGrupoLotes == 'GRUPO_IV') {
+          if (!grupo.contains('GRUPO_IV') && !grupo.contains('ANTIBIOTICO')) {
+            return false;
+          }
+        } else if (_filtroGrupoLotes == 'GRUPO_V') {
+          if (!grupo.contains('GRUPO_V') && !grupo.contains('CRONICO')) {
+            return false;
+          }
+        } else if (_filtroGrupoLotes == 'GRUPO_VI') {
+          if (!grupo.contains('GRUPO_VI') && !grupo.contains('LIBRE')) {
+            return false;
+          }
+        } else if (grupo != _filtroGrupoLotes) {
+          return false;
+        }
+      }
+
+      // 3. Filtro por Búsqueda (Nombre Comercial, Sustancia Activa, Presentación, Laboratorio, Código o Lote)
+      if (query.isNotEmpty) {
+        final nom = (p['nombre_comercial'] ?? '').toString().toLowerCase();
+        final sus = (p['sustancia_activa'] ?? '').toString().toLowerCase();
+        final pre = (p['presentacion'] ?? '').toString().toLowerCase();
+        final lab = (p['laboratorio'] ?? '').toString().toLowerCase();
+        final cod = (p['codigo_barras'] ?? '').toString().toLowerCase();
+
+        final lotes = (p['lotes'] as List<dynamic>? ?? []);
+        final coincideLote = lotes.any((l) =>
+            (l['numero_lote'] ?? '').toString().toLowerCase().contains(query) ||
+            (l['laboratorio_fabricante'] ?? '').toString().toLowerCase().contains(query));
+
+        if (!nom.contains(query) &&
+            !sus.contains(query) &&
+            !pre.contains(query) &&
+            !lab.contains(query) &&
+            !cod.contains(query) &&
+            !coincideLote) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
   }
 
   Future<void> _cargarTodo() async {
@@ -1127,50 +1209,202 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   }
 
   Widget _buildListaProductos() {
-    if (_productos.isEmpty) {
-      return const Center(child: Text('No hay productos en inventario'));
-    }
+    final productosVisibles = _productosFiltrados;
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _productos.length,
-      itemBuilder: (context, index) {
-        final p = _productos[index];
-        final int stockTotal = p['stock_total'] ?? 0;
-        final bool requiereReceta = p['requiere_receta'] ?? false;
-        final List<dynamic> lotes = p['lotes'] ?? [];
+    return Column(
+      children: [
+        // Barra de Búsqueda y Clasificación por Grupo Terapéutico COFEPRIS
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Barra de Búsqueda con Cámara y Botón Limpiar
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _busquedaLotesController,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar por medicamento, sustancia, lote o escanea código...',
+                        prefixIcon: const Icon(Icons.search),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_busquedaLotesController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 18),
+                                onPressed: () {
+                                  _busquedaLotesController.clear();
+                                  setState(() {});
+                                },
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.camera_alt, color: Colors.teal),
+                              tooltip: 'Escanear código de barras con la cámara',
+                              onPressed: _escanearCodigoParaInventario,
+                            ),
+                          ],
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ExpansionTile(
-            leading: CircleAvatar(
-              backgroundColor: requiereReceta ? Colors.amber.shade100 : Colors.teal.shade100,
-              child: Icon(
-                requiereReceta ? Icons.receipt_long : Icons.medication_liquid,
-                color: requiereReceta ? Colors.amber.shade900 : Colors.teal.shade900,
-              ),
-            ),
-            title: Text(p['nombre_comercial'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${p["sustancia_activa"]}  •  ${p["presentacion"]}\nPrecio: \$${p["precio_venta"]} MXN'),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: stockTotal > 10 ? Colors.green.shade100 : Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Stock: $stockTotal',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: stockTotal > 10 ? Colors.green.shade900 : Colors.orange.shade900,
+              // Chips de Clasificación Sanitaria COFEPRIS (similar al mostrador POS)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: Text('Todos (${_productos.length})'),
+                      selected: _filtroGrupoLotes == 'TODOS',
+                      onSelected: (_) => setState(() => _filtroGrupoLotes = 'TODOS'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Venta Libre (Grupo VI)'),
+                      selected: _filtroGrupoLotes == 'GRUPO_VI',
+                      selectedColor: Colors.teal.shade100,
+                      onSelected: (_) => setState(() => _filtroGrupoLotes = 'GRUPO_VI'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Antibióticos (Grupo IV)'),
+                      selected: _filtroGrupoLotes == 'GRUPO_IV',
+                      selectedColor: Colors.amber.shade100,
+                      onSelected: (_) => setState(() => _filtroGrupoLotes = 'GRUPO_IV'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Controlados (Grupo I-III)'),
+                      selected: _filtroGrupoLotes == 'CONTROLADOS',
+                      selectedColor: Colors.red.shade100,
+                      onSelected: (_) => setState(() => _filtroGrupoLotes = 'CONTROLADOS'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Crónicos (Grupo V)'),
+                      selected: _filtroGrupoLotes == 'GRUPO_V',
+                      selectedColor: Colors.purple.shade100,
+                      onSelected: (_) => setState(() => _filtroGrupoLotes = 'GRUPO_V'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilterChip(
+                      label: const Text('Solo con Stock'),
+                      selected: _soloConStockLotes,
+                      onSelected: (val) => setState(() => _soloConStockLotes = val),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+
+        // Listado de Medicamentos con sus Lotes
+        Expanded(
+          child: productosVisibles.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search_off, size: 54, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No se encontraron medicamentos ni lotes para "${_busquedaLotesController.text.trim()}"',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Prueba buscando por nombre comercial, sustancia activa o número de lote.',
+                        style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.tonal(
+                        onPressed: () {
+                          _busquedaLotesController.clear();
+                          setState(() {
+                            _filtroGrupoLotes = 'TODOS';
+                            _soloConStockLotes = false;
+                          });
+                        },
+                        child: const Text('Limpiar Filtros y Ver Todos'),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: productosVisibles.length,
+                  itemBuilder: (context, index) {
+                    final p = productosVisibles[index];
+                    final int stockTotal = p['stock_total'] ?? 0;
+                    final bool requiereReceta = p['requiere_receta'] ?? false;
+                    final List<dynamic> lotes = p['lotes'] ?? [];
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ExpansionTile(
+                        leading: CircleAvatar(
+                          backgroundColor: requiereReceta ? Colors.amber.shade100 : Colors.teal.shade100,
+                          child: Icon(
+                            requiereReceta ? Icons.receipt_long : Icons.medication_liquid,
+                            color: requiereReceta ? Colors.amber.shade900 : Colors.teal.shade900,
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(p['nombre_comercial'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: requiereReceta ? Colors.amber.shade100 : Colors.teal.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                p['grupo_farmacopea'] ?? 'GRUPO_VI',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: requiereReceta ? Colors.amber.shade900 : Colors.teal.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Text(
+                          '${p["sustancia_activa"]}  •  ${p["presentacion"]}\nPrecio: \$${p["precio_venta"]} MXN  •  ${lotes.length} ${lotes.length == 1 ? "lote registrado" : "lotes registrados"}',
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: stockTotal > 10 ? Colors.green.shade100 : Colors.orange.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Stock: $stockTotal',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: stockTotal > 10 ? Colors.green.shade900 : Colors.orange.shade900,
+                            ),
+                          ),
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Divider(),
@@ -1328,6 +1562,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           ),
         );
       },
+    ),
+        ),
+      ],
     );
   }
 

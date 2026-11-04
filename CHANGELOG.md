@@ -6,6 +6,32 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.4.4] - 2026-11-03 (Búsqueda y Clasificación COFEPRIS en Lotes y Filtro de Fechas en Devoluciones)
+
+### 🔍 Catálogo General de Lotes e Inventario (`inventario_screen.dart`)
+- **Buscador Multicriterio en Tiempo Real:**
+  - Búsqueda integrada por nombre comercial, sustancia activa (fórmula), presentación, laboratorio, código de barras y número de lote individual (`numero_lote`).
+  - Botón de escaneo con cámara fotográfica (`Icons.camera_alt`) para buscar medicamentos físicos instantáneamente en almacén.
+- **Categorización Regulatoria por Grupo Terapéutico COFEPRIS:**
+  - Filtro dinámico con chips horizontales: `TODOS`, `GRUPO_VI` (Venta libre - OTC), `GRUPO_IV` (Receta médica), `CONTROLADOS` (Grupos I, II y III con control especial), `GRUPO_V` (Venta en farmacia).
+  - Filtro booleano `Solo con Stock` para aislar productos con existencia activa.
+  - Badges informativos con colorimetría oficial COFEPRIS y contador de lotes registrados en cada tarjeta de producto.
+
+### 📅 Módulo de Devoluciones y Mermas (`devoluciones_screen.dart`)
+- **Filtro Avanzado por Rango de Fechas:**
+  - Selector con calendario interactivo (`showDateRangePicker`) para acotar fechas específicas de auditoría.
+  - Atajos rápidos de filtrado: `Todo el Historial`, `Hoy`, `Últimos 7 días`, `Este mes`.
+- **Búsqueda por Texto Libre:**
+  - Búsqueda en tiempo real por folio de venta, motivo de devolución o causa de merma.
+- **Tarjetas Resumen del Período:**
+  - Métricas acumuladas del rango seleccionado: total devuelto en pesos, cantidad de devoluciones, importe de mermas y total de eventos registrados.
+
+### 🧾 Historial de Ventas (`ventas_screen.dart`)
+- **Filtrado Rápido por Fechas:**
+  - Selector de rango de fechas y presets temporales para localizar tickets pasados de clientes que solicitan devoluciones o refacturación CFDI 4.0.
+
+---
+
 ## [1.4.3] - 2026-11-02 (Escáner de Código de Barras con Cámara y Modo Vertical/Portrait)
 
 ### 📸 Lector de Código de Barras Móvil con Cámara (`mobile_scanner`)

@@ -21,6 +21,12 @@ class _VentasScreenState extends State<VentasScreen> {
   final _ticketSearchController = TextEditingController();
   bool _buscandoTicket = false;
 
+  // Filtros de Consulta y Búsqueda por Fecha para Historial de Ventas y Devoluciones
+  final _busquedaVentasController = TextEditingController();
+  DateTime? _fechaInicioVentas;
+  DateTime? _fechaFinVentas;
+  String _presetFechaVentas = 'TODAS';
+
   @override
   void initState() {
     super.initState();
@@ -30,7 +36,92 @@ class _VentasScreenState extends State<VentasScreen> {
   @override
   void dispose() {
     _ticketSearchController.dispose();
+    _busquedaVentasController.dispose();
     super.dispose();
+  }
+
+  void _aplicarPresetVentas(String preset) {
+    final now = DateTime.now();
+    setState(() {
+      _presetFechaVentas = preset;
+      if (preset == 'HOY') {
+        _fechaInicioVentas = DateTime(now.year, now.month, now.day);
+        _fechaFinVentas = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      } else if (preset == '7DIAS') {
+        final start = now.subtract(const Duration(days: 7));
+        _fechaInicioVentas = DateTime(start.year, start.month, start.day);
+        _fechaFinVentas = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      } else if (preset == 'MES') {
+        _fechaInicioVentas = DateTime(now.year, now.month, 1);
+        _fechaFinVentas = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      } else {
+        _fechaInicioVentas = null;
+        _fechaFinVentas = null;
+      }
+    });
+  }
+
+  Future<void> _abrirSelectorRangoFechasVentas() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: (_fechaInicioVentas != null && _fechaFinVentas != null)
+          ? DateTimeRange(start: _fechaInicioVentas!, end: _fechaFinVentas!)
+          : DateTimeRange(
+              start: now.subtract(const Duration(days: 7)),
+              end: now,
+            ),
+      helpText: 'Filtrar ventas por fecha',
+      saveText: 'Aplicar Período',
+    );
+
+    if (picked != null) {
+      setState(() {
+        _fechaInicioVentas = DateTime(picked.start.year, picked.start.month, picked.start.day);
+        _fechaFinVentas = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
+        _presetFechaVentas = 'PERSONALIZADO';
+      });
+    }
+  }
+
+  List<dynamic> get _ventasFiltradas {
+    final query = _busquedaVentasController.text.trim().toLowerCase();
+
+    return _ventas.where((v) {
+      // 1. Filtro por Fecha
+      if (_fechaInicioVentas != null || _fechaFinVentas != null) {
+        final rawFecha = v['fecha_venta']?.toString() ?? '';
+        final parsed = DateTime.tryParse(rawFecha);
+        if (parsed != null) {
+          if (_fechaInicioVentas != null && parsed.isBefore(_fechaInicioVentas!)) return false;
+          if (_fechaFinVentas != null && parsed.isAfter(_fechaFinVentas!)) return false;
+        }
+      }
+
+      // 2. Filtro por Búsqueda (Folio, Cliente, Cajero, Estado o Medicamento)
+      if (query.isNotEmpty) {
+        final folio = (v['folio_ticket'] ?? '').toString().toLowerCase();
+        final comprador = (v['comprador_nombre'] ?? '').toString().toLowerCase();
+        final cajero = (v['cajero_nombre'] ?? '').toString().toLowerCase();
+        final estado = (v['estado'] ?? '').toString().toLowerCase();
+        final detalles = (v['detalles'] as List<dynamic>? ?? []);
+        final coincideItem = detalles.any((d) =>
+            (d['producto_nombre'] ?? '').toString().toLowerCase().contains(query) ||
+            (d['sustancia_activa'] ?? '').toString().toLowerCase().contains(query));
+
+        if (!folio.contains(query) &&
+            !comprador.contains(query) &&
+            !cajero.contains(query) &&
+            !estado.contains(query) &&
+            !coincideItem) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
   }
 
   Future<void> _cargarVentas() async {
@@ -935,18 +1026,179 @@ class _VentasScreenState extends State<VentasScreen> {
             ),
             const SizedBox(height: 14),
 
+            // Barra de Búsqueda y Filtros de Fecha para el Historial de Ventas
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 650;
+                      final searchField = TextField(
+                        controller: _busquedaVentasController,
+                        decoration: InputDecoration(
+                          hintText: 'Filtrar ventas por ticket (TK-...), cliente o medicamento...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          suffixIcon: _busquedaVentasController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _busquedaVentasController.clear();
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      );
+
+                      final String labelRangoVentas = (_fechaInicioVentas != null && _fechaFinVentas != null)
+                          ? '${_fechaInicioVentas!.day.toString().padLeft(2, "0")}/${_fechaInicioVentas!.month.toString().padLeft(2, "0")}/${_fechaInicioVentas!.year} - ${_fechaFinVentas!.day.toString().padLeft(2, "0")}/${_fechaFinVentas!.month.toString().padLeft(2, "0")}/${_fechaFinVentas!.year}'
+                          : 'Rango de Fechas';
+
+                      final datePickerBtn = OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          side: BorderSide(
+                            color: _presetFechaVentas == 'PERSONALIZADO' ? Colors.indigo : Colors.grey.shade400,
+                            width: _presetFechaVentas == 'PERSONALIZADO' ? 1.5 : 1,
+                          ),
+                        ),
+                        icon: Icon(
+                          Icons.calendar_month,
+                          size: 18,
+                          color: _presetFechaVentas == 'PERSONALIZADO' ? Colors.indigo : Colors.blueGrey,
+                        ),
+                        label: Text(
+                          labelRangoVentas,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _presetFechaVentas == 'PERSONALIZADO' ? FontWeight.bold : FontWeight.normal,
+                            color: _presetFechaVentas == 'PERSONALIZADO' ? Colors.indigo.shade900 : Colors.black87,
+                          ),
+                        ),
+                        onPressed: _abrirSelectorRangoFechasVentas,
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            searchField,
+                            const SizedBox(height: 8),
+                            datePickerBtn,
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(flex: 3, child: searchField),
+                            const SizedBox(width: 10),
+                            Expanded(flex: 2, child: datePickerBtn),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.date_range, size: 16, color: Colors.blueGrey),
+                        const SizedBox(width: 6),
+                        const Text('Período: ', style: TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        ChoiceChip(
+                          label: Text('Todas (${_ventas.length})'),
+                          selected: _presetFechaVentas == 'TODAS',
+                          onSelected: (_) => _aplicarPresetVentas('TODAS'),
+                        ),
+                        const SizedBox(width: 6),
+                        ChoiceChip(
+                          label: const Text('Hoy'),
+                          selected: _presetFechaVentas == 'HOY',
+                          selectedColor: Colors.teal.shade100,
+                          onSelected: (_) => _aplicarPresetVentas('HOY'),
+                        ),
+                        const SizedBox(width: 6),
+                        ChoiceChip(
+                          label: const Text('Últimos 7 días'),
+                          selected: _presetFechaVentas == '7DIAS',
+                          selectedColor: Colors.teal.shade100,
+                          onSelected: (_) => _aplicarPresetVentas('7DIAS'),
+                        ),
+                        const SizedBox(width: 6),
+                        ChoiceChip(
+                          label: const Text('Este mes'),
+                          selected: _presetFechaVentas == 'MES',
+                          selectedColor: Colors.teal.shade100,
+                          onSelected: (_) => _aplicarPresetVentas('MES'),
+                        ),
+                        if (_fechaInicioVentas != null || _fechaFinVentas != null || _busquedaVentasController.text.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          ActionChip(
+                            avatar: const Icon(Icons.close, size: 14, color: Colors.red),
+                            label: const Text('Limpiar filtros', style: TextStyle(color: Colors.red, fontSize: 11)),
+                            onPressed: () {
+                              _busquedaVentasController.clear();
+                              _aplicarPresetVentas('TODAS');
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
             // Lista de Ventas
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
                       ? Center(child: Text('Error: $_error'))
-                      : _ventas.isEmpty
-                          ? const Center(child: Text('No hay ventas registradas aún'))
+                      : _ventasFiltradas.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off, size: 54, color: Colors.grey.shade400),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No se encontraron tickets en el período o búsqueda especificada',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Prueba seleccionando "Todas" para consultar el historial completo.',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton.tonal(
+                                    onPressed: () {
+                                      _busquedaVentasController.clear();
+                                      _aplicarPresetVentas('TODAS');
+                                    },
+                                    child: const Text('Ver Todas las Ventas'),
+                                  ),
+                                ],
+                              ),
+                            )
                           : ListView.builder(
-                              itemCount: _ventas.length,
+                              itemCount: _ventasFiltradas.length,
                               itemBuilder: (context, index) {
-                                final v = _ventas[index];
+                                final v = _ventasFiltradas[index];
                                 final List<dynamic> detalles = v['detalles'] ?? [];
                                 final String estado = v['estado'] ?? 'COMPLETADA';
                                 final bool estaFacturada = v['facturada'] == true;
