@@ -1413,27 +1413,140 @@ class _ClientesScreenState extends State<ClientesScreen> {
     );
   }
 
+  Widget _buildClienteFilterChip({
+    required String titulo,
+    required String valor,
+    required IconData icono,
+    required Color color,
+    required String filtroKey,
+    required ThemeService ts,
+  }) {
+    final bool isSelected = _filtroResurtimiento == filtroKey;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _filtroResurtimiento = isSelected && filtroKey != 'TODOS' ? 'TODOS' : filtroKey;
+        });
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? ts.tintBg(color, lightAlpha: 0.16, darkAlpha: 0.28) : ts.cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? color : ts.borderColor, width: 1.2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icono, color: color, size: 15),
+            const SizedBox(width: 6),
+            Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? color : ts.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: ts.tintBg(color, lightAlpha: 0.16, darkAlpha: 0.26),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                valor,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ts = ThemeService.instance;
+    final bool isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
       backgroundColor: ts.scaffoldBg,
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 12.0 : 20.0,
+          vertical: isMobile ? 10.0 : 20.0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Cabecera de módulo HeroUI / Fragments UI
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 18,
+                vertical: isMobile ? 10 : 14,
+              ),
               decoration: BoxDecoration(
                 gradient: ts.heroBannerGradient,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                 border: Border.all(color: ts.borderColor, width: 1.2),
                 boxShadow: ts.cardGlowShadow,
               ),
-              child: Wrap(
+              child: isMobile
+                  ? Row(
+                      children: [
+                        Icon(
+                          Icons.people_alt,
+                          color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Padrón de Clientes',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: ts.esTemaNeon ? ts.textPrimary : Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () => _abrirFormularioCliente(),
+                          icon: Icon(
+                            Icons.person_add,
+                            size: 16,
+                            color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                          ),
+                          label: Text(
+                            'Nuevo',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                            ),
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                            foregroundColor: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 16,
@@ -1511,10 +1624,64 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: isMobile ? 8 : 14),
 
-            // Tarjetas KPI Bento y Filtros de Pacientes
-            LayoutBuilder(
+            // Tarjetas KPI Bento (escritorio) o Chips compactos horizontales (móvil)
+            if (isMobile)
+              SizedBox(
+                height: 38,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildClienteFilterChip(
+                      titulo: 'Todos',
+                      valor: '${_clientes.length}',
+                      icono: Icons.people_outline,
+                      color: ts.accentPrimary,
+                      filtroKey: 'TODOS',
+                      ts: ts,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildClienteFilterChip(
+                      titulo: 'Resurtir',
+                      valor: '$_countAlertas',
+                      icono: Icons.alarm_on,
+                      color: ts.neonAmber,
+                      filtroKey: 'ALERTAS',
+                      ts: ts,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildClienteFilterChip(
+                      titulo: 'Vencido',
+                      valor: '$_countVencidos',
+                      icono: Icons.warning_amber_rounded,
+                      color: ts.neonRed,
+                      filtroKey: 'VENCIDOS',
+                      ts: ts,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildClienteFilterChip(
+                      titulo: 'Al Día',
+                      valor: '$_countAlDia',
+                      icono: Icons.check_circle_outline,
+                      color: ts.neonGreen,
+                      filtroKey: 'AL_DIA',
+                      ts: ts,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildClienteFilterChip(
+                      titulo: 'Crónicos',
+                      valor: '$_countCronicos',
+                      icono: Icons.medication_outlined,
+                      color: ts.neonBlue,
+                      filtroKey: 'CRONICOS',
+                      ts: ts,
+                    ),
+                  ],
+                ),
+              )
+            else
+              LayoutBuilder(
               builder: (context, kConstraints) {
                 final double w = kConstraints.maxWidth;
                 final double cardWidth = w < 480 ? (w - 12) / 2 : (w < 860 ? (w - 24) / 3 : 190);
@@ -1572,7 +1739,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 );
               },
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: isMobile ? 8 : 14),
 
             // Barra de Búsqueda
             Container(
