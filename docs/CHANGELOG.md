@@ -1,0 +1,423 @@
+# Historial de Versiones (Changelog) - FarmaControl
+
+Todas las modificaciones notables de este proyecto están documentadas en este archivo.
+El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
+y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver.org/lang/es/).
+
+---
+
+## [1.4.8] - 2026-11-13 (Auditoría de Seguridad, Autenticación Robusta PBKDF2/HMAC y Endurecimiento Operativo)
+
+### 🔐 Seguridad, Criptografía y Control de Acceso RBAC (`backend/app/security.py`, `routers/auth.py`, `routers/inventario.py`)
+- **Contraseñas Seguras PBKDF2-SHA256:**
+  - Sustitución de SHA-256 plano por PBKDF2 con sal aleatoria criptográfica y 310 000 iteraciones según estándares de seguridad actuales.
+  - Migración transparente y automática de credenciales heredadas a PBKDF2 en el primer inicio de sesión exitoso.
+  - Eliminación de comparación directa de contraseñas en texto plano contra hashes; verificación en tiempo constante con `hmac.compare_digest`.
+  - Expansión de columna `Usuario.password_hash` a `String(255)`.
+- **Tokens de Sesión Firmados HMAC-SHA256:**
+  - Generación de tokens criptográficos con firma HMAC-SHA256 y caducidad configurable (`TOKEN_TTL_SECONDS`).
+  - Implementación de dependencia `auth_guard` y validador de permisos `require_roles(...)`.
+  - Restricción estricta de administración de usuarios (`POST /api/auth/usuarios` y `PUT /api/auth/usuarios/{id}`) exclusivamente al rol `ADMINISTRADOR`.
+- **Integridad de Auditoría en Ajustes y Kardex:**
+  - La identidad y el rol en ajustes de inventario y observaciones de Kardex se extraen del token de sesión verificado, impidiendo la manipulación de campos de auditoría desde el cliente.
+
+### 🛡️ Endurecimiento Normativo de Negocio (FEFO, Devoluciones, Cobranza y Caja)
+- **FEFO Sanitario Estricto (COFEPRIS / FEUM):**
+  - Despacho garantizado únicamente de lotes no caducados (`fecha_caducidad >= hoy`).
+  - Desempate determinista por caducidad/id y bloqueo transaccional `with_for_update()`.
+- **Devoluciones Seguras y Control de Reembolsos:**
+  - Verificación acumulada por lote para impedir reembolsos superiores a la cantidad originalmente surtida.
+  - Reembolso calculado sobre el importe efectivamente pagado con descuento prorrateado por partida.
+  - Bloqueo de tickets con estatus `DEVUELTA` y validación sanitaria del estado del producto.
+- **Topes de Descuento y Validación de Efectivo:**
+  - Cálculo y validación en backend del descuento según fidelización del cliente.
+  - Verificación estricta de importe recibido en pagos en efectivo en punto de venta.
+
+### 💻 Frontend Flutter (`frontend` v1.4.8+1, `LoginScreen`, `AuthService`, `ApiService`)
+- **Pantalla de Inicio de Sesión Oficial (`LoginScreen`):**
+  - Nueva interfaz Material 3 con identidad FarmaControl, validación de credenciales y mensajes de error descriptivos.
+  - Panel de acceso rápido para auditoría y demostración de roles en un solo clic:
+    - 👑 **Administrador:** `admin` / `admin123`
+    - 💳 **Cajero:** `cajero` / `caja123`
+    - ⚕️ **Responsable Sanitario:** `sanitario` / `resp123`
+- **Gestión Centralizada de Autorización y Red (`ApiService`):**
+  - Inyección automática de cabeceras `Authorization: Bearer <token>` en todas las peticiones HTTP (`_get`, `_post`, `_put`, `_delete`).
+  - Interceptor reactivo ante código HTTP 401 que revoca la sesión y redirige al login ante tokens expirados.
+- **Control de Sesión Reactivo (`AuthService`):**
+  - Almacenamiento seguro del token en memoria y reactividad mediante `ListenableBuilder` en `main.dart`.
+  - Métodos `login`, `logout` y `loginRapidoDemo`.
+- **Navegación y Cierre de Sesión:**
+  - Botón de "Cerrar Sesión" integrado en AppBar móvil y de escritorio con diálogo de confirmación.
+  - Actualización de metadatos y versión en `pubspec.yaml` a `1.4.8+1`.
+
+---
+
+## [1.4.7] - 2026-11-03 (Seguimiento de Pacientes Crónicos, Búsqueda en Inventario y Recordatorios con Anticipación Semanal)
+
+### 👥 Módulo de Clientes y Resurtimiento Preventivo (`clientes_screen.dart`, `models.py`, `routers/clientes.py`)
+- **Búsqueda e Integración Directa con el Inventario de la Farmacia:**
+  - Conexión interactiva con el catálogo en existencia (`ApiService.getProductos()`): autocompletado en vivo por nombre comercial, sustancia activa, presentación o código de barras mientras se escribe.
+  - Indicador de stock en tiempo real (`Stock: X pzas`) y detalles de presentación/laboratorio en las sugerencias del buscador.
+  - **Escáner Óptico de Código de Barras con Cámara (`LectorCodigoBarrasDialog`):** botón táctil en el buscador para escanear cajas físicas de medicamentos y agregarlas de inmediato al tratamiento crónico del paciente.
+  - **Gestión Multi-Medicamento:** posibilidad de agregar múltiples medicamentos crónicos a una lista de resurtimiento visual con chips interactivos y botón de eliminación individual.
+  - Soporte para agregar medicamentos personalizados en caso de fármacos aún no registrados en el catálogo.
+- **Configuración Enriquecida de Recordatorios y Semanas de Anticipación:**
+  - **Duración del Tratamiento / Suministro:** selectores rápidos tipo preset (`15 días`, `30 días [1 mes]`, `60 días [2 meses]`, `90 días [3 meses]`) y campo numérico para días personalizados.
+  - **Anticipación del Recordatorio (Semanas de Anticipación):** configuración explícita para definir con cuántas semanas de anticipación avisar al mostrador y al paciente (`1 semana [7d]`, `2 semanas [14d]`, `3 semanas [21d - Estándar]`, `4 semanas [28d - 1 mes]`).
+  - **Fecha Meta de Próximo Resurtimiento:** selección con calendario interactivo (`showDatePicker`) o cálculo automático instantáneo según los días de tratamiento programados.
+  - **Panel de Resumen Informativo en Vivo:** cálculo dinámico que muestra fecha estimada de agotamiento, días restantes y la fecha exacta en la que se activará la alerta preventiva.
+- **Filtros Rápidos en el Listado de Clientes:**
+  - Barra de chips interactivos con recuento en vivo:
+    - `Todos (N)`
+    - `⚠️ Próximos a Resurtir (N)` (alertas preventivas activas en la ventana de anticipación)
+    - `🚨 Resurtimiento Vencido (N)` (tratamientos que sobrepasaron su fecha límite)
+    - `🟢 Tratamiento al Día (N)` (pacientes crónicos con suministro vigente)
+    - `💊 Crónicos Totales (N)` (padrón completo de pacientes con padecimientos crónicos)
+- **Badges Visuales y Tarjetas Enriquecidas:**
+  - Badges con colorimetría y estados en mostrador:
+    - 🚨 `Vencido hace Xd` (Rojo)
+    - ⚠️ `Resurtir en Xd (~Y sem)` (Ámbar)
+    - 🟢 `Al día (Xd restantes)` (Verde / Teal)
+  - Despliegue de los medicamentos prescritos (`Rx: [Medicamentos]`) y fecha meta programada (`📅 Próx. Resurtido: dd/mm/aaaa`) directamente en la tarjeta de cliente.
+  - Modal de Expediente Clínico (`_verDetallesCliente`) con desglose de medicamentos crónicos en chips individuales, estado de suministro y aviso preventivo para atención en caja.
+- **Backend Robusto y Persistencia:**
+  - Soporte de campo ampliado `medicamento_cronico_principal` (Text) en `Cliente` para almacenar listas extensas de medicamentos crónicos.
+  - Cálculo de `alerta_resurtimiento_activa` ampliado hasta 4 semanas de anticipación (28 días) y formateo de semanas restantes en `mensaje_alerta_resurtimiento`.
+  - Recálculo automático de fecha meta de resurtimiento si no es provista de forma manual.
+
+---
+
+## [1.4.6] - 2026-11-03 (Migración y Conexión Oficial con CIE-11 de la OMS)
+
+### 🏥 Catálogo de Diagnósticos y Enfermedades CIE-11 (`catalogo_cie.py`, `enfermedades.py`, `enfermedades_screen.dart`)
+- **Conexión en Vivo con la API Oficial ICD-11 (NIH / OMS):**
+  - Sustitución de ICD-10 por el motor de búsqueda en tiempo real de ICD-11 (`https://clinicaltables.nlm.nih.gov/api/icd11_codes/v3/search`).
+  - Resolución bilingüe con soporte semántico para términos médicos en español.
+- **Catálogo Enriquecido Local CIE-11 para Farmacia y Consulta:**
+  - Más de 100 patologías frecuentes bajo la linearización MMS de CIE-11 (ej. `5A11` Diabetes tipo 2, `BA00` Hipertensión esencial, `CA23` Asma, `CA00` Resfriado común, `RA01` COVID-19, `1A40` Gastroenteritis).
+- **Actualización Total de la Suite y Módulos de Clientes:**
+  - Módulo de diagnósticos, modales de alta, padrón de clientes crónicos y barra de navegación adaptados a la nomenclatura oficial CIE-11.
+
+---
+
+## [1.4.5] - 2026-11-03 (Búsqueda por Rango de Fechas, Multicriterio y Escáner en Kardex Inmutable)
+
+### 📊 Kardex Inmutable y Auditoría (`inventario_screen.dart`, `api_service.dart`)
+- **Filtro Avanzado por Rango de Fechas y Preajustes Rápidos:**
+  - Selector con calendario interactivo (`showDateRangePicker`) para acotar fechas específicas de movimientos en almacén y mostrador.
+  - Atajos temporales en un solo clic: `Todo el Historial`, `Hoy`, `Últimos 7 días`, `Este mes`, con botón dinámico de `Limpiar filtros`.
+- **Buscador Multicriterio y Escáner con Cámara:**
+  - Búsqueda en tiempo real por nombre de medicamento, lote (`numero_lote`), laboratorio, tipo de movimiento, motivo, folio o usuario auditor.
+  - Botón táctil de escáner con cámara (`Icons.camera_alt`) para enfocar códigos de barras físicos y filtrar de inmediato su historial de movimientos.
+- **Filtros por Tipo de Movimiento:**
+  - Selector dinámico por chips: `Todos`, `Entradas (+)`, `Salidas (-)`, `Ajustes y Bajas`, más el filtro sanitario `⚠️ Solo Irregulares`.
+- **Tarjetas Enriquecidas con Resolución Automática y Resumen KPI:**
+  - Resolución automática de lote a nombre comercial del fármaco y número de lote oficial (evita IDs numéricos abstractos).
+  - Estampado legible de fecha y hora `📅 dd/mm/aaaa hh:mm` en cada movimiento.
+  - Barra resumen KPI con balance de piezas ingresadas, egresadas y recuento de anomalías del período.
+  - Petición ampliada de hasta 300 movimientos en `ApiService.getKardex({limit = 300})`.
+
+---
+
+## [1.4.4] - 2026-11-03 (Búsqueda y Clasificación COFEPRIS en Lotes y Filtro de Fechas en Devoluciones)
+
+### 🔍 Catálogo General de Lotes e Inventario (`inventario_screen.dart`)
+- **Buscador Multicriterio en Tiempo Real:**
+  - Búsqueda integrada por nombre comercial, sustancia activa (fórmula), presentación, laboratorio, código de barras y número de lote individual (`numero_lote`).
+  - Botón de escaneo con cámara fotográfica (`Icons.camera_alt`) para buscar medicamentos físicos instantáneamente en almacén.
+- **Categorización Regulatoria por Grupo Terapéutico COFEPRIS:**
+  - Filtro dinámico con chips horizontales: `TODOS`, `GRUPO_VI` (Venta libre - OTC), `GRUPO_IV` (Receta médica), `CONTROLADOS` (Grupos I, II y III con control especial), `GRUPO_V` (Venta en farmacia).
+  - Filtro booleano `Solo con Stock` para aislar productos con existencia activa.
+  - Badges informativos con colorimetría oficial COFEPRIS y contador de lotes registrados en cada tarjeta de producto.
+
+### 📅 Módulo de Devoluciones y Mermas (`devoluciones_screen.dart`)
+- **Filtro Avanzado por Rango de Fechas:**
+  - Selector con calendario interactivo (`showDateRangePicker`) para acotar fechas específicas de auditoría.
+  - Atajos rápidos de filtrado: `Todo el Historial`, `Hoy`, `Últimos 7 días`, `Este mes`.
+- **Búsqueda por Texto Libre:**
+  - Búsqueda en tiempo real por folio de venta, motivo de devolución o causa de merma.
+- **Tarjetas Resumen del Período:**
+  - Métricas acumuladas del rango seleccionado: total devuelto en pesos, cantidad de devoluciones, importe de mermas y total de eventos registrados.
+
+### 🧾 Historial de Ventas (`ventas_screen.dart`)
+- **Filtrado Rápido por Fechas:**
+  - Selector de rango de fechas y presets temporales para localizar tickets pasados de clientes que solicitan devoluciones o refacturación CFDI 4.0.
+
+---
+
+## [1.4.3] - 2026-11-02 (Escáner de Código de Barras con Cámara y Modo Vertical/Portrait)
+
+### 📸 Lector de Código de Barras Móvil con Cámara (`mobile_scanner`)
+- **Escáner Óptico con Cámara en Punto de Venta (`pos_screen.dart`, `lector_codigo_barras_dialog.dart`):**
+  - Integración del paquete de escaneo por cámara de alta velocidad `mobile_scanner: ^7.5.0` con soporte automático Web/Android/iOS (`BarcodeDetector` y fallback WASM).
+  - Nuevo botón de cámara (`Icons.camera_alt`) situado en la barra de búsqueda de medicamentos del mostrador y en la búsqueda de tickets de facturación (`ventas_screen.dart`).
+  - Visor interactivo con retícula de enfoque táctil, botón de linterna (flash), alternancia de cámara frontal/trasera y modo de respaldo para ingreso manual si la cámara no enfoca.
+  - Al detectar el código de barras, busca el medicamento por coincidencia exacta, valida stock en tiempo real y lo agrega de inmediato al carrito con notificación emergente.
+
+### 📱 Optimización de Pantallas Verticales (Modo Portrait / Móvil Vertical)
+- **Eliminación de Contenedores y Alturas Rígidas:**
+  - Sustitución de alturas fijas en modales (búsqueda de clientes y chat de IA) por alturas elásticas (`MediaQuery * 0.65` / `0.70` con `maxHeight` seguro) para evitar desbordamientos cuando el teclado táctil se despliega.
+  - El Bottom Sheet del Ticket ahora incorpora `viewInsets.bottom` para elevarse dinámicamente sobre el teclado de la pantalla.
+- **Botones y Funciones Ocultas Recuperados en Inventario (`inventario_screen.dart`):**
+  - En la lista de lotes, el número de lote, stock y metadatos se reorganizan verticalmente en pantallas $< 500$px, asegurando que los botones de acción administrativa (**Ajustar Stock** y **Dar de Baja**) permanezcan 100% visibles y accesibles con el pulgar.
+  - En el listado de caducidades FEFO, las tarjetas adaptan sus acciones y badges para no desbordar lateralmente.
+  - El banner superior y el buscador con filtros de caducidades ahora usan disposición responsiva en dos niveles.
+- **Arqueo y Turno de Caja (`caja_screen.dart`):**
+  - Las tarjetas KPI del turno activo calculan dinámicamente su ancho con `(ancho - espacio) / 2` en celulares, formando una cuadrícula perfecta de 2 columnas que aprovecha el 100% del ancho vertical sin espacios muertos.
+- **Preservación Total en PC:**
+  - Cero afectación a la experiencia en monitores y computadoras: los selectores condicionales (`LayoutBuilder` y `constraints.maxWidth >= 850px`) garantizan que la versión de escritorio conserve su disposición amplia original de dos columnas y paneles extendidos.
+
+---
+
+## [1.4.2] - 2026-11-02 (Optimizacion Responsiva para Moviles y Tablets Android)
+
+### Optimización Móvil y Adaptabilidad Responsiva
+- **Punto de Venta Mostrador Móvil (pos_screen.dart):**
+  - Deteccion de ancho viewport (isMobile < 850px) con LayoutBuilder.
+  - En móviles, el catálogo de medicamentos ocupa el 100% con rejilla fluida adaptada.
+  - Barra inferior fija flotante con resumen de carrito (ítems y total en tiempo real).
+  - Apertura táctil de ticket completo mediante bottom sheet interactivo al 88% de pantalla para cobro y selección de cliente en 1 toque.
+  - Preservación íntegra de la disposición dual de escritorio (>= 850px).
+- **Tablero de Mando (dashboard_screen.dart):**
+  - Encabezado fluido con Wrap para evitar desbordamiento de botones y títulos.
+  - Métricas KPI adaptadas a 2 columnas con proporciones dinámicas.
+  - Gráfico de barras mes a mes y KPIs anuales desplazables horizontalmente de forma táctil.
+  - Sección de Alertas FEFO y Últimas Ventas convertida a Column vertical en móviles.
+- **Inventario y Caducidades (inventario_screen.dart):**
+  - Pestañas con desplazamiento horizontal (isScrollable: true) y textos concisos.
+  - Botón 'Registrar Lote' como FloatingActionButton flotante en móviles.
+- **Historial de Ventas y Facturación (ventas_screen.dart):**
+  - Módulo CFDI 4.0 adaptativo que apila campos en pantallas pequeñas sin desbordamiento.
+  - Folios, badges y botones de acción reorganizados con Wrap responsivo.
+- **Diálogos Universales en Toda la Suite:**
+  - Sustitución de anchos fijos de 380px a 580px por límites elásticos (width: 90%, maxWidth: ...).
+- **Barra de Navegación Global (home_screen.dart):**
+  - Rediseño responsivo de AppBar en móviles con acceso directo a IA y usuario.
+  - Barra inferior con 5 destinos y acceso directo al Drawer lateral.
+
+---
+
+## [1.4.1] - 2026-10-29 (Alertas de Resurtimiento Crónico, Corrección CFDI 4.0 con XML Oficial y Aceleración de Carga)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Seguimiento de Pacientes Crónicos y Alerta Preventiva de Resurtimiento (`models.py`, `database.py`, `schemas.py`, `clientes.py`, `ventas.py`, `pos_screen.dart`, `clientes_screen.dart`):**
+  - Incorporación al modelo `Cliente` de los campos: `ultima_visita`, `tiene_padecimientos_cronicos`, `medicamento_cronico_principal`, `dias_tratamiento` y `fecha_proximo_resurtimiento`.
+  - Alerta en tiempo real para el cajero en el Punto de Venta (POS) cuando restan $\le 21$ días (2 a 3 semanas de anticipación) para que el paciente agote su medicamento crónico.
+  - Actualización automática de la fecha de última visita y reprogramación del siguiente resurtimiento al registrar cualquier cobro con cliente vinculado.
+  - Insignias visuales en el padrón y búsqueda de clientes (`🔔 Resurtir (Xd)` y `💊 Crónico`).
+- **Sub-Agente 2: Corrección Integral del Sistema de Facturación Electrónica SAT CFDI 4.0 (`schemas.py`, `ventas.py`, `ventas_screen.dart`, `ticket_impresion_dialog.dart`, `api_service.dart`):**
+  - Sanitización automática de RFC: remueve guiones y espacios tanto en el validador Pydantic del backend como en el frontend para evitar rechazos por longitud.
+  - Búsqueda flexible de tickets: permite localizar ventas por coincidencia exacta, ID numérico o fragmentos parciales del folio.
+  - Estructuración y generación del archivo XML CFDI 4.0 oficial con desglose de impuestos (tasa 0% medicamentos / 16% misceláneos), nodo emisor/receptor, sellos digitales y timbre fiscal SAT (`tfd:TimbreFiscalDigital`).
+  - Nuevo endpoint `GET /api/ventas/{id}/factura/xml` para descarga directa del comprobante oficial.
+  - Botón directo `[Facturar Ticket]` dentro del ticket térmico para timbrado inmediato en 1 clic post-venta.
+- **Sub-Agente 3: Optimización del Rendimiento y Tiempo de Carga de la Aplicación (`main.py`, `dashboard_screen.dart`, `home_screen.dart`, `web/index.html`):**
+  - Activación de compresión HTTP `GZipMiddleware` en el servidor FastAPI para reducir hasta un 75% el tamaño de transferencia de catálogos e inventarios.
+  - Paralelización concurrente de peticiones con `Future.wait` en el Tablero de Mando, reduciendo la latencia de carga inicial a un tercio.
+  - Carga perezosa (Lazy Loading) en `HomeScreen` mediante `_construirPantallaActual(index)`, evitando montar 10 pantallas simultáneas en memoria por frame.
+  - Inicialización limpia de `web/index.html` con soporte de hot-reload y ejecución en modo release (`--release`) para arranque en menos de 2 segundos.
+
+---
+
+## [1.4.0] - 2026-10-28 (Facturación CFDI Ventas, Catálogo CIE-10 Ampliado, Gestión y Apellidos de Médicos, ID en Tickets y Dosis Separada)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Facturación Electrónica CFDI 4.0 y Automatización por Búsqueda de Ticket (`ventas_screen.dart`, `ventas.py`, `schemas.py`, `models.py`, `database.py`, `api_service.dart`):**
+  - Módulo y apartado dedicado de **Facturación Electrónica** en el panel de Ventas con banner interactivo de automatización para que el cliente o cajero busque la venta por Folio de Ticket (`TK-...` o ID numérico).
+  - Modal integral de emisión de factura con validación de campos fiscales del SAT (RFC, Razón Social, Régimen Fiscal, Código Postal, Uso de CFDI y Correo Electrónico).
+  - Emisión de CFDI 4.0 con generación de UUID Fiscal simétrico (36 caracteres), folio `FAC-YYYYMMDD-XXXXX` y almacenamiento persistente en base de datos.
+  - Visor interactivo de comprobante fiscal digital con opción de visualización de datos timbrados, desglose de IVA y badges de estado `FACTURADA` en el historial de ventas.
+  - Endpoints implementados: `GET /api/ventas/ticket/{folio_ticket}`, `POST /api/ventas/{venta_id}/facturar` y `GET /api/ventas/{venta_id}/factura`.
+- **Sub-Agente 2: Catálogo Epidemiológico CIE-10 Enriquecido y Motor de Búsqueda Normalizado (`catalogo_cie.py`, `enfermedades.py`, `test_api.py`):**
+  - Catálogo nativo ampliado con más de **200 diagnósticos clínicos y epidemiológicos** representativos del sistema de salud mexicano, cubriendo los 22 capítulos de la Clasificación Internacional de Enfermedades (CIE-10).
+  - Algoritmo de búsqueda inteligente insensible a mayúsculas y acentos (`á`, `é`, `í`, `ó`, `ú`, `ñ`), con tokenización multitérmino ponderada por concordancia de código y descripción clínica.
+  - Diccionario de mapeo bilingüe (Español a Inglés) para integración resiliente con la API NIH ICD-10 externa, ejecutándose con fallback inmediato sin bloqueos de red.
+  - Soporte de búsqueda por términos populares y síntomas comunes (ej: "resfriado" -> `J00`, "dolor de cabeza" -> `R51`, "gripe" -> `J11`).
+- **Sub-Agente 3: Desglose de Apellidos Paterno y Materno en Registro de Médicos (`medico.dart`, `registrar_medico_screen.dart`, `models.py`, `schemas.py`, `medicos.py`, `database.py`):**
+  - Desacoplamiento de apellidos en `apellido_paterno` y `apellido_materno` en el formulario y entidad de Médicos.
+  - Flexibilidad para médicos con un solo apellido y compatibilidad con apellidos compuestos (ej: *de la Cruz*, *del Moral*, *Montes de Oca*).
+  - Propiedad de lectura calculada `nombre_completo` y sincronización bidireccional no destructiva con el campo histórico `apellidos` para preservar la compatibilidad con recetas existentes.
+- **Sub-Agente 4: Módulo de Gestión Completa de Médicos: Edición y Borrado / Desactivación (`medicos_screen.dart`, `registrar_medico_screen.dart`, `medicos.py`, `api_service.dart`):**
+  - Acción de **Edición de Médicos** directamente desde la tarjeta del médico en el catálogo, precargando todos sus datos en el formulario para actualización inmediata.
+  - Acción de **Borrado de Médicos** con modal de confirmación inteligente: si el médico tiene recetas o ventas vinculadas, se ejecuta una baja lógica / desactivación (`vigente = False`) protegiendo la integridad referencial; si no tiene registros vinculados, permite la eliminación definitiva.
+  - Endpoints actualizados: `PUT /api/medicos/{medico_id}` y `DELETE /api/medicos/{medico_id}`.
+- **Sub-Agente 5: Ticket de Compra al Cliente con Nombre de Producto e ID de Inventario y Remoción de Lote Interno (`ticket_impresion_dialog.dart`, `models.py`, `schemas.py`, `ventas.py`):**
+  - En el ticket de compra entregado al cliente, se despliega de forma destacada el **Nombre del Producto** y su **ID de Inventario** (ej: `[ID: #1] Paracetamol 500mg`).
+  - **Eliminación del número de lote en el comprobante del cliente:** Los lotes se mantienen como información de control interno exclusiva de la farmacia para devoluciones, mermas y auditoría de Kardex, evitando confusión en el comprador final.
+  - Campos calculados `@property producto_nombre` y `@property sustancia_activa` expuestos en `VentaDetalleOut`.
+- **Sub-Agente 6: Dosis Separada de Dosificación, Eliminación de Botones de Concentración y Autocompletado por Código de Barras Previo (`inventario_screen.dart`, `inventario.py`, `models.py`, `schemas.py`, `api_service.dart`):**
+  - **Estructuración canónica de dosis:** Separación de la forma farmacéutica y la dosis en campos independientes (`forma_farmaceutica`, `dosis_valor`, `dosis_unidad`), consolidándose bajo el formato canónico estricto: `Forma | Dosis | Unidad` (ej: `Tableta | 100 | mg`).
+  - **Eliminación de botones de concentración:** Se retiraron los botones de chips predeterminados, habilitando la captura manual y precisa de la magnitud y su unidad (mg, ml, mcg, g, UI, pza).
+  - **Restricción estricta de autocompletado de producto:** El nombre del medicamento o producto se ingresa manualmente por defecto; el autocompletado inteligente se activa **únicamente** si el código de barras escaneado ya se encuentra registrado previamente en la base de datos de la farmacia mediante el nuevo endpoint `GET /api/inventario/productos/buscar-codigo/{codigo_barras}`.
+
+---
+
+## [1.3.0] - 2026-10-28 (Dosis y Dispositivos, IA Terapéutica Estricta, Búsqueda Telefónica POS y Apellidos Paterno/Materno)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Dosis y Concentración Rápida + Catálogo de Dispositivos Médicos y Misceláneos (`inventario_screen.dart`, `seed.py`, `catalogo_medicamentos.py`):**
+  - Apartado destacado *"Dosis / Concentración del Lote"* en el diálogo de registro con chips de acceso rápido (`100mg`, `250mg`, `500mg`, `1g`, `250ml`, `500ml`, `1UI`, `100UI`, `1 kit`, `1 pza`).
+  - Incorporación al inventario de **7 dispositivos médicos y material de curación** (Termómetro Infrarrojo, Oxímetro de Pulso, Baumanómetro Digital, Glucómetro Accu-Chek, Jeringas 5ml BD, Gasas Estériles y Vendas Elásticas).
+  - Incorporación al inventario de **7 productos misceláneos y bebidas** (Electrolit Fresa, Suerox Mora Azul, Agua Purificada Ciel 1L, Agua Mineral Peñafiel, Coca-Cola 600ml, Sprite y Manzana Lift).
+  - Asignación de formas farmacéuticas como *Dispositivo Médico*, *Material de Curación*, *Solución Rehidratante* y *Refresco / Bebida*.
+- **Sub-Agente 2: Consulta IA con Validación Terapéutica Estricta, Aviso de Compra y Deslinde (`ia.py`, `test_api.py`):**
+  - **Alineación farmacológica estricta:** Bloqueo absoluto de cruces erróneos entre familias clínicas (la IA nunca sugiere analgésicos para sustituir antibióticos ni viceversa; solo bioequivalentes directos o de la misma indicación terapéutica).
+  - **Aviso de solicitud de compra:** Si un fármaco o su clase terapéutica no tiene stock físico en farmacia, notifica explícitamente al usuario que puede tramitarse una solicitud de compra o pedido urgente a proveedor/almacén.
+  - **Deslinde orientativo obligatorio:** Mensaje de deslinde clínico que aclara que la respuesta es asistencial y no reemplaza la búsqueda, diagnóstico ni validación de un humano calificado (médico o farmacéutico).
+- **Sub-Agente 3: Barra Buscadora de Clientes en Cobro (POS) y Confirmación de Identidad (`pos_screen.dart`):**
+  - Barra de búsqueda interactiva en mostrador con filtrado instantáneo por **número telefónico**, nombre completo o apellidos.
+  - Modal *"Búsqueda y Confirmación de Cliente"* con panel de verificación por **Fecha de Nacimiento** (`🎂 DD/MM/AAAA`) para corroborar la identidad del comprador y evitar seleccionar homónimos o clientes incorrectos.
+  - Acciones rápidas para asignar a *Público General* o invocar el alta rápida de clientes con 1 clic.
+- **Sub-Agente 4: Corrección de Visualización del Género ante Escalas de Fuente (`clientes_screen.dart`, `pos_screen.dart`):**
+  - Resolución del error de renderizado y desbordamiento (`RenderFlex overflowed`) al aumentar la fuente al 115% o 130%.
+  - El selector de Sexo/Género (`DropdownButtonFormField`) ahora cuenta con `isExpanded: true` y control de texto (`TextOverflow.ellipsis`).
+  - Separación del género y la fecha de nacimiento en bloques independientes y reemplazo de filas rígidas por contenedores `Wrap` adaptables en las tarjetas de cliente.
+- **Sub-Agente 5: Desglose Obligatorio/Opcional en Apellido Paterno y Materno (`models.py`, `database.py`, `schemas.py`, `clientes.py`, `clientes_screen.dart`, `pos_screen.dart`):**
+  - Desacoplamiento de apellidos en `apellido_paterno` y `apellido_materno`.
+  - Flexibilidad legal: el primer apellido (paterno o principal) es obligatorio, mientras que el materno es opcional para amparar personas con un solo apellido o de origen extranjero.
+  - Sincronización transparente con el campo consolidado `apellido` para mantener compatibilidad total con ventas y tickets previos.
+
+---
+
+## [1.2.0] - 2026-10-28 (Inteligencia Clínica, Alertas FEFO, Gráficos Anuales y Robustez de UI)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Conexión de Tablero a Alertas de Caducidad y Pestaña de Lotes por Caducar (`dashboard_screen.dart`, `inventario_screen.dart`, `inventario.py`):**
+  - Conexión interactiva directa: Las tarjetas de *Alertas de Caducidad* y el listado de *Lotes con Prioridad de Despacho (FEFO)* en el Tablero de Mando ahora navegan con 1 clic al submódulo de caducidades en el Inventario.
+  - Pestaña dedicada *"Lotes por Caducar (Alertas FEFO)"* en el Inventario para separar y priorizar lotes próximos a vencer.
+  - Filtros rápidos por horizonte de vencimiento: *Todos*, *Críticos (≤ 30 días)*, *En Riesgo (31-60 días)* y *Preventivos (61-90 días)*.
+  - Badges de urgencia por color, días restantes, cálculo en vivo de existencias y botones directos de acción (Ajustar / Dar de baja).
+- **Sub-Agente 2: Datos de Fabricación, Forma y Dosificación en Lotes (`models.py`, `schemas.py`, `inventario_screen.dart`, `inventario.py`):**
+  - Nuevos campos en el modelo `Lote`: `laboratorio_fabricante`, `forma_farmaceutica`, `dosificacion` y `fecha_ingreso` con migración no destructiva en SQLite.
+  - Formulario de alta de lotes enriquecido con selector de formas farmacéuticas (Tabletas, Cápsulas, Solución, Suspensión, Inyectable, etc.), campo de dosificación por presentación y selector de fecha de recepción.
+  - Visualización integral de laboratorio fabricante y presentación en las tarjetas de lotes de inventario.
+- **Sub-Agente 3: Captura Opcional de Fecha de Nacimiento Desglosada y Sexo en Clientes (`models.py`, `schemas.py`, `clientes_screen.dart`, `pos_screen.dart`):**
+  - Campos `fecha_nacimiento` y `sexo` (`MASCULINO`, `FEMENINO`, `OTRO`) en `Cliente`.
+  - Captura estructurada con campos independientes para Día (DD), Mes (MM) y Año (AAAA), complementado con botón selector de calendario interactivo (`showDatePicker`).
+  - Integración en el catálogo maestro de Clientes y en el modal de *Registro Exprés* del Punto de Venta.
+  - Badges visuales con fecha de nacimiento, edad calculada y sexo en el expediente clínico del cliente.
+- **Sub-Agente 4: Menú y Navegación Responsiva sin Desbordamiento (`home_screen.dart`):**
+  - Envoltura del `NavigationRail` de 10 módulos en un contenedor con desplazamiento vertical (`SingleChildScrollView` + `ConstrainedBox`), garantizando que la navegación nunca se corte ni genere excepciones `RenderFlex overflowed` al incrementar la fuente al 115% o 130%.
+  - Integración de menú lateral desplegable (`Drawer`) completo para dispositivos móviles o monitores de baja resolución con accesos directos a todos los módulos.
+- **Sub-Agente 5: Chat Asistente IA para Búsqueda y Sustitutos Terapéuticos en Stock (`ia.py`, `home_screen.dart`, `api_service.dart`):**
+  - Botón de acceso rápido `[🤖 Consulta IA]` en la barra superior de FarmaControl.
+  - Endpoint de inteligencia clínica `POST /api/ia/consulta-medicamento` con resolución de marcas comerciales a genéricos bioequivalentes y mapeo de 8 familias terapéuticas.
+  - Cruce en tiempo real con el inventario de la farmacia para recomendar alternativas disponibles en stock cuando el fármaco solicitado no está disponible.
+  - Alertas regulatorias automáticas para antibióticos (Grupo IV) y fármacos controlados (Grupos I-III).
+  - Sugerencias rápidas de consulta en forma de chips y chat interactivo con respuestas contextuales.
+- **Sub-Agente 6: Gráfico Desglosado de Ventas Mes a Mes (`dashboard_screen.dart`, `ventas.py`, `schemas.py`, `seed.py`):**
+  - Endpoint `GET /api/ventas/reporte-mensual?anio=2026` con desglose mensual de ventas e importes acumulados.
+  - Gráfico de barras interactivo de 12 meses integrado en el Tablero de Mando, con alturas proporcionales y destacado visual del mes con mayor facturación (`★ PICO`).
+  - Selector dinámico de año fiscal (2026, 2025, 2024).
+  - Tarjetas de resumen ejecutivo: Total Anual Facturado, Promedio Mensual, Mes Pico y Total de Tickets Emitidos.
+  - Detalle interactivo por mes al hacer clic sobre cualquier columna del gráfico.
+
+---
+
+## [1.1.0] - 2026-10-27 (Expansión Multisistema: Clientes CIE-10, Permisos de Lotes, Ajustes Visuales y Auditoría Kardex)
+
+### 🚀 Añadido
+- **Sub-Agente 1: Padrón de Clientes e Historial Clínico CIE-10 (`clientes_screen.dart`, `models.py`, `routers/clientes.py`):**
+  - Modelo relacional `Cliente` y tabla asociativa `cliente_enfermedades` para vincular clientes frecuentes con sus diagnósticos del CIE-10.
+  - Campos obligatorios: `nombre`, `apellido`. Campos opcionales: `correo_electronico`, `telefono`, `direccion`, `notas_clinicas` y `descuento_porcentaje` (lealtad).
+  - Pantalla dedicada con búsqueda reactiva, visualización de expediente clínico, edición y alta de clientes.
+- **Sub-Agente 2: Integración de Clientes en Punto de Venta y Descuentos (`pos_screen.dart`, `ventas.py`):**
+  - Selector en barra lateral de cobro: alternancia fluida entre *Público General* y clientes registrados.
+  - Botón de *Registro Exprés* directo desde el mostrador para dar de alta clientes al instante sin perder la venta.
+  - Cálculo automático y transparente del porcentaje de descuento de fidelidad sobre el subtotal.
+  - Visualización de credenciales y padecimientos CIE-10 del cliente en mostrador para alertar al farmacéutico.
+  - Desglose del descuento en el ticket térmico de 80mm y almacenamiento en la base de datos fiscal.
+- **Sub-Agente 3: Ajustes de Piezas y Baja de Lotes con Restricción de Roles (`inventario_screen.dart`, `routers/inventario.py`):**
+  - Endpoints seguros `POST /api/inventario/lotes/{id}/ajuste` y `POST /api/inventario/lotes/{id}/baja` protegidos por rol.
+  - Restricción estricta: Acceso concedido solo a `ADMINISTRADOR` y `RESPONSABLE_SANITARIO`; usuarios con rol `CAJERO` reciben bloqueo preventivo y error HTTP `403 Forbidden`.
+  - Trazabilidad total en Kardex mediante asientos inmutables `ENTRADA_AJUSTE`, `SALIDA_AJUSTE` o `BAJA_LOTE` con registro de usuario y motivo.
+- **Sub-Agente 4: Panel de Configuración, Administración de Usuarios y Temas (`configuracion_screen.dart`, `theme_service.dart`, `routers/auth.py`):**
+  - Módulo completo de administración de usuarios: alta, edición de nombres, asignación de roles y actualización de contraseñas.
+  - Selector dinámico de paleta de colores institucional: *Teal Farmacéutico*, *Azul Clínico*, *Verde Médico*, *Índigo Quirúrgico* y *Cian Sanitario*.
+  - Escala de tipografía global en tiempo real: 4 niveles de ajuste (*Compacta 88%*, *Estándar 100%*, *Grande 115%*, *Alta Legibilidad 130%*) para accesibilidad en pantallas táctiles.
+- **Sub-Agente 5: Auditoría de Kardex y Detección de Irregularidades (`inventario_screen.dart`, `models.py`):**
+  - Campos de auditoría `observaciones_auditoria`, `es_irregular` y `usuario_auditor` en la bitácora del Kardex.
+  - Modal interactivo para que supervisores y usuarios añadan notas explicativas y marquen movimientos sospechosos o "fuera de lugar".
+  - Filtro dinámico en vista de Kardex: chip para aislar instantáneamente movimientos marcados como irregulares.
+
+---
+
+## [1.0.0] - 2026-10-26 (Versión Mayor: Búsqueda POS, Catálogo Maestro 100 y API CIE-10)
+
+### 🚀 Añadido
+- **Búsqueda Reactiva en Punto de Venta (`pos_screen.dart`):**
+  - Motor de búsqueda en memoria con filtrado instantáneo por nombre comercial, sustancia activa, código de barras EAN-13 y laboratorio fabricante.
+  - Soporte de pistola/escáner de código de barras: auto-adición al carrito al detectar escaneo exacto o pulsar `Enter`, con vaciado automático del buffer de entrada.
+  - Chips de filtrado rápido por categorías regulatorias COFEPRIS: *Todos*, *Venta Libre (Grupo VI)*, *Antibióticos (Grupo IV)*, *Controlados (Grupo I-III)*, *Crónicos (Grupo V)* y *Solo con Stock*.
+  - Indicador de stock en carrito directamente en cada tarjeta de medicamento (`🛒 X en carrito`).
+  - Contador dinámico de inventario mostrado en mostrador y estado vacío interactivo con botón para restablecer filtros.
+- **Base de Datos Maestra de 100 Medicamentos (`catalogo_medicamentos.py` y `seed.py`):**
+  - 100 medicamentos mexicanos reales estructurados rigurosamente según el Art. 226 de la Ley General de Salud:
+    - 25 Antibióticos de prescripción médica (Grupo IV).
+    - 15 Psicotrópicos y Estupefacientes con receta especial/retenida (Grupos I, II y III).
+    - 30 Medicamentos para padecimientos crónicos y especializados (Grupo V).
+    - 30 Medicamentos de venta libre / OTC (Grupo VI).
+  - 103 Lotes con fechas de caducidad escalonadas bajo política FEFO (*First Expired, First Out*).
+  - Generación de asientos inmutables en el Kardex (`ENTRADA_COMPRA` con referencia `SEED-100`) para auditar la recepción de cada lote.
+- **Conexión de API y Catálogo de Enfermedades CIE-10 (`catalogo_cie.py`, `enfermedades.py`, `enfermedades_screen.dart`):**
+  - Catálogo híbrido con más de 80 afecciones clínicas estándar en México y conexión a la API pública de terminología médica **NIH Clinical Tables (ICD-10)**.
+  - Endpoint `GET /api/enfermedades/catalogo-cie/buscar`: Búsqueda asistida con indicador en vivo `ya_registrado` para cruzar diagnósticos con la base de datos de la farmacia.
+  - Endpoint `POST /api/enfermedades/catalogo-cie/importar`: Importación de diagnósticos con 1 solo clic sin riesgos de duplicación.
+  - Endpoint `POST /api/enfermedades/auto-registrar`: Adición dinámica sobre la marcha durante la expedición de recetas y cobro.
+  - Rediseño de la interfaz de enfermedades en Flutter con navegación por pestañas: *Mis Diagnósticos en Farmacia* y *Catálogo Oficial CIE-10 (Búsqueda Global y API)*.
+  - Asistente de autocompletado en el formulario de captura manual basado en códigos CIE.
+
+### 🔧 Modificado
+- `ApiService` en Flutter actualizado con métodos `buscarCatalogoCIE`, `importarDesdeCatalogoCIE` y `autoRegistrarEnfermedad`.
+- Refactorización de tipos en decoraciones de interfaz para compatibilidad estricta con Flutter Web SDK.
+
+---
+
+## [0.3.0] - 2026-10-25 (Paso 6: Control de Caja, Tickets Térmicos y Mermas Sanitarias)
+
+### 🚀 Añadido
+- **Módulo de Devoluciones y Mermas Sanitarias:**
+  - Clasificación sanitaria de producto retornado: `BUEN_ESTADO` (reingreso a stock con Kardex `ENTRADA_DEVOLUCION`) y `DANADO` (apartado a cuarentena/baja con Kardex `SALIDA_MERMA`).
+  - Endpoints `/api/devoluciones/` y `/api/devoluciones/mermas` para seguimiento y auditoría sanitaria.
+- **Emisión de Tickets Térmicos de 80mm:**
+  - Modal visual con membrete sanitario COFEPRIS, RFC, desglose de lotes y fechas de caducidad FEFO por producto.
+  - Botones de *"Imprimir Ticket"* y *"Copiar Ticket"* en formato de texto plano para impresoras térmicas ESC/POS.
+- **Control de Turnos y Cortes de Caja (Corte Z):**
+  - Endpoints `/api/caja/abrir`, `/api/caja/resumen`, `/api/caja/cerrar` y `/api/caja/turno-activo`.
+  - Registro de fondo de apertura ($ MXN), arqueo en tiempo real de ventas en efectivo/tarjeta/transferencia y semáforo de cuadre (Exacto, Sobrante o Faltante).
+  - Selector de método de pago en mostrador con botones de importe rápido ($100, $200, $500, $1000, Exacto) y cálculo automático de cambio.
+- **Autenticación y Matriz de Roles:**
+  - Tabla `usuarios` con hash SHA-256 de contraseña.
+  - Perfiles preconfigurados: `ADMINISTRADOR` (Alejandro Mendoza), `CAJERO` (Juan Daniel Morales) y `RESPONSABLE_SANITARIO` (Dra. Carmen Sofía Morales).
+  - Selector de usuario en la barra superior para alternar de perfil durante pruebas operativas.
+- **Migración a Entorno Local Libre de Bloqueos:**
+  - Migración del proyecto fuera de OneDrive a `C:\Developer` para evitar bloqueos de archivos en `.dart_tool/` y `build/`.
+
+---
+
+## [0.2.0] - 2026-10-24 (Paso 5: Trazabilidad FEFO y Candados Sanitarios)
+
+### 🚀 Añadido
+- **Motor de Despacho FEFO (*First Expired, First Out*):**
+  - Algoritmo que consume automáticamente los lotes más próximos a caducar al momento de cobrar una venta.
+  - Desglose por lote y cantidad despachada en la tabla `ventas_detalle_lotes`.
+- **Candado Regulatorio para Antibióticos (Grupo IV):**
+  - Bloqueo preventivo de venta en el POS si el carrito incluye fármacos del Grupo IV y no se ha seleccionado un médico prescriptor.
+  - Validación de cédula profesional médica y vigencia antes de autorizar la transacción.
+- **Kardex Inmutable:**
+  - Tabla `kardex_movimientos` para registrar cada entrada (`ENTRADA_COMPRA`, `ENTRADA_DEVOLUCION`) y salida (`SALIDA_VENTA`, `SALIDA_MERMA`) con stock anterior y posterior.
+
+---
+
+## [0.1.0] - 2026-10-23 (Paso 1-4: Arquitectura Base y MVP)
+
+### 🚀 Añadido
+- **Base de Datos y Modelado Relacional:**
+  - Configuración de SQLite con SQLAlchemy en `backend/app/models.py`.
+  - Tablas fundacionales: `productos`, `lotes`, `medicos`, `enfermedades`, `ventas`, `ventas_detalle`.
+- **Backend API REST (FastAPI):**
+  - Endpoints CRUD para productos, lotes, médicos y ventas.
+  - Documentación interactiva Swagger UI en `/docs`.
+- **Frontend Base en Flutter Web:**
+  - Pantallas iniciales: `dashboard_screen.dart`, `inventario_screen.dart`, `pos_screen.dart`, `ventas_screen.dart`, `medicos_screen.dart`.
+  - Conexión HTTP con el backend mediante `ApiService`.

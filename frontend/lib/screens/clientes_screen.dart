@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/theme_service.dart';
 import '../widgets/lector_codigo_barras_dialog.dart';
 
 class ClientesScreen extends StatefulWidget {
@@ -173,15 +174,24 @@ class _ClientesScreenState extends State<ClientesScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (dialogCtx, setDialogState) {
+            final ts = ThemeService.instance;
             return AlertDialog(
+              backgroundColor: ts.cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+              ),
               title: Row(
                 children: [
                   Icon(
                     esEdicion ? Icons.edit : Icons.person_add_alt_1,
-                    color: Theme.of(context).primaryColor,
+                    color: ts.accentPrimary,
                   ),
                   const SizedBox(width: 8),
-                  Text(esEdicion ? 'Editar Cliente' : 'Registrar Nuevo Cliente'),
+                  Text(
+                    esEdicion ? 'Editar Cliente' : 'Registrar Nuevo Cliente',
+                    style: TextStyle(color: ts.textPrimary),
+                  ),
                 ],
               ),
               content: Container(
@@ -195,18 +205,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: ts.tintBg(ts.neonBlue),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
+                          border: Border.all(color: ts.neonBlue.withValues(alpha: 0.35)),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.blue, size: 18),
-                            SizedBox(width: 8),
+                            Icon(Icons.info_outline, color: ts.neonBlue, size: 18),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Nombre y al menos un Apellido son obligatorios. El Apellido Materno es opcional para personas con un solo apellido o extranjeros.',
-                                style: TextStyle(fontSize: 11, color: Colors.blueGrey),
+                                style: TextStyle(fontSize: 11, color: ts.textSecondary),
                               ),
                             ),
                           ],
@@ -328,17 +338,17 @@ class _ClientesScreenState extends State<ClientesScreen> {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             spacing: 8,
                             children: [
-                              const Row(
+                              Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.cake, size: 16, color: Colors.teal),
-                                  SizedBox(width: 6),
-                                  Text('Fecha de Nacimiento:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Icon(Icons.cake, size: 16, color: ts.accentPrimary),
+                                  const SizedBox(width: 6),
+                                  Text('Fecha de Nacimiento:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.textPrimary)),
                                 ],
                               ),
                               TextButton.icon(
-                                icon: const Icon(Icons.calendar_month, color: Colors.teal, size: 16),
-                                label: const Text('Calendario', style: TextStyle(fontSize: 11)),
+                                icon: Icon(Icons.calendar_month, color: ts.accentPrimary, size: 16),
+                                label: Text('Calendario', style: TextStyle(fontSize: 11, color: ts.accentPrimary)),
                                 onPressed: () async {
                                   final picked = await showDatePicker(
                                     context: context,
@@ -392,23 +402,23 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'Historial Clínico - Diagnósticos CIE-11 Vinculados:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
                       ),
                       const SizedBox(height: 6),
                       if (_enfermedadesDisponibles.isEmpty)
-                        const Text(
+                        Text(
                           'No hay enfermedades registradas en el catálogo local. Puede darlas de alta desde el módulo CIE-11.',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 12, color: ts.textSecondary),
                         )
                       else
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: ts.surfaceBg,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: ts.borderColor),
                           ),
                           constraints: const Duration(milliseconds: 300) == Duration.zero
                               ? null
@@ -425,11 +435,19 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   labelStyle: TextStyle(
                                     fontSize: 11,
                                     fontWeight: seleccionada ? FontWeight.bold : FontWeight.normal,
-                                    color: seleccionada ? Colors.teal.shade900 : Colors.black87,
+                                    color: seleccionada
+                                        ? (ts.esTemaNeon ? Colors.black : ts.accentPrimary)
+                                        : ts.textPrimary,
                                   ),
                                   selected: seleccionada,
-                                  selectedColor: Colors.teal.shade100,
-                                  checkmarkColor: Colors.teal.shade900,
+                                  selectedColor: ts.esTemaNeon
+                                      ? ts.accentPrimary
+                                      : ts.tintBg(ts.accentPrimary, lightAlpha: 0.2, darkAlpha: 0.3),
+                                  checkmarkColor: ts.esTemaNeon ? Colors.black : ts.accentPrimary,
+                                  backgroundColor: ts.surfaceAltBg,
+                                  side: BorderSide(
+                                    color: seleccionada ? ts.accentPrimary : ts.borderColor,
+                                  ),
                                   onSelected: (bool selected) {
                                     setDialogState(() {
                                       if (selected) {
@@ -459,10 +477,14 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: tienePadecimientosCronicos ? Colors.amber.shade50 : Colors.grey.shade50,
+                          color: tienePadecimientosCronicos
+                              ? ts.tintBg(ts.neonAmber, lightAlpha: 0.12, darkAlpha: 0.2)
+                              : ts.surfaceBg,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: tienePadecimientosCronicos ? Colors.amber.shade400 : Colors.grey.shade300,
+                            color: tienePadecimientosCronicos
+                                ? ts.neonAmber.withValues(alpha: 0.45)
+                                : ts.borderColor,
                           ),
                         ),
                         child: Column(
@@ -470,25 +492,28 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           children: [
                             SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: const Text('Paciente con Padecimiento Crónico', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              subtitle: const Text(
+                              title: Text(
+                                'Paciente con Padecimiento Crónico',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
+                              ),
+                              subtitle: Text(
                                 'Activa recordatorios inteligentes con semanas de anticipación y vincula medicamentos de nuestro inventario.',
-                                style: TextStyle(fontSize: 11),
+                                style: TextStyle(fontSize: 11, color: ts.textSecondary),
                               ),
                               value: tienePadecimientosCronicos,
-                              activeThumbColor: Colors.amber.shade800,
+                              activeThumbColor: ts.neonAmber,
                               onChanged: (val) => setDialogState(() => tienePadecimientosCronicos = val),
                             ),
                             if (tienePadecimientosCronicos) ...[
-                              const Divider(),
+                              Divider(color: ts.borderColor),
                               // 1. Buscador conectado al Inventario con Escáner de Cámara
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.inventory_2_outlined, size: 16, color: Colors.teal),
-                                  SizedBox(width: 6),
+                                  Icon(Icons.inventory_2_outlined, size: 16, color: ts.accentPrimary),
+                                  const SizedBox(width: 6),
                                   Text(
                                     'Buscar Medicamentos en Inventario:',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: ts.textPrimary),
                                   ),
                                 ],
                               ),
@@ -516,12 +541,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       decoration: InputDecoration(
                                         labelText: 'Buscar medicamento o fórmula...',
                                         hintText: 'Ej. Losartán, Metformina, Insulina, 750100...',
-                                        prefixIcon: const Icon(Icons.search, size: 20),
+                                        prefixIcon: Icon(Icons.search, size: 20, color: ts.textSecondary),
                                         suffixIcon: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             IconButton(
-                                              icon: const Icon(Icons.qr_code_scanner, color: Colors.teal),
+                                              icon: Icon(Icons.qr_code_scanner, color: ts.accentPrimary),
                                               tooltip: 'Escanear código de barras con la cámara',
                                               onPressed: () async {
                                                 final cod = await LectorCodigoBarrasDialog.escanear(
@@ -556,7 +581,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               },
                                             ),
                                             IconButton(
-                                              icon: const Icon(Icons.add_circle, color: Colors.teal),
+                                              icon: Icon(Icons.add_circle, color: ts.accentPrimary),
                                               tooltip: 'Agregar medicamento ingresado',
                                               onPressed: () {
                                                 final txt = buscarMedCtrl.text.trim();
@@ -583,18 +608,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 const SizedBox(height: 4),
                                 Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: ts.cardBg,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.teal.shade300),
+                                    border: Border.all(color: ts.borderColor),
                                     boxShadow: [
-                                      BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 4, offset: const Offset(0, 2)),
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: ts.esOscuro ? 0.3 : 0.06),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
                                     ],
                                   ),
                                   constraints: const BoxConstraints(maxHeight: 180),
                                   child: ListView.separated(
                                     shrinkWrap: true,
                                     itemCount: sugerenciasInventario.length,
-                                    separatorBuilder: (_, _) => const Divider(height: 1),
+                                    separatorBuilder: (_, _) => Divider(height: 1, color: ts.borderColor),
                                     itemBuilder: (ctx, i) {
                                       final p = sugerenciasInventario[i];
                                       final stock = (p['stock_total'] ?? 0) as int;
@@ -604,30 +633,34 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       final lab = (p['laboratorio'] ?? '').toString().trim();
                                       return ListTile(
                                         dense: true,
-                                        leading: const Icon(Icons.medication, color: Colors.teal, size: 20),
-                                        title: Text(nom, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                        subtitle: Text('$sust • $pres${lab.isNotEmpty ? " ($lab)" : ""}', style: const TextStyle(fontSize: 10)),
+                                        leading: Icon(Icons.medication, color: ts.accentPrimary, size: 20),
+                                        title: Text(nom, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: ts.textPrimary)),
+                                        subtitle: Text('$sust • $pres${lab.isNotEmpty ? " ($lab)" : ""}', style: TextStyle(fontSize: 10, color: ts.textSecondary)),
                                         trailing: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: stock > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                                                color: stock > 0 ? ts.tintBg(ts.neonGreen) : ts.tintBg(ts.neonRed),
                                                 borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: stock > 0 ? Colors.green.shade300 : Colors.red.shade300),
+                                                border: Border.all(
+                                                  color: stock > 0
+                                                      ? ts.neonGreen.withValues(alpha: 0.4)
+                                                      : ts.neonRed.withValues(alpha: 0.4),
+                                                ),
                                               ),
                                               child: Text(
                                                 'Stock: $stock',
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.bold,
-                                                  color: stock > 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                                  color: stock > 0 ? ts.neonGreen : ts.neonRed,
                                                 ),
                                               ),
                                             ),
                                             const SizedBox(width: 6),
-                                            const Icon(Icons.add_circle_outline, color: Colors.teal, size: 18),
+                                            Icon(Icons.add_circle_outline, color: ts.accentPrimary, size: 18),
                                           ],
                                         ),
                                         onTap: () {
@@ -647,27 +680,27 @@ class _ClientesScreenState extends State<ClientesScreen> {
                               ],
                               const SizedBox(height: 8),
                               // Lista de Medicamentos Crónicos Agregados
-                              const Text(
+                              Text(
                                 'Lista de Medicamentos que Requieren Resurtimiento:',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: ts.textSecondary),
                               ),
                               const SizedBox(height: 4),
                               if (medicamentosList.isEmpty)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange.shade50,
+                                    color: ts.tintBg(ts.neonAmber),
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.orange.shade200),
+                                    border: Border.all(color: ts.neonAmber.withValues(alpha: 0.35)),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     children: [
-                                      Icon(Icons.info_outline, size: 14, color: Colors.orange),
-                                      SizedBox(width: 6),
+                                      Icon(Icons.info_outline, size: 14, color: ts.neonAmber),
+                                      const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
                                           'No hay medicamentos asignados todavía. Busque en inventario arriba o use la cámara.',
-                                          style: TextStyle(fontSize: 11, color: Colors.brown),
+                                          style: TextStyle(fontSize: 11, color: ts.textPrimary),
                                         ),
                                       ),
                                     ],
@@ -679,10 +712,17 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   runSpacing: 6,
                                   children: medicamentosList.map((m) {
                                     return Chip(
-                                      avatar: const Icon(Icons.medication, size: 14, color: Colors.white),
-                                      backgroundColor: Colors.teal.shade700,
-                                      label: Text(m, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                      deleteIcon: const Icon(Icons.close, color: Colors.white, size: 14),
+                                      avatar: Icon(Icons.medication, size: 14, color: ts.esTemaNeon ? Colors.black : Colors.white),
+                                      backgroundColor: ts.accentPrimary,
+                                      label: Text(
+                                        m,
+                                        style: TextStyle(
+                                          color: ts.esTemaNeon ? Colors.black : Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      deleteIcon: Icon(Icons.close, color: ts.esTemaNeon ? Colors.black : Colors.white, size: 14),
                                       onDeleted: () {
                                         setDialogState(() {
                                           medicamentosList.remove(m);
@@ -693,9 +733,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 ),
                               const SizedBox(height: 12),
                               // 2. Duración del Suministro / Tratamiento
-                              const Text(
+                              Text(
                                 'Duración del Suministro / Tratamiento (Días):',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: ts.textSecondary),
                               ),
                               const SizedBox(height: 4),
                               Wrap(
@@ -707,10 +747,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   return ChoiceChip(
                                     label: Text(
                                       diasPreset == 30 ? '30 días (1 mes)' : (diasPreset == 60 ? '60 días (2 m)' : (diasPreset == 90 ? '90 días (3 m)' : '$diasPreset días')),
-                                      style: TextStyle(fontSize: 11, fontWeight: sel ? FontWeight.bold : FontWeight.normal, color: sel ? Colors.teal.shade900 : Colors.black87),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                        color: sel ? (ts.esTemaNeon ? Colors.black : ts.accentPrimary) : ts.textSecondary,
+                                      ),
                                     ),
                                     selected: sel,
-                                    selectedColor: Colors.teal.shade100,
+                                    selectedColor: ts.esTemaNeon
+                                        ? ts.accentPrimary
+                                        : ts.tintBg(ts.accentPrimary, lightAlpha: 0.2, darkAlpha: 0.3),
+                                    backgroundColor: ts.surfaceAltBg,
+                                    side: BorderSide(color: sel ? ts.accentPrimary : ts.borderColor),
                                     onSelected: (val) {
                                       if (val) {
                                         setDialogState(() {
@@ -756,17 +804,17 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
+                                      color: ts.surfaceBg,
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.amber.shade200),
+                                      border: Border.all(color: ts.borderColor),
                                     ),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text('Última Visita:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                        Text('Última Visita:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: ts.textSecondary)),
                                         Text(
                                           ultimaVisitaStr ?? 'Sin compras previas',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ts.textPrimary),
                                         ),
                                       ],
                                     ),
@@ -775,9 +823,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                               ),
                               const SizedBox(height: 12),
                               // 3. Anticipación de Alerta (Semanas de Anticipación)
-                              const Text(
+                              Text(
                                 'Anticipación para Alerta al Cajero y Recordatorio al Paciente:',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.blueGrey),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: ts.textSecondary),
                               ),
                               const SizedBox(height: 4),
                               Wrap(
@@ -788,10 +836,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   return ChoiceChip(
                                     label: Text(
                                       sem == 1 ? '1 semana (7d antes)' : (sem == 3 ? '3 semanas (21d - Recomendado)' : '$sem semanas (${sem * 7}d antes)'),
-                                      style: TextStyle(fontSize: 11, fontWeight: sel ? FontWeight.bold : FontWeight.normal, color: sel ? Colors.amber.shade900 : Colors.black87),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                        color: sel ? (ts.esTemaNeon ? Colors.black : ts.neonAmber) : ts.textSecondary,
+                                      ),
                                     ),
                                     selected: sel,
-                                    selectedColor: Colors.amber.shade200,
+                                    selectedColor: ts.esTemaNeon
+                                        ? ts.neonAmber
+                                        : ts.tintBg(ts.neonAmber, lightAlpha: 0.2, darkAlpha: 0.3),
+                                    backgroundColor: ts.surfaceAltBg,
+                                    side: BorderSide(color: sel ? ts.neonAmber : ts.borderColor),
                                     onSelected: (val) {
                                       if (val) {
                                         setDialogState(() {
@@ -810,31 +866,31 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: ts.surfaceBg,
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.amber.shade300),
+                                        border: Border.all(color: ts.borderColor),
                                       ),
                                       child: Row(
                                         children: [
-                                          const Icon(Icons.event, color: Colors.teal, size: 20),
+                                          Icon(Icons.event, color: ts.accentPrimary, size: 20),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                const Text('Fecha Meta de Resurtimiento:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                                                Text('Fecha Meta de Resurtimiento:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: ts.textSecondary)),
                                                 Text(
                                                   fechaProximoResurtimiento != null
                                                       ? '${fechaProximoResurtimiento!.day.toString().padLeft(2, '0')}/${fechaProximoResurtimiento!.month.toString().padLeft(2, '0')}/${fechaProximoResurtimiento!.year}'
                                                       : 'Sin fecha asignada',
-                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.textPrimary),
                                                 ),
                                               ],
                                             ),
                                           ),
                                           TextButton.icon(
-                                            icon: const Icon(Icons.edit_calendar, size: 16),
-                                            label: const Text('Cambiar', style: TextStyle(fontSize: 11)),
+                                            icon: Icon(Icons.edit_calendar, size: 16, color: ts.accentPrimary),
+                                            label: Text('Cambiar', style: TextStyle(fontSize: 11, color: ts.accentPrimary)),
                                             onPressed: () async {
                                               final picked = await showDatePicker(
                                                 context: context,
@@ -866,35 +922,33 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   final diasRestantes = target.difference(today).inDays;
                                   final fechaAlerta = target.subtract(Duration(days: semanasAnticipacion * 7));
                                   final bool alertaActiva = today.isAfter(fechaAlerta) || today.isAtSameMomentAs(fechaAlerta);
+                                  final bool isVencido = diasRestantes < 0;
+                                  final statusColor = isVencido
+                                      ? ts.neonRed
+                                      : (alertaActiva ? ts.neonAmber : ts.neonGreen);
 
                                   return Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: diasRestantes < 0
-                                          ? Colors.red.shade50
-                                          : (alertaActiva ? Colors.amber.shade100 : Colors.teal.shade50),
+                                      color: ts.tintBg(statusColor, lightAlpha: 0.12, darkAlpha: 0.2),
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: diasRestantes < 0
-                                            ? Colors.red.shade400
-                                            : (alertaActiva ? Colors.amber.shade700 : Colors.teal.shade300),
+                                        color: statusColor.withValues(alpha: 0.45),
                                       ),
                                     ),
                                     child: Row(
                                       children: [
                                         Icon(
-                                          diasRestantes < 0
+                                          isVencido
                                               ? Icons.error
                                               : (alertaActiva ? Icons.notifications_active : Icons.check_circle),
-                                          color: diasRestantes < 0
-                                              ? Colors.red.shade800
-                                              : (alertaActiva ? Colors.amber.shade900 : Colors.teal.shade800),
+                                          color: statusColor,
                                           size: 18,
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            diasRestantes < 0
+                                            isVencido
                                                 ? '🚨 ¡Tratamiento vencido hace ${diasRestantes.abs()} días! Alerta de resurtimiento prioritaria activa en mostrador.'
                                                 : (alertaActiva
                                                     ? '🔔 Alerta activa hoy: Restan $diasRestantes días de tratamiento (~${((diasRestantes + 6) ~/ 7)} sem). Se notificará al cajero en el POS.'
@@ -902,9 +956,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
-                                              color: diasRestantes < 0
-                                                  ? Colors.red.shade900
-                                                  : (alertaActiva ? Colors.amber.shade900 : Colors.teal.shade900),
+                                              color: statusColor,
                                             ),
                                           ),
                                         ),
@@ -924,14 +976,14 @@ class _ClientesScreenState extends State<ClientesScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancelar'),
+                  child: Text('Cancelar', style: TextStyle(color: ts.textSecondary)),
                 ),
                 ElevatedButton.icon(
                   icon: const Icon(Icons.save),
                   label: Text(esEdicion ? 'Actualizar' : 'Guardar Cliente'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: ts.accentPrimary,
+                    foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                   ),
                   onPressed: () async {
                     final nom = nombreCtrl.text.trim();
@@ -1007,7 +1059,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                   ? 'Cliente "$nom $apCompleto" actualizado.'
                                   : 'Cliente "$nom $apCompleto" dado de alta con éxito.',
                             ),
-                            backgroundColor: Colors.green,
+                            backgroundColor: ts.accentPrimary,
                           ),
                         );
                       }
@@ -1016,7 +1068,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error al guardar cliente: $e'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: ts.neonRed,
                           ),
                         );
                       }
@@ -1032,16 +1084,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
   }
 
   void _verDetallesCliente(Map<String, dynamic> c) {
+    final ts = ThemeService.instance;
     showDialog(
       context: context,
       builder: (ctx) {
         final List enfermedades = c['enfermedades'] ?? [];
         return AlertDialog(
+          backgroundColor: ts.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+          ),
           title: Row(
             children: [
-              const CircleAvatar(
-                backgroundColor: Colors.teal,
-                child: Icon(Icons.person, color: Colors.white),
+              CircleAvatar(
+                backgroundColor: ts.accentPrimary,
+                child: Icon(Icons.person, color: ts.esTemaNeon ? Colors.black : Colors.white),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1050,11 +1108,11 @@ class _ClientesScreenState extends State<ClientesScreen> {
                   children: [
                     Text(
                       '${c['nombre']} ${c['apellido']}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: ts.textPrimary),
                     ),
                     Text(
                       'Cliente Lealtad • ${c['descuento_porcentaje']}% Descuento en Compras',
-                      style: const TextStyle(fontSize: 12, color: Colors.teal, fontWeight: FontWeight.bold),
+                      style: TextStyle(fontSize: 12, color: ts.accentPrimary, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -1068,7 +1126,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Divider(),
+                  Divider(color: ts.borderColor),
                   _infoItem(Icons.phone, 'Teléfono', c['telefono'] ?? 'No especificado'),
                   _infoItem(Icons.email, 'Correo', c['correo_electronico'] ?? 'No especificado'),
                   _infoItem(Icons.location_on, 'Dirección', c['direccion'] ?? 'No especificada'),
@@ -1085,22 +1143,22 @@ class _ClientesScreenState extends State<ClientesScreen> {
                         final String medStr = c['medicamento_cronico_principal'] ?? 'Tratamiento crónico';
                         final medsList = medStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
 
-                        Color headerColor = Colors.teal.shade50;
-                        Color borderColor = Colors.teal.shade300;
-                        Color textColor = Colors.teal.shade900;
+                        Color headerColor = ts.tintBg(ts.neonGreen);
+                        Color statusBorderColor = ts.neonGreen.withValues(alpha: 0.45);
+                        Color textColor = ts.neonGreen;
                         IconData icon = Icons.check_circle_outline;
                         String statusTitle = '🟢 Tratamiento al Día';
 
                         if (vencido) {
-                          headerColor = Colors.red.shade50;
-                          borderColor = Colors.red.shade400;
-                          textColor = Colors.red.shade900;
+                          headerColor = ts.tintBg(ts.neonRed);
+                          statusBorderColor = ts.neonRed.withValues(alpha: 0.45);
+                          textColor = ts.neonRed;
                           icon = Icons.error_outline;
                           statusTitle = '🚨 Resurtimiento Vencido hace ${dias.abs()} días';
                         } else if (alerta) {
-                          headerColor = Colors.amber.shade50;
-                          borderColor = Colors.amber.shade600;
-                          textColor = Colors.amber.shade900;
+                          headerColor = ts.tintBg(ts.neonAmber);
+                          statusBorderColor = ts.neonAmber.withValues(alpha: 0.45);
+                          textColor = ts.neonAmber;
                           icon = Icons.alarm_on;
                           statusTitle = '⚠️ Alerta de Resurtimiento Activa (${dias ?? 0} días restantes)';
                         }
@@ -1110,7 +1168,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           decoration: BoxDecoration(
                             color: headerColor,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: borderColor),
+                            border: Border.all(color: statusBorderColor),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1128,29 +1186,29 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              const Text('Medicamentos Crónicos Prescritos:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                              Text('Medicamentos Crónicos Prescritos:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.textSecondary)),
                               const SizedBox(height: 4),
                               Wrap(
                                 spacing: 6,
                                 runSpacing: 4,
                                 children: medsList.map((m) {
                                   return Chip(
-                                    avatar: const Icon(Icons.medication, size: 14, color: Colors.white),
-                                    backgroundColor: Colors.teal.shade700,
-                                    label: Text(m, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    avatar: Icon(Icons.medication, size: 14, color: ts.esTemaNeon ? Colors.black : Colors.white),
+                                    backgroundColor: ts.accentPrimary,
+                                    label: Text(m, style: TextStyle(color: ts.esTemaNeon ? Colors.black : Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                                   );
                                 }).toList(),
                               ),
                               const SizedBox(height: 8),
                               Text(
                                 'Suministro: ${c["dias_tratamiento"] ?? 30} días  •  Última Visita: ${c["ultima_visita"] != null ? c["ultima_visita"].toString().replaceFirst("T", " ").substring(0, 16) : "Sin registrar"}',
-                                style: const TextStyle(fontSize: 11),
+                                style: TextStyle(fontSize: 11, color: ts.textPrimary),
                               ),
                               if (c['fecha_proximo_resurtimiento'] != null) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   'Fecha Meta de Resurtimiento: ${c["fecha_proximo_resurtimiento"]}',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.textPrimary),
                                 ),
                               ],
                               if (c['mensaje_alerta_resurtimiento'] != null) ...[
@@ -1158,9 +1216,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.85),
+                                    color: ts.surfaceBg,
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: borderColor),
+                                    border: Border.all(color: statusBorderColor),
                                   ),
                                   child: Text(
                                     c['mensaje_alerta_resurtimiento'],
@@ -1175,23 +1233,24 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  const Text(
+                  Text(
                     'Historial Clínico (Diagnósticos CIE-11):',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   if (enfermedades.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: ts.surfaceBg,
                         borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: ts.borderColor),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.health_and_safety_outlined, color: Colors.grey, size: 18),
-                          SizedBox(width: 8),
-                          Text('Sin padecimientos crónicos registrados.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          Icon(Icons.health_and_safety_outlined, color: ts.textSecondary, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Sin padecimientos crónicos registrados.', style: TextStyle(fontSize: 12, color: ts.textSecondary)),
                         ],
                       ),
                     )
@@ -1201,33 +1260,34 @@ class _ClientesScreenState extends State<ClientesScreen> {
                       runSpacing: 6,
                       children: enfermedades.map((enf) {
                         return Chip(
-                          avatar: const Icon(Icons.medical_services, size: 16, color: Colors.white),
-                          backgroundColor: Colors.teal.shade800,
+                          avatar: Icon(Icons.medical_services, size: 16, color: ts.accentPrimary),
+                          backgroundColor: ts.surfaceAltBg,
+                          side: BorderSide(color: ts.borderColor),
                           label: Text(
                             '${enf['codigo_cie']} - ${enf['descripcion']}',
-                            style: const TextStyle(color: Colors.white, fontSize: 11),
+                            style: TextStyle(color: ts.textPrimary, fontSize: 11),
                           ),
                         );
                       }).toList(),
                     ),
                   const SizedBox(height: 12),
                   if (c['notas_clinicas'] != null && (c['notas_clinicas'] as String).isNotEmpty) ...[
-                    const Text(
+                    Text(
                       'Notas Médicas y Farmacéuticas:',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
                     ),
                     const SizedBox(height: 4),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
+                        color: ts.tintBg(ts.neonAmber),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.shade300),
+                        border: Border.all(color: ts.neonAmber.withValues(alpha: 0.35)),
                       ),
                       child: Text(
                         c['notas_clinicas'],
-                        style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                        style: TextStyle(fontSize: 12, color: ts.textPrimary),
                       ),
                     ),
                   ],
@@ -1237,6 +1297,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(foregroundColor: ts.accentPrimary),
               onPressed: () {
                 Navigator.of(ctx).pop();
                 _abrirFormularioCliente(clienteExistente: c);
@@ -1251,6 +1312,10 @@ class _ClientesScreenState extends State<ClientesScreen> {
               ),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ts.accentPrimary,
+                foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+              ),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Cerrar'),
             ),
@@ -1261,83 +1326,276 @@ class _ClientesScreenState extends State<ClientesScreen> {
   }
 
   Widget _infoItem(IconData icon, String label, String value) {
+    final ts = ThemeService.instance;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.blueGrey),
+          Icon(icon, size: 18, color: ts.textSecondary),
           const SizedBox(width: 8),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+          Text('$label: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary)),
+          Expanded(child: Text(value, style: TextStyle(fontSize: 13, color: ts.textPrimary))),
         ],
+      ),
+    );
+  }
+
+  Widget _buildClienteKpiCard({
+    required String titulo,
+    required String valor,
+    required IconData icono,
+    required Color color,
+    required String filtroKey,
+    required ThemeService ts,
+    double? width,
+  }) {
+    final bool isSelected = _filtroResurtimiento == filtroKey;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _filtroResurtimiento = isSelected && filtroKey != 'TODOS' ? 'TODOS' : filtroKey;
+        });
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: width ?? 190,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24) : ts.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? color : ts.borderColor,
+            width: 1.2,
+          ),
+          boxShadow: ts.cardGlowShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    titulo,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isSelected ? color : ts.textSecondary,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.22),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icono, color: color, size: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              valor,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isSelected ? color : ts.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: ts.scaffoldBg,
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 16,
-              runSpacing: 12,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.people_alt, color: Theme.of(context).primaryColor, size: 28),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Padrón de Clientes',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            // Cabecera de módulo HeroUI / Fragments UI
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: ts.heroBannerGradient,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ts.borderColor, width: 1.2),
+                boxShadow: ts.cardGlowShadow,
+              ),
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 12,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: ts.esTemaNeon
+                              ? ts.accentPrimary.withValues(alpha: 0.16)
+                              : Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: ts.esTemaNeon
+                                ? ts.accentPrimary.withValues(alpha: 0.45)
+                                : Colors.white.withValues(alpha: 0.25),
+                          ),
                         ),
-                      ],
+                        child: Icon(
+                          Icons.people_alt,
+                          color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Padrón de Clientes y Expediente Clínico',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: ts.esTemaNeon ? ts.textPrimary : Colors.white,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Historial clínico CIE-11, tratamientos crónicos, descuentos de lealtad y alertas de resurtimiento.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ts.esTemaNeon ? ts.textSecondary : Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => _abrirFormularioCliente(),
+                    icon: Icon(
+                      Icons.person_add,
+                      size: 18,
+                      color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
                     ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Historial clínico CIE-11, descuentos de lealtad y alertas.',
-                      style: TextStyle(color: Colors.blueGrey, fontSize: 13),
+                    label: Text(
+                      'Registrar Nuevo Cliente',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                      foregroundColor: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                      elevation: 2,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Tarjetas KPI Bento y Filtros de Pacientes
+            LayoutBuilder(
+              builder: (context, kConstraints) {
+                final double w = kConstraints.maxWidth;
+                final double cardWidth = w < 480 ? (w - 12) / 2 : (w < 860 ? (w - 24) / 3 : 190);
+
+                return Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  children: [
+                    _buildClienteKpiCard(
+                      titulo: 'Todos los Clientes',
+                      valor: '${_clientes.length}',
+                      icono: Icons.people_outline,
+                      color: ts.accentPrimary,
+                      filtroKey: 'TODOS',
+                      ts: ts,
+                      width: cardWidth,
+                    ),
+                    _buildClienteKpiCard(
+                      titulo: '⚠️ Próx. a Resurtir',
+                      valor: '$_countAlertas',
+                      icono: Icons.alarm_on,
+                      color: ts.neonAmber,
+                      filtroKey: 'ALERTAS',
+                      ts: ts,
+                      width: cardWidth,
+                    ),
+                    _buildClienteKpiCard(
+                      titulo: '🚨 Resurtido Vencido',
+                      valor: '$_countVencidos',
+                      icono: Icons.warning_amber_rounded,
+                      color: ts.neonRed,
+                      filtroKey: 'VENCIDOS',
+                      ts: ts,
+                      width: cardWidth,
+                    ),
+                    _buildClienteKpiCard(
+                      titulo: '🟢 Tratamiento al Día',
+                      valor: '$_countAlDia',
+                      icono: Icons.check_circle_outline,
+                      color: ts.neonGreen,
+                      filtroKey: 'AL_DIA',
+                      ts: ts,
+                      width: cardWidth,
+                    ),
+                    _buildClienteKpiCard(
+                      titulo: '💊 Pacientes Crónicos',
+                      valor: '$_countCronicos',
+                      icono: Icons.medication_outlined,
+                      color: ts.neonBlue,
+                      filtroKey: 'CRONICOS',
+                      ts: ts,
+                      width: cardWidth,
                     ),
                   ],
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _abrirFormularioCliente(),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Registrar Nuevo Cliente'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
-            const SizedBox(height: 16),
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            const SizedBox(height: 14),
+
+            // Barra de Búsqueda
+            Container(
+              decoration: BoxDecoration(
+                color: ts.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ts.borderColor, width: 1.2),
+                boxShadow: ts.cardGlowShadow,
+              ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 child: Row(
                   children: [
-                    const Icon(Icons.search, color: Colors.blueGrey),
+                    Icon(Icons.search, color: ts.textSecondary),
                     const SizedBox(width: 10),
                     Expanded(
                       child: TextField(
                         controller: _searchController,
                         onSubmitted: (_) => _cargarDatos(),
-                        decoration: const InputDecoration(
+                        style: TextStyle(color: ts.textPrimary),
+                        decoration: InputDecoration(
                           hintText: 'Buscar por nombre, apellido, teléfono o correo electrónico...',
+                          hintStyle: TextStyle(color: ts.textSecondary.withValues(alpha: 0.7)),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -1347,17 +1605,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
                     ),
                     if (_searchController.text.isNotEmpty)
                       IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
+                        icon: Icon(Icons.clear, size: 20, color: ts.textSecondary),
                         onPressed: () {
                           _searchController.clear();
                           _cargarDatos();
                         },
                       ),
-                    ElevatedButton(
+                    FilledButton(
                       onPressed: _cargarDatos,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: ts.accentPrimary,
+                        foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       child: const Text('Buscar'),
                     ),
@@ -1365,89 +1624,7 @@ class _ClientesScreenState extends State<ClientesScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            // Filtros rápidos de Pacientes y Resurtimiento
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                FilterChip(
-                  avatar: const Icon(Icons.people_outline, size: 16),
-                  label: Text('Todos (${_clientes.length})'),
-                  selected: _filtroResurtimiento == 'TODOS',
-                  selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.18),
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: _filtroResurtimiento == 'TODOS' ? FontWeight.bold : FontWeight.normal,
-                    color: _filtroResurtimiento == 'TODOS' ? Theme.of(context).primaryColor : Colors.black87,
-                  ),
-                  onSelected: (val) {
-                    if (val) setState(() => _filtroResurtimiento = 'TODOS');
-                  },
-                ),
-                FilterChip(
-                  avatar: Icon(Icons.alarm_on, size: 16, color: Colors.amber.shade900),
-                  label: Text('⚠️ Próximos a Resurtir ($_countAlertas)'),
-                  selected: _filtroResurtimiento == 'ALERTAS',
-                  selectedColor: Colors.amber.shade100,
-                  checkmarkColor: Colors.amber.shade900,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: _filtroResurtimiento == 'ALERTAS' ? FontWeight.bold : FontWeight.normal,
-                    color: _filtroResurtimiento == 'ALERTAS' ? Colors.amber.shade900 : Colors.black87,
-                  ),
-                  onSelected: (val) {
-                    setState(() => _filtroResurtimiento = val ? 'ALERTAS' : 'TODOS');
-                  },
-                ),
-                FilterChip(
-                  avatar: Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red.shade900),
-                  label: Text('🚨 Resurtimiento Vencido ($_countVencidos)'),
-                  selected: _filtroResurtimiento == 'VENCIDOS',
-                  selectedColor: Colors.red.shade100,
-                  checkmarkColor: Colors.red.shade900,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: _filtroResurtimiento == 'VENCIDOS' ? FontWeight.bold : FontWeight.normal,
-                    color: _filtroResurtimiento == 'VENCIDOS' ? Colors.red.shade900 : Colors.black87,
-                  ),
-                  onSelected: (val) {
-                    setState(() => _filtroResurtimiento = val ? 'VENCIDOS' : 'TODOS');
-                  },
-                ),
-                FilterChip(
-                  avatar: Icon(Icons.check_circle_outline, size: 16, color: Colors.teal.shade800),
-                  label: Text('🟢 Tratamiento al Día ($_countAlDia)'),
-                  selected: _filtroResurtimiento == 'AL_DIA',
-                  selectedColor: Colors.teal.shade100,
-                  checkmarkColor: Colors.teal.shade900,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: _filtroResurtimiento == 'AL_DIA' ? FontWeight.bold : FontWeight.normal,
-                    color: _filtroResurtimiento == 'AL_DIA' ? Colors.teal.shade900 : Colors.black87,
-                  ),
-                  onSelected: (val) {
-                    setState(() => _filtroResurtimiento = val ? 'AL_DIA' : 'TODOS');
-                  },
-                ),
-                FilterChip(
-                  avatar: Icon(Icons.medication_outlined, size: 16, color: Colors.blue.shade900),
-                  label: Text('💊 Crónicos Totales ($_countCronicos)'),
-                  selected: _filtroResurtimiento == 'CRONICOS',
-                  selectedColor: Colors.blue.shade100,
-                  checkmarkColor: Colors.blue.shade900,
-                  labelStyle: TextStyle(
-                    fontSize: 12,
-                    fontWeight: _filtroResurtimiento == 'CRONICOS' ? FontWeight.bold : FontWeight.normal,
-                    color: _filtroResurtimiento == 'CRONICOS' ? Colors.blue.shade900 : Colors.black87,
-                  ),
-                  onSelected: (val) {
-                    setState(() => _filtroResurtimiento = val ? 'CRONICOS' : 'TODOS');
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -1456,11 +1633,15 @@ class _ClientesScreenState extends State<ClientesScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                              Icon(Icons.error_outline, color: ts.neonRed, size: 40),
                               const SizedBox(height: 8),
-                              Text(_error!, style: const TextStyle(color: Colors.red)),
+                              Text(_error!, style: TextStyle(color: ts.neonRed)),
                               const SizedBox(height: 12),
                               ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: ts.accentPrimary,
+                                  foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                                ),
                                 onPressed: _cargarDatos,
                                 child: const Text('Reintentar'),
                               ),
@@ -1472,22 +1653,30 @@ class _ClientesScreenState extends State<ClientesScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.person_off_outlined, size: 48, color: Colors.grey.shade400),
+                                  Icon(Icons.person_off_outlined, size: 48, color: ts.textSecondary.withValues(alpha: 0.5)),
                                   const SizedBox(height: 12),
                                   Text(
                                     _clientes.isNotEmpty
                                         ? 'No se encontraron clientes con el filtro "$_filtroResurtimiento".'
                                         : 'No se encontraron clientes registrados con ese criterio.',
-                                    style: const TextStyle(fontSize: 15, color: Colors.grey),
+                                    style: TextStyle(fontSize: 15, color: ts.textSecondary),
                                   ),
                                   const SizedBox(height: 12),
                                   if (_clientes.isNotEmpty && _filtroResurtimiento != 'TODOS')
                                     ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: ts.accentPrimary,
+                                        foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                                      ),
                                       onPressed: () => setState(() => _filtroResurtimiento = 'TODOS'),
                                       child: const Text('Ver Todos los Clientes'),
                                     )
                                   else
                                     ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: ts.accentPrimary,
+                                        foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                                      ),
                                       onPressed: () => _abrirFormularioCliente(),
                                       icon: const Icon(Icons.add),
                                       label: const Text('Registrar Primer Cliente'),
@@ -1506,19 +1695,24 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                 final bool alerta = c['alerta_resurtimiento_activa'] == true;
                                 final bool vencido = esCronico && dias != null && dias < 0;
 
-                                return Card(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: ts.cardBg,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: ts.borderColor, width: 1.2),
+                                    boxShadow: ts.cardGlowShadow,
+                                  ),
                                   child: ListTile(
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                     leading: CircleAvatar(
                                       radius: 22,
-                                      backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                                      backgroundColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.15, darkAlpha: 0.25),
                                       child: Text(
                                         '${c['nombre'][0]}${c['apellido'][0]}'.toUpperCase(),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: Theme.of(context).primaryColor,
+                                          color: ts.accentPrimary,
                                         ),
                                       ),
                                     ),
@@ -1529,20 +1723,20 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       children: [
                                         Text(
                                           '${c['nombre']} ${c['apellido']}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: ts.textPrimary),
                                         ),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.green.shade50,
+                                            color: ts.tintBg(ts.neonGreen),
                                             borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: Colors.green.shade300),
+                                            border: Border.all(color: ts.neonGreen.withValues(alpha: 0.4)),
                                           ),
                                           child: Text(
                                             '$descuento% Desc. Lealtad',
                                             style: TextStyle(
                                               fontSize: 11,
-                                              color: Colors.green.shade800,
+                                              color: ts.neonGreen,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -1552,20 +1746,20 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.red.shade100,
+                                                color: ts.tintBg(ts.neonRed),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: Colors.red.shade800),
+                                                border: Border.all(color: ts.neonRed.withValues(alpha: 0.5)),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.warning, size: 12, color: Colors.red.shade900),
+                                                  Icon(Icons.warning, size: 12, color: ts.neonRed),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     '🚨 Vencido hace ${dias.abs()}d',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      color: Colors.red.shade900,
+                                                      color: ts.neonRed,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1576,20 +1770,20 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.amber.shade100,
+                                                color: ts.tintBg(ts.neonAmber),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: Colors.amber.shade800),
+                                                border: Border.all(color: ts.neonAmber.withValues(alpha: 0.5)),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.alarm_on, size: 12, color: Colors.amber.shade900),
+                                                  Icon(Icons.alarm_on, size: 12, color: ts.neonAmber),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     '⚠️ Resurtir en ${dias ?? 0}d (~${((dias ?? 0) + 6) ~/ 7} sem)',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      color: Colors.amber.shade900,
+                                                      color: ts.neonAmber,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1600,20 +1794,20 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
-                                                color: Colors.teal.shade50,
+                                                color: ts.tintBg(ts.neonGreen),
                                                 borderRadius: BorderRadius.circular(12),
-                                                border: Border.all(color: Colors.teal.shade300),
+                                                border: Border.all(color: ts.neonGreen.withValues(alpha: 0.5)),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Icon(Icons.check_circle_outline, size: 12, color: Colors.teal.shade800),
+                                                  Icon(Icons.check_circle_outline, size: 12, color: ts.neonGreen),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     '🟢 Al día (${dias ?? 0}d)',
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      color: Colors.teal.shade800,
+                                                      color: ts.neonGreen,
                                                       fontWeight: FontWeight.bold,
                                                     ),
                                                   ),
@@ -1637,44 +1831,44 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  const Icon(Icons.phone, size: 13, color: Colors.blueGrey),
+                                                  Icon(Icons.phone, size: 13, color: ts.textSecondary),
                                                   const SizedBox(width: 4),
-                                                  Text(c['telefono'], style: const TextStyle(fontSize: 12)),
+                                                  Text(c['telefono'], style: TextStyle(fontSize: 12, color: ts.textSecondary)),
                                                 ],
                                               ),
                                             if (c['correo_electronico'] != null)
                                               Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  const Icon(Icons.email, size: 13, color: Colors.blueGrey),
+                                                  Icon(Icons.email, size: 13, color: ts.textSecondary),
                                                   const SizedBox(width: 4),
-                                                  Text(c['correo_electronico'], style: const TextStyle(fontSize: 12)),
+                                                  Text(c['correo_electronico'], style: TextStyle(fontSize: 12, color: ts.textSecondary)),
                                                 ],
                                               ),
                                             if (c['sexo'] != null)
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.blue.shade50,
+                                                  color: ts.tintBg(ts.neonBlue),
                                                   borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: Colors.blue.shade200),
+                                                  border: Border.all(color: ts.neonBlue.withValues(alpha: 0.4)),
                                                 ),
                                                 child: Text(
                                                   c['sexo'] == 'MASCULINO' ? '♂ Masc' : (c['sexo'] == 'FEMENINO' ? '♀ Fem' : '${c['sexo']}'),
-                                                  style: TextStyle(fontSize: 10, color: Colors.blue.shade900, fontWeight: FontWeight.bold),
+                                                  style: TextStyle(fontSize: 10, color: ts.neonBlue, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
                                             if (c['fecha_nacimiento'] != null)
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.purple.shade50,
+                                                  color: ts.tintBg(ts.neonPurple),
                                                   borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: Colors.purple.shade200),
+                                                  border: Border.all(color: ts.neonPurple.withValues(alpha: 0.4)),
                                                 ),
                                                 child: Text(
                                                   '🎂 ${c["fecha_nacimiento"]}',
-                                                  style: TextStyle(fontSize: 10, color: Colors.purple.shade900, fontWeight: FontWeight.bold),
+                                                  style: TextStyle(fontSize: 10, color: ts.neonPurple, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
                                           ],
@@ -1688,19 +1882,19 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.teal.shade50,
+                                                  color: ts.tintBg(ts.accentPrimary),
                                                   borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: Colors.teal.shade200),
+                                                  border: Border.all(color: ts.accentPrimary.withValues(alpha: 0.35)),
                                                 ),
                                                 child: Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    const Icon(Icons.medication, size: 12, color: Colors.teal),
+                                                    Icon(Icons.medication, size: 12, color: ts.accentPrimary),
                                                     const SizedBox(width: 4),
                                                     Flexible(
                                                       child: Text(
                                                         'Rx: ${c["medicamento_cronico_principal"]}',
-                                                        style: TextStyle(fontSize: 11, color: Colors.teal.shade900, fontWeight: FontWeight.w600),
+                                                        style: TextStyle(fontSize: 11, color: ts.accentPrimary, fontWeight: FontWeight.w600),
                                                         overflow: TextOverflow.ellipsis,
                                                       ),
                                                     ),
@@ -1711,18 +1905,18 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                                 Container(
                                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                   decoration: BoxDecoration(
-                                                    color: Colors.grey.shade100,
+                                                    color: ts.surfaceBg,
                                                     borderRadius: BorderRadius.circular(4),
-                                                    border: Border.all(color: Colors.grey.shade300),
+                                                    border: Border.all(color: ts.borderColor),
                                                   ),
                                                   child: Row(
                                                     mainAxisSize: MainAxisSize.min,
                                                     children: [
-                                                      const Icon(Icons.event, size: 12, color: Colors.blueGrey),
+                                                      Icon(Icons.event, size: 12, color: ts.textSecondary),
                                                       const SizedBox(width: 4),
                                                       Text(
                                                         'Próx. Resurtido: ${c["fecha_proximo_resurtimiento"]}',
-                                                        style: const TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.w600),
+                                                        style: TextStyle(fontSize: 11, color: ts.textSecondary, fontWeight: FontWeight.w600),
                                                       ),
                                                     ],
                                                   ),
@@ -1739,15 +1933,15 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                               return Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.teal.shade50,
+                                                  color: ts.surfaceAltBg,
                                                   borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.teal.shade200),
+                                                  border: Border.all(color: ts.borderColor),
                                                 ),
                                                 child: Text(
                                                   '${enf['codigo_cie']}: ${enf['descripcion']}',
                                                   style: TextStyle(
                                                     fontSize: 10,
-                                                    color: Colors.teal.shade900,
+                                                    color: ts.textPrimary,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
@@ -1755,9 +1949,9 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                             }).toList(),
                                           )
                                         else
-                                          const Text(
+                                          Text(
                                             'Sin historial de enfermedades crónicas.',
-                                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                                            style: TextStyle(fontSize: 11, color: ts.textSecondary),
                                           ),
                                       ],
                                     ),
@@ -1765,12 +1959,12 @@ class _ClientesScreenState extends State<ClientesScreen> {
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         IconButton(
-                                          icon: const Icon(Icons.visibility_outlined, color: Colors.teal),
+                                          icon: Icon(Icons.visibility_outlined, color: ts.accentPrimary),
                                           tooltip: 'Ver Expediente Clínico',
                                           onPressed: () => _verDetallesCliente(c),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.edit_outlined, color: Colors.blueGrey),
+                                          icon: Icon(Icons.edit_outlined, color: ts.textSecondary),
                                           tooltip: 'Editar Cliente',
                                           onPressed: () => _abrirFormularioCliente(clienteExistente: c),
                                         ),

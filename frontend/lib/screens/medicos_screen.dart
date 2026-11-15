@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/medico.dart';
 import '../services/api_service.dart';
+import '../services/theme_service.dart';
 import 'registrar_medico_screen.dart';
 
 class MedicosScreen extends StatefulWidget {
@@ -62,15 +63,20 @@ class _MedicosScreenState extends State<MedicosScreen> {
   }
 
   void _confirmarEliminarMedico(Medico m) {
+    final ts = ThemeService.instance;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: ts.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+        ),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade800),
+            Icon(Icons.warning_amber_rounded, color: ts.neonAmber),
             const SizedBox(width: 8),
-            const Text('Baja o Eliminación de Médico'),
+            Text('Baja o Eliminación de Médico', style: TextStyle(color: ts.textPrimary)),
           ],
         ),
         content: Container(
@@ -82,27 +88,27 @@ class _MedicosScreenState extends State<MedicosScreen> {
             children: [
               Text(
                 '¿Qué acción desea realizar con el Dr(a). ${m.nombreCompleto} (Cédula: ${m.cedulaProfesional})?',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: ts.textPrimary),
               ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
+                  color: ts.tintBg(ts.neonAmber),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade200),
+                  border: Border.all(color: ts.neonAmber.withValues(alpha: 0.35)),
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '• "Dar de Baja": Desactiva su vigencia sanitaria. Permite conservar la trazabilidad de recetas y ventas históricas conforme a la regulación de COFEPRIS.',
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                      style: TextStyle(fontSize: 12, color: ts.textPrimary),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(
                       '• "Eliminar Permanente": Borra definitivamente el registro de la base de datos (únicamente si no tiene recetas ni tickets vinculados).',
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                      style: TextStyle(fontSize: 12, color: ts.textPrimary),
                     ),
                   ],
                 ),
@@ -113,12 +119,15 @@ class _MedicosScreenState extends State<MedicosScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: Text('Cancelar', style: TextStyle(color: ts.textSecondary)),
           ),
           OutlinedButton.icon(
             icon: const Icon(Icons.block, size: 16),
             label: const Text('Dar de Baja'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.orange.shade900),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: ts.neonAmber,
+              side: BorderSide(color: ts.neonAmber.withValues(alpha: 0.5)),
+            ),
             onPressed: () async {
               Navigator.of(ctx).pop();
               await _eliminarMedicoApi(m, permanente: false);
@@ -127,7 +136,7 @@ class _MedicosScreenState extends State<MedicosScreen> {
           FilledButton.icon(
             icon: const Icon(Icons.delete_forever, size: 16),
             label: const Text('Eliminar Permanente'),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
+            style: FilledButton.styleFrom(backgroundColor: ts.neonRed, foregroundColor: Colors.white),
             onPressed: () async {
               Navigator.of(ctx).pop();
               await _eliminarMedicoApi(m, permanente: true);
@@ -139,6 +148,7 @@ class _MedicosScreenState extends State<MedicosScreen> {
   }
 
   Future<void> _eliminarMedicoApi(Medico m, {required bool permanente}) async {
+    final ts = ThemeService.instance;
     setState(() => _isLoading = true);
     try {
       final res = await ApiService.deleteMedico(m.id!, permanente: permanente);
@@ -146,7 +156,7 @@ class _MedicosScreenState extends State<MedicosScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res['mensaje'] ?? 'Operación realizada con éxito'),
-            backgroundColor: Colors.teal.shade800,
+            backgroundColor: ts.accentPrimary,
           ),
         );
         _cargarMedicos();
@@ -155,7 +165,7 @@ class _MedicosScreenState extends State<MedicosScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red.shade800),
+          SnackBar(content: Text('Error: $e'), backgroundColor: ts.neonRed),
         );
       }
     }
@@ -163,7 +173,10 @@ class _MedicosScreenState extends State<MedicosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
+
     return Scaffold(
+      backgroundColor: ts.scaffoldBg,
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -177,10 +190,10 @@ class _MedicosScreenState extends State<MedicosScreen> {
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Buscar médico por nombre, apellidos, especialidad o cédula...',
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: Icon(Icons.search, color: ts.textSecondary),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear),
+                              icon: Icon(Icons.clear, color: ts.textSecondary),
                               onPressed: () {
                                 _searchController.clear();
                                 _cargarMedicos();
@@ -196,7 +209,8 @@ class _MedicosScreenState extends State<MedicosScreen> {
                 const SizedBox(width: 12),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal.shade800,
+                    backgroundColor: ts.accentPrimary,
+                    foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -224,11 +238,19 @@ class _MedicosScreenState extends State<MedicosScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.cloud_off, size: 48, color: Colors.orange),
+                              Icon(Icons.cloud_off, size: 48, color: ts.neonAmber),
                               const SizedBox(height: 12),
-                              Text('No se pudo conectar con el backend:\n$_error', textAlign: TextAlign.center),
+                              Text(
+                                'No se pudo conectar con el backend:\n$_error',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: ts.textPrimary),
+                              ),
                               const SizedBox(height: 12),
                               ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: ts.accentPrimary,
+                                  foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                                ),
                                 onPressed: _cargarMedicos,
                                 child: const Text('Reintentar'),
                               ),
@@ -240,9 +262,12 @@ class _MedicosScreenState extends State<MedicosScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.person_search_outlined, size: 64, color: Colors.grey.shade400),
+                                  Icon(Icons.person_search_outlined, size: 64, color: ts.textSecondary.withValues(alpha: 0.5)),
                                   const SizedBox(height: 12),
-                                  const Text('No se encontraron médicos registrados'),
+                                  Text(
+                                    'No se encontraron médicos registrados',
+                                    style: TextStyle(color: ts.textSecondary),
+                                  ),
                                 ],
                               ),
                             )
@@ -254,36 +279,48 @@ class _MedicosScreenState extends State<MedicosScreen> {
                                 itemBuilder: (context, index) {
                                   final m = _medicos[index];
                                   return Card(
-                                    elevation: 1.5,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: ts.esTemaNeon ? 0 : 1.5,
+                                    color: ts.cardBg,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      side: BorderSide(color: ts.borderColor),
+                                    ),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 4.0),
                                       child: ListTile(
                                         leading: CircleAvatar(
-                                          backgroundColor: m.vigente ? Colors.teal.shade100 : Colors.grey.shade300,
-                                          foregroundColor: m.vigente ? Colors.teal.shade900 : Colors.grey.shade700,
-                                          child: Text(m.nombres.isNotEmpty ? m.nombres[0] : 'M'),
+                                          backgroundColor: m.vigente
+                                              ? ts.tintBg(ts.accentPrimary, lightAlpha: 0.15, darkAlpha: 0.25)
+                                              : ts.surfaceAltBg,
+                                          foregroundColor: m.vigente ? ts.accentPrimary : ts.textSecondary,
+                                          child: Text(
+                                            m.nombres.isNotEmpty ? m.nombres[0] : 'M',
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
                                         ),
                                         title: Text(
                                           'Dr(a). ${m.nombreCompleto}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                          style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
                                         ),
                                         subtitle: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             const SizedBox(height: 4),
-                                            Text('Cédula: ${m.cedulaProfesional}  •  ${m.especialidad ?? "Medicina General"}'),
+                                            Text(
+                                              'Cédula: ${m.cedulaProfesional}  •  ${m.especialidad ?? "Medicina General"}',
+                                              style: TextStyle(color: ts.textSecondary),
+                                            ),
                                             if (m.institucionEmisora != null)
                                               Text(
                                                 'Institución: ${m.institucionEmisora}',
-                                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                                style: TextStyle(color: ts.textSecondary, fontSize: 12),
                                               ),
                                             if (m.telefono != null || m.correo != null)
                                               Padding(
                                                 padding: const EdgeInsets.only(top: 2.0),
                                                 child: Text(
                                                   'Contacto: ${m.telefono ?? ""} ${m.correo != null ? "• ${m.correo}" : ""}'.trim(),
-                                                  style: TextStyle(color: Colors.teal.shade800, fontSize: 11),
+                                                  style: TextStyle(color: ts.accentPrimary, fontSize: 11),
                                                 ),
                                               ),
                                           ],
@@ -296,29 +333,36 @@ class _MedicosScreenState extends State<MedicosScreen> {
                                               avatar: Icon(
                                                 m.vigente ? Icons.verified_user : Icons.block,
                                                 size: 16,
-                                                color: m.vigente ? Colors.green.shade800 : Colors.red.shade800,
+                                                color: m.vigente ? ts.neonGreen : ts.neonRed,
                                               ),
                                               label: Text(
                                                 m.vigente ? 'Vigente' : 'Inactivo',
                                                 style: TextStyle(
-                                                  color: m.vigente ? Colors.green.shade900 : Colors.red.shade900,
+                                                  color: m.vigente ? ts.neonGreen : ts.neonRed,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 11,
                                                 ),
                                               ),
-                                              backgroundColor: m.vigente ? Colors.green.shade50 : Colors.red.shade50,
+                                              backgroundColor: m.vigente
+                                                  ? ts.tintBg(ts.neonGreen)
+                                                  : ts.tintBg(ts.neonRed),
+                                              side: BorderSide(
+                                                color: m.vigente
+                                                    ? ts.neonGreen.withValues(alpha: 0.4)
+                                                    : ts.neonRed.withValues(alpha: 0.4),
+                                              ),
                                             ),
                                             // Sub-Agente 4: Botón Editar
                                             IconButton(
                                               icon: const Icon(Icons.edit_outlined, size: 20),
-                                              color: Colors.indigo.shade700,
+                                              color: ts.accentPrimary,
                                               tooltip: 'Editar Datos de Médico',
                                               onPressed: () => _editarMedico(m),
                                             ),
                                             // Sub-Agente 4: Botón Borrar / Dar de baja
                                             IconButton(
                                               icon: const Icon(Icons.delete_outline, size: 20),
-                                              color: Colors.red.shade700,
+                                              color: ts.neonRed,
                                               tooltip: 'Baja o Eliminación',
                                               onPressed: () => _confirmarEliminarMedico(m),
                                             ),

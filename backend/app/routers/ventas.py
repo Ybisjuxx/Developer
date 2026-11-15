@@ -12,10 +12,12 @@ from ..models import (
     Medico,
     Producto,
     TurnoCaja,
+    Usuario,
     Venta,
     VentaDetalle,
     VentaDetalleLote,
 )
+from ..security import encrypt_pii, get_current_user_optional
 from ..schemas import (
     FacturaCreate,
     FacturaOut,
@@ -30,7 +32,11 @@ router = APIRouter(prefix="/api/ventas", tags=["Ventas y Despacho FEFO"])
 
 
 @router.post("/", response_model=VentaOut, status_code=status.HTTP_201_CREATED)
-def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
+def registrar_venta(
+    venta_in: VentaCreate,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """
     Registra una venta de contado y actualiza el stock aplicando FEFO:
     1. Valida existencia de productos y médicos (si el producto es controlado/requiere receta).
@@ -68,18 +74,23 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
         if cli and (not venta_in.comprador_nombre or venta_in.comprador_nombre == "Público General"):
             comprador = cli.nombre_completo
 
+    cajero_real = (
+        usuario.nombre_completo
+        if usuario is not None
+        else (venta_in.cajero_nombre or "Cajero Principal")
+    )
     nueva_venta = Venta(
         folio_ticket=folio,
         cliente_id=venta_in.cliente_id,
         comprador_nombre=comprador,
-        comprador_identificacion=venta_in.comprador_identificacion,
+        comprador_identificacion=encrypt_pii(venta_in.comprador_identificacion),
         medico_id=venta_in.medico_id,
         descuento=venta_in.descuento,
         metodo_pago=venta_in.metodo_pago.upper() if venta_in.metodo_pago else "EFECTIVO",
         monto_recibido=round(venta_in.monto_recibido, 2),
         cambio=0.0,
         turno_id=turno_id,
-        cajero_nombre=venta_in.cajero_nombre or "Cajero Principal",
+        cajero_nombre=cajero_real,
         subtotal=0.0,
         total=0.0,
         estado="COMPLETADA",
@@ -112,9 +123,12 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
             .filter(
                 Lote.producto_id == producto.id,
                 Lote.stock_actual > 0,
-                Lote.activo == True
+                Lote.activo == True,
+                # Regla sanitaria: nunca despachar lotes caducados
+                Lote.fecha_caducidad >= datetime.date.today(),
             )
-            .order_by(Lote.fecha_caducidad.asc())
+            .order_by(Lote.fecha_caducidad.asc(), Lote.id.asc())
+            .with_for_update()
             .all()
         )
 
@@ -123,8 +137,8 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"Stock insuficiente para '{producto.nombre_comercial}'. "
-                    f"Requerido: {item.cantidad}, Disponible: {stock_disponible}"
+                    f"Stock vigente insuficiente para '{producto.nombre_comercial}'. "
+                    f"Requerido: {item.cantidad}, Disponible (no caducado): {stock_disponible}"
                 )
             )
 
@@ -180,7 +194,9 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
     # 5. Calcular totales finales y cambio en efectivo
     nueva_venta.subtotal = round(subtotal_acumulado, 2)
 
-    # Si se asoció cliente, registrar última visita y aplicar descuento si corresponde
+    # El descuento lo determina el servidor: solo aplica el % de fidelización del cliente.
+    # (Antes se aceptaba cualquier monto enviado por el cliente HTTP.)
+    descuento_permitido = 0.0
     if venta_in.cliente_id:
         cli = db.query(Cliente).filter(Cliente.id == venta_in.cliente_id).first()
         if cli:
@@ -188,14 +204,30 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
             cli.ultima_visita = nueva_venta.fecha_venta
             dias = cli.dias_tratamiento or 30
             cli.fecha_proximo_resurtimiento = nueva_venta.fecha_venta.date() + datetime.timedelta(days=dias)
+            if cli.descuento_porcentaje and cli.descuento_porcentaje > 0:
+                descuento_permitido = round(subtotal_acumulado * (cli.descuento_porcentaje / 100.0), 2)
 
-            if venta_in.descuento == 0.0 and cli.descuento_porcentaje > 0:
-                nueva_venta.descuento = round(subtotal_acumulado * (cli.descuento_porcentaje / 100.0), 2)
-
+    if venta_in.descuento > descuento_permitido + 0.01:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Descuento no autorizado: solicitado ${venta_in.descuento:.2f}, "
+                f"máximo permitido ${descuento_permitido:.2f}"
+            ),
+        )
+    nueva_venta.descuento = descuento_permitido
     nueva_venta.total = max(0.0, round(nueva_venta.subtotal - nueva_venta.descuento, 2))
 
-    if nueva_venta.metodo_pago == "EFECTIVO" and nueva_venta.monto_recibido >= nueva_venta.total:
-        nueva_venta.cambio = round(nueva_venta.monto_recibido - nueva_venta.total, 2)
+    if nueva_venta.metodo_pago == "EFECTIVO":
+        if nueva_venta.monto_recibido + 0.009 < nueva_venta.total:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Monto recibido insuficiente: ${nueva_venta.monto_recibido:.2f} "
+                    f"para un total de ${nueva_venta.total:.2f}"
+                ),
+            )
+        nueva_venta.cambio = round(max(0.0, nueva_venta.monto_recibido - nueva_venta.total), 2)
     else:
         nueva_venta.cambio = 0.0
 
@@ -218,9 +250,17 @@ def registrar_venta(venta_in: VentaCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[VentaOut])
-def listar_ventas(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
-    """Lista las ventas históricas con sus detalles de lotes despachados y devoluciones."""
-    return db.query(Venta).order_by(Venta.fecha_venta.desc()).offset(skip).limit(limit).all()
+def listar_ventas(
+    skip: int = 0,
+    limit: int = 50,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Lista las ventas históricas con sus detalles de lotes despachados y devoluciones (RLS para cajero)."""
+    query = db.query(Venta)
+    if usuario is not None and (usuario.rol or "").upper() == "CAJERO":
+        query = query.filter(Venta.cajero_nombre == usuario.nombre_completo)
+    return query.order_by(Venta.fecha_venta.desc()).offset(skip).limit(limit).all()
 
 
 @router.get("/reporte-mensual", response_model=ReporteVentasMensualOut)

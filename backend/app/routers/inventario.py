@@ -4,7 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import KardexMovimiento, Lote, Producto
+from ..security import get_current_user_optional, require_roles
+from ..models import KardexMovimiento, Lote, Producto, Sustancia, TareaClasificacionFarmaceutica
+from ..utils.presentacion_parser import normalizar_sustancia_exacta, parsear_presentacion
 from ..schemas import (
     KardexMovimientoOut,
     KardexObservacionInput,
@@ -15,6 +17,7 @@ from ..schemas import (
     LoteOut,
     ProductoCreate,
     ProductoOut,
+    ProductoUpdate,
 )
 
 router = APIRouter(prefix="/api/inventario", tags=["Inventario y Lotes"])
@@ -23,7 +26,11 @@ ROLES_PERMITIDOS_AJUSTE = {"ADMINISTRADOR", "RESPONSABLE_SANITARIO"}
 
 
 @router.post("/productos", response_model=ProductoOut, status_code=status.HTTP_201_CREATED)
-def crear_producto(prod_in: ProductoCreate, db: Session = Depends(get_db)):
+def crear_producto(
+    prod_in: ProductoCreate,
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Crea un nuevo producto farmacéutico."""
     codigo_limpio = prod_in.codigo_barras.strip()
     existente = db.query(Producto).filter(Producto.codigo_barras == codigo_limpio).first()
@@ -33,7 +40,47 @@ def crear_producto(prod_in: ProductoCreate, db: Session = Depends(get_db)):
             detail=f"Ya existe un producto con el código de barras '{codigo_limpio}'"
         )
     
-    nuevo_prod = Producto(**prod_in.model_dump())
+    datos = prod_in.model_dump()
+    if (
+        datos.get("concentracion_valor") is None
+        or datos.get("forma_farmaceutica") is None
+        or datos.get("via_administracion") is None
+    ):
+        c_val, c_unit, forma, via, req_rev = parsear_presentacion(datos["presentacion"])
+        datos.setdefault("concentracion_valor", c_val)
+        if datos.get("concentracion_valor") is None:
+            datos["concentracion_valor"] = c_val
+        if datos.get("concentracion_unidad") is None:
+            datos["concentracion_unidad"] = c_unit
+        if datos.get("forma_farmaceutica") is None:
+            datos["forma_farmaceutica"] = forma
+        if datos.get("via_administracion") is None:
+            datos["via_administracion"] = via
+        datos["requiere_revision_manual"] = req_rev
+
+    # Vincular o crear sustancia en catálogo (PENDIENTE si es nueva)
+    sust_norm = normalizar_sustancia_exacta(datos["sustancia_activa"])
+    sustancia = db.query(Sustancia).filter(Sustancia.nombre_normalizado == sust_norm).first()
+    if not sustancia and sust_norm:
+        sustancia = Sustancia(
+            nombre_normalizado=sust_norm,
+            estado_clasificacion="PENDIENTE",
+            requiere_receta_por_defecto=bool(datos.get("requiere_receta", False)),
+            grupo_farmacopea=datos.get("grupo_farmacopea", "GRUPO_VI"),
+        )
+        db.add(sustancia)
+        db.flush()
+        db.add(
+            TareaClasificacionFarmaceutica(
+                sustancia_id=sustancia.id,
+                mensaje=f"Nueva sustancia {sust_norm} sin clasificar: asigne código ATC, grupo y pares de sustitución.",
+                estado="PENDIENTE",
+            )
+        )
+    if sustancia:
+        datos["sustancia_id"] = sustancia.id
+
+    nuevo_prod = Producto(**datos)
     nuevo_prod.codigo_barras = codigo_limpio
     db.add(nuevo_prod)
     db.commit()
@@ -42,6 +89,27 @@ def crear_producto(prod_in: ProductoCreate, db: Session = Depends(get_db)):
     # Calcular stock inicial
     nuevo_prod.stock_total = 0
     return nuevo_prod
+
+
+@router.put("/productos/{producto_id}", response_model=ProductoOut)
+def actualizar_producto(
+    producto_id: int,
+    prod_in: ProductoUpdate,
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
+    """Actualiza datos del producto, incluyendo familia e indicación terapéutica para la IA."""
+    prod = db.query(Producto).filter(Producto.id == producto_id).first()
+    if not prod:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+
+    for campo, valor in prod_in.model_dump(exclude_unset=True).items():
+        setattr(prod, campo, valor)
+
+    db.commit()
+    db.refresh(prod)
+    prod.stock_total = sum(lote.stock_actual for lote in prod.lotes if lote.activo)
+    return prod
 
 
 @router.get("/productos", response_model=List[ProductoOut])
@@ -87,7 +155,11 @@ def buscar_producto_por_codigo(codigo_barras: str, db: Session = Depends(get_db)
 
 
 @router.post("/lotes", response_model=LoteOut, status_code=status.HTTP_201_CREATED)
-def registrar_lote(lote_in: LoteCreate, db: Session = Depends(get_db)):
+def registrar_lote(
+    lote_in: LoteCreate,
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """
     Registra un lote con fecha de caducidad, datos de fabricación y stock inicial.
     Genera automáticamente el movimiento inmutable en el Kardex.
@@ -217,12 +289,16 @@ def listar_lotes_proximos_caducar(
 
 
 @router.post("/lotes/{lote_id}/ajuste", response_model=LoteOut)
-def ajustar_stock_lote(lote_id: int, ajuste_in: LoteAjusteInput, db: Session = Depends(get_db)):
+def ajustar_stock_lote(lote_id: int, ajuste_in: LoteAjusteInput, sesion=Depends(get_current_user_optional), db: Session = Depends(get_db)):
     """
     Ajusta manualmente las piezas de un lote en inventario.
     RESTRINGIDO: Solo accesible para ADMINISTRADOR y RESPONSABLE_SANITARIO.
     Registra el movimiento correspondiente en Kardex (ENTRADA_AJUSTE o SALIDA_AJUSTE).
     """
+    # Con sesión válida, el rol y el nombre provienen del token (no del cuerpo de la petición)
+    if sesion is not None:
+        ajuste_in.rol_usuario = sesion.rol
+        ajuste_in.usuario = sesion.nombre_completo
     rol = (ajuste_in.rol_usuario or "").upper().strip()
     if rol not in ROLES_PERMITIDOS_AJUSTE:
         raise HTTPException(
@@ -267,12 +343,16 @@ def ajustar_stock_lote(lote_id: int, ajuste_in: LoteAjusteInput, db: Session = D
 
 @router.post("/lotes/{lote_id}/baja", response_model=LoteOut)
 @router.delete("/lotes/{lote_id}", response_model=LoteOut)
-def dar_de_baja_lote(lote_id: int, baja_in: LoteBajaInput, db: Session = Depends(get_db)):
+def dar_de_baja_lote(lote_id: int, baja_in: LoteBajaInput, sesion=Depends(get_current_user_optional), db: Session = Depends(get_db)):
     """
     Elimina/desactiva un lote del inventario y pone su stock en cero.
     RESTRINGIDO: Solo accesible para ADMINISTRADOR y RESPONSABLE_SANITARIO.
     Registra la salida total en Kardex como BAJA_LOTE con motivo y auditoría.
     """
+    # Con sesión válida, el rol y el nombre provienen del token (no del cuerpo de la petición)
+    if sesion is not None:
+        baja_in.rol_usuario = sesion.rol
+        baja_in.usuario = sesion.nombre_completo
     rol = (baja_in.rol_usuario or "").upper().strip()
     if rol not in ROLES_PERMITIDOS_AJUSTE:
         raise HTTPException(
@@ -327,6 +407,7 @@ def consultar_kardex(
 def agregar_observacion_kardex(
     movimiento_id: int,
     obs_in: KardexObservacionInput,
+    _rol=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
     db: Session = Depends(get_db)
 ):
     """

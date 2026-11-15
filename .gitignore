@@ -43,6 +43,9 @@ fefarmex_web_app/
 incientiva_web/
 personal_finance_app/
 social_media_editor/
+video_factory/
+content_factory/
+Content-Factory/
 hermes3d_office/
 .hermes/
 .env.*
@@ -72,3 +75,9 @@ Thumbs.db
 # Archivos temporales o bases de datos en raíz
 _ul
 /farmacia.db
+
+# BD de trabajo: no versionar datos operativos
+backend/farmacia.db
+.pytest_cache/
+graphify-out/
+backups/

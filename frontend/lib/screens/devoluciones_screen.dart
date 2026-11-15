@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/theme_service.dart';
 
 class DevolucionesScreen extends StatefulWidget {
   const DevolucionesScreen({super.key});
@@ -178,6 +179,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
   }
 
   Widget _buildBarraFiltrosFechas() {
+    final ts = ThemeService.instance;
     final String labelRango = (_fechaInicio != null && _fechaFin != null)
         ? '${_fechaInicio!.day.toString().padLeft(2, "0")}/${_fechaInicio!.month.toString().padLeft(2, "0")}/${_fechaInicio!.year} - ${_fechaFin!.day.toString().padLeft(2, "0")}/${_fechaFin!.month.toString().padLeft(2, "0")}/${_fechaFin!.year}'
         : 'Seleccionar Rango de Fechas';
@@ -185,12 +187,12 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ts.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: ts.borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: ts.esOscuro ? 0.2 : 0.03),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -206,14 +208,17 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
 
               final searchField = TextField(
                 controller: _busquedaController,
+                style: TextStyle(color: ts.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Buscar por folio (DEV-...), venta #, motivo o lote...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
+                  prefixIcon: Icon(Icons.search, size: 20, color: ts.textSecondary),
                   isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: ts.borderColor)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: ts.borderColor)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: ts.accentPrimary, width: 2)),
                   suffixIcon: _busquedaController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
+                          icon: Icon(Icons.clear, size: 18, color: ts.textSecondary),
                           onPressed: () {
                             _busquedaController.clear();
                             setState(() {});
@@ -228,21 +233,21 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   side: BorderSide(
-                    color: _presetFecha == 'PERSONALIZADO' ? Colors.teal : Colors.grey.shade400,
+                    color: _presetFecha == 'PERSONALIZADO' ? ts.accentPrimary : ts.borderColor,
                     width: _presetFecha == 'PERSONALIZADO' ? 1.5 : 1,
                   ),
                 ),
                 icon: Icon(
                   Icons.calendar_month,
                   size: 18,
-                  color: _presetFecha == 'PERSONALIZADO' ? Colors.teal : Colors.blueGrey,
+                  color: _presetFecha == 'PERSONALIZADO' ? ts.accentPrimary : ts.textSecondary,
                 ),
                 label: Text(
                   labelRango,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: _presetFecha == 'PERSONALIZADO' ? FontWeight.bold : FontWeight.normal,
-                    color: _presetFecha == 'PERSONALIZADO' ? Colors.teal.shade900 : Colors.black87,
+                    color: _presetFecha == 'PERSONALIZADO' ? ts.accentPrimary : ts.textPrimary,
                   ),
                 ),
                 onPressed: _abrirSelectorRangoFechas,
@@ -275,41 +280,42 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                const Icon(Icons.filter_list, size: 16, color: Colors.blueGrey),
+                Icon(Icons.filter_list, size: 16, color: ts.textSecondary),
                 const SizedBox(width: 6),
-                const Text('Filtro por fechas: ', style: TextStyle(fontSize: 11, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                Text('Filtro por fechas: ', style: TextStyle(fontSize: 11, color: ts.textSecondary, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 4),
                 ChoiceChip(
                   label: const Text('Todo el Historial'),
                   selected: _presetFecha == 'TODAS',
+                  selectedColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.20, darkAlpha: 0.30),
                   onSelected: (_) => _aplicarPreset('TODAS'),
                 ),
                 const SizedBox(width: 6),
                 ChoiceChip(
                   label: const Text('Hoy'),
                   selected: _presetFecha == 'HOY',
-                  selectedColor: Colors.teal.shade100,
+                  selectedColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.20, darkAlpha: 0.30),
                   onSelected: (_) => _aplicarPreset('HOY'),
                 ),
                 const SizedBox(width: 6),
                 ChoiceChip(
                   label: const Text('Últimos 7 días'),
                   selected: _presetFecha == '7DIAS',
-                  selectedColor: Colors.teal.shade100,
+                  selectedColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.20, darkAlpha: 0.30),
                   onSelected: (_) => _aplicarPreset('7DIAS'),
                 ),
                 const SizedBox(width: 6),
                 ChoiceChip(
                   label: const Text('Este mes'),
                   selected: _presetFecha == 'MES',
-                  selectedColor: Colors.teal.shade100,
+                  selectedColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.20, darkAlpha: 0.30),
                   onSelected: (_) => _aplicarPreset('MES'),
                 ),
                 if (_fechaInicio != null || _fechaFin != null || _busquedaController.text.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   ActionChip(
-                    avatar: const Icon(Icons.close, size: 14, color: Colors.red),
-                    label: const Text('Limpiar filtros', style: TextStyle(color: Colors.red, fontSize: 11)),
+                    avatar: Icon(Icons.close, size: 14, color: ts.neonRed),
+                    label: Text('Limpiar filtros', style: TextStyle(color: ts.neonRed, fontSize: 11)),
                     onPressed: () {
                       _busquedaController.clear();
                       _aplicarPreset('TODAS');
@@ -326,6 +332,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -339,8 +346,9 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                   child: TabBar(
                     controller: _tabController,
                     isScrollable: true,
-                    labelColor: Colors.teal.shade900,
-                    indicatorColor: Colors.teal,
+                    labelColor: ts.accentPrimary,
+                    unselectedLabelColor: ts.textSecondary,
+                    indicatorColor: ts.accentPrimary,
                     tabs: [
                       Tab(
                         icon: const Icon(Icons.assignment_return_outlined),
@@ -354,7 +362,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: Icon(Icons.refresh, color: ts.textSecondary),
                   onPressed: _cargarDatos,
                   tooltip: 'Actualizar registros',
                 ),
@@ -371,7 +379,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text('Error: $_error'))
+                      ? Center(child: Text('Error: $_error', style: TextStyle(color: ts.neonRed)))
                       : TabBarView(
                           controller: _tabController,
                           children: [
@@ -387,6 +395,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
   }
 
   Widget _buildPestanaDevoluciones() {
+    final ts = ThemeService.instance;
     final lista = _devolucionesFiltradas;
     final double totalReembolsado = lista.fold<double>(
       0.0,
@@ -398,16 +407,16 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 54, color: Colors.grey.shade400),
+            Icon(Icons.search_off, size: 54, color: ts.textSecondary),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No se encontraron devoluciones en el período o búsqueda especificada',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ts.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               'Prueba ampliando el rango de fechas a "Todo el Historial".',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: ts.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 12),
             FilledButton.tonal(
@@ -430,20 +439,20 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.teal.shade50,
+            color: ts.tintBg(ts.accentPrimary, lightAlpha: 0.10, darkAlpha: 0.18),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.teal.shade200),
+            border: Border.all(color: ts.accentPrimary.withValues(alpha: 0.35)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '${lista.length} ${lista.length == 1 ? "devolución encontrada" : "devoluciones encontradas"}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.accentPrimary),
               ),
               Text(
                 'Total Reembolsado: \$${totalReembolsado.toStringAsFixed(2)} MXN',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonRed),
               ),
             ],
           ),
@@ -459,19 +468,25 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: ts.esTemaNeon ? 0 : 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+                ),
+                color: ts.cardBg,
                 child: ExpansionTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.orange.shade50,
-                    child: Icon(Icons.replay, color: Colors.orange.shade800),
+                    backgroundColor: ts.tintBg(ts.neonAmber, lightAlpha: 0.15, darkAlpha: 0.25),
+                    child: Icon(Icons.replay, color: ts.neonAmber),
                   ),
                   title: Text(
                     'Folio: ${d["folio_devolucion"]}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
                   ),
                   subtitle: Text(
                     'Venta ID: #${d["venta_id"]} | Motivo: ${d["motivo"]}\n'
                     'Fecha: ${d["fecha_devolucion"].toString().replaceFirst("T", " ").substring(0, 16)}',
+                    style: TextStyle(color: ts.textSecondary),
                   ),
                   trailing: Text(
                     'Reembolso:\n\$${d["total_reembolsado"]} MXN',
@@ -479,7 +494,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: Colors.red.shade900,
+                      color: ts.neonRed,
                     ),
                   ),
                   children: [
@@ -488,29 +503,30 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text('Artículos Devueltos:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Artículos Devueltos:', style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary)),
                           const SizedBox(height: 8),
                           ...detalles.map((det) {
                             final bool buenEstado = det['estado_producto'] == 'BUEN_ESTADO';
+                            final Color itemColor = buenEstado ? ts.neonGreen : ts.neonRed;
                             return Container(
                               margin: const EdgeInsets.only(bottom: 6),
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: buenEstado ? Colors.green.shade50 : Colors.red.shade50,
+                                color: ts.tintBg(itemColor, lightAlpha: 0.10, darkAlpha: 0.18),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: buenEstado ? Colors.green.shade200 : Colors.red.shade200),
+                                border: Border.all(color: itemColor.withValues(alpha: 0.35)),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     '• ${det["cantidad"]} pzas (Prod #${det["producto_id"]}, Lote #${det["lote_id"]})',
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                    style: TextStyle(fontWeight: FontWeight.w500, color: ts.textPrimary),
                                   ),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: buenEstado ? Colors.green.shade100 : Colors.red.shade100,
+                                      color: ts.tintBg(itemColor, lightAlpha: 0.20, darkAlpha: 0.30),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
@@ -518,7 +534,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: buenEstado ? Colors.green.shade900 : Colors.red.shade900,
+                                        color: itemColor,
                                       ),
                                     ),
                                   ),
@@ -540,6 +556,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
   }
 
   Widget _buildPestanaMermas() {
+    final ts = ThemeService.instance;
     final listaMermas = _mermasFiltradas;
     final double costoTotal = listaMermas.fold<double>(
       0.0,
@@ -551,16 +568,16 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 54, color: Colors.grey.shade400),
+            Icon(Icons.search_off, size: 54, color: ts.textSecondary),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No hay registros de merma sanitaria en el período o búsqueda especificada',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ts.textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               'Todo el inventario de mermas se mantiene registrado.',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: ts.textSecondary, fontSize: 12),
             ),
             const SizedBox(height: 12),
             FilledButton.tonal(
@@ -583,20 +600,20 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.red.shade50,
+            color: ts.tintBg(ts.neonRed, lightAlpha: 0.10, darkAlpha: 0.18),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red.shade200),
+            border: Border.all(color: ts.neonRed.withValues(alpha: 0.35)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 '${listaMermas.length} ${listaMermas.length == 1 ? "baja registrada" : "bajas registradas"}',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonRed),
               ),
               Text(
                 'Costo Total de Bajas: \$${costoTotal.toStringAsFixed(2)} MXN',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red.shade900),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonRed),
               ),
             ],
           ),
@@ -611,19 +628,25 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: ts.esTemaNeon ? 0 : 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+                ),
+                color: ts.cardBg,
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Colors.red.shade50,
-                    child: Icon(Icons.delete_forever, color: Colors.red.shade800),
+                    backgroundColor: ts.tintBg(ts.neonRed, lightAlpha: 0.15, darkAlpha: 0.25),
+                    child: Icon(Icons.delete_forever, color: ts.neonRed),
                   ),
                   title: Text(
                     '${m["producto_nombre"]} (Lote: ${m["numero_lote"]})',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
                   ),
                   subtitle: Text(
                     'Cantidad Merma: ${m["cantidad"]} piezas | Motivo: ${m["motivo"]}\n'
                     'Fecha de baja: ${m["fecha"].toString().replaceFirst("T", " ").substring(0, 16)}',
+                    style: TextStyle(color: ts.textSecondary),
                   ),
                   trailing: Text(
                     'Costo Baja:\n\$${m["costo_total"]} MXN',
@@ -631,7 +654,7 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Colors.red.shade900,
+                      color: ts.neonRed,
                     ),
                   ),
                 ),

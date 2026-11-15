@@ -118,6 +118,31 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_valor VARCHAR(50)")
                 if "dosis_unidad" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_unidad VARCHAR(50)")
+                conn.commit()
+
+            # 5. Columnas en tabla productos (familia_terapeutica, indicacion_terapeutica, presentación estructurada y sustancia)
+            result_productos = conn.exec_driver_sql("PRAGMA table_info(productos)").fetchall()
+            existing_prod_cols = [r[1] for r in result_productos]
+            if existing_prod_cols:
+                if "familia_terapeutica" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN familia_terapeutica VARCHAR(100)")
+                if "indicacion_terapeutica" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN indicacion_terapeutica TEXT")
+                if "sustancia_id" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN sustancia_id INTEGER")
+                if "concentracion_valor" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN concentracion_valor FLOAT")
+                if "concentracion_unidad" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN concentracion_unidad VARCHAR(20)")
+                if "forma_farmaceutica" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN forma_farmaceutica VARCHAR(50)")
+                if "via_administracion" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN via_administracion VARCHAR(30)")
+                if "es_generico_intercambiable" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN es_generico_intercambiable BOOLEAN NOT NULL DEFAULT 0")
+                if "requiere_revision_manual" not in existing_prod_cols:
+                    conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN requiere_revision_manual BOOLEAN NOT NULL DEFAULT 0")
+                conn.commit()
                 if "fecha_ingreso" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
                 conn.commit()

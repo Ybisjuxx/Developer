@@ -121,7 +121,7 @@ class Usuario(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
-    password_hash = Column(String(100), nullable=False)
+    password_hash = Column(String(255), nullable=False)  # PBKDF2 (~118 chars)
     nombre_completo = Column(String(150), nullable=False)
     rol = Column(String(30), default="CAJERO", nullable=False)  # CAJERO, ADMINISTRADOR, RESPONSABLE_SANITARIO
     activo = Column(Boolean, default=True, nullable=False)
@@ -169,6 +169,49 @@ class Enfermedad(Base):
 
 
 
+class Sustancia(Base):
+    __tablename__ = "sustancias"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre_normalizado = Column(String(200), unique=True, index=True, nullable=False)
+    codigo_atc = Column(String(20), nullable=True, index=True)
+    estado_clasificacion = Column(String(20), default="PENDIENTE", nullable=False)  # PENDIENTE | CLASIFICADA
+    requiere_receta_por_defecto = Column(Boolean, default=False, nullable=False)
+    grupo_farmacopea = Column(String(20), default="GRUPO_VI", nullable=False)
+    clasificado_por = Column(String(150), nullable=True)
+    fecha_clasificacion = Column(DateTime, nullable=True)
+    consultas_recibidas = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    productos = relationship("Producto", back_populates="sustancia_rel")
+    tareas = relationship("TareaClasificacionFarmaceutica", back_populates="sustancia", cascade="all, delete-orphan")
+
+
+class ParSustitucion(Base):
+    __tablename__ = "pares_sustitucion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sustancia_origen = Column(String(200), index=True, nullable=False)
+    sustancia_alternativa = Column(String(200), index=True, nullable=False)
+    nivel = Column(String(40), default="CONSULTAR_MEDICO", nullable=False)
+    advertencias = Column(Text, nullable=True)  # JSON list
+    validado_por = Column(String(150), nullable=True)
+    fecha_validacion = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class TareaClasificacionFarmaceutica(Base):
+    __tablename__ = "tareas_clasificacion_farmaceutica"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sustancia_id = Column(Integer, ForeignKey("sustancias.id"), nullable=False)
+    mensaje = Column(String(255), nullable=False)
+    estado = Column(String(20), default="PENDIENTE", nullable=False)  # PENDIENTE | COMPLETADA
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    sustancia = relationship("Sustancia", back_populates="tareas")
+
+
 class Producto(Base):
     __tablename__ = "productos"
 
@@ -176,14 +219,24 @@ class Producto(Base):
     codigo_barras = Column(String(50), unique=True, index=True, nullable=False)
     nombre_comercial = Column(String(150), nullable=False)
     sustancia_activa = Column(String(200), nullable=False)
+    sustancia_id = Column(Integer, ForeignKey("sustancias.id"), nullable=True)
     presentacion = Column(String(100), nullable=False)
+    concentracion_valor = Column(Float, nullable=True)
+    concentracion_unidad = Column(String(20), nullable=True)
+    forma_farmaceutica = Column(String(50), nullable=True)
+    via_administracion = Column(String(30), nullable=True)
+    es_generico_intercambiable = Column(Boolean, default=False, nullable=False)
+    requiere_revision_manual = Column(Boolean, default=False, nullable=False)
     laboratorio = Column(String(100), nullable=False)
     grupo_farmacopea = Column(String(20), nullable=False, default="GRUPO_VI")
     requiere_receta = Column(Boolean, default=False, nullable=False)
     precio_venta = Column(Float, nullable=False)
+    familia_terapeutica = Column(String(100), nullable=True)
+    indicacion_terapeutica = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
+    sustancia_rel = relationship("Sustancia", back_populates="productos")
     lotes = relationship("Lote", back_populates="producto", cascade="all, delete-orphan")
     detalles_venta = relationship("VentaDetalle", back_populates="producto")
 

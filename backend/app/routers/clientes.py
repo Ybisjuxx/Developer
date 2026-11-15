@@ -4,15 +4,25 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Cliente, Enfermedad
+from ..models import Cliente, Enfermedad, Usuario
 from ..schemas import ClienteCreate, ClienteOut, ClienteUpdate
+from ..security import get_current_user_optional, require_roles
 
 router = APIRouter(prefix="/api/clientes", tags=["Clientes e Historial Clínico"])
 
 
 @router.post("/", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
-def crear_cliente(cli_in: ClienteCreate, db: Session = Depends(get_db)):
+def crear_cliente(
+    cli_in: ClienteCreate,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Registra un nuevo cliente con historial clínico opcional (diagnósticos CIE-10)."""
+    if (cli_in.descuento_porcentaje or 0) > 0 and usuario and (usuario.rol or "").upper() != "ADMINISTRADOR":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo un ADMINISTRADOR puede asignar descuentos mayores a 0%.",
+        )
     datos = cli_in.model_dump(exclude={"enfermedades_ids"})
 
     # Resolver apellido compuesto / paterno y materno
@@ -100,8 +110,19 @@ def obtener_cliente(cliente_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{cliente_id}", response_model=ClienteOut)
-def actualizar_cliente(cliente_id: int, cli_in: ClienteUpdate, db: Session = Depends(get_db)):
+def actualizar_cliente(
+    cliente_id: int,
+    cli_in: ClienteUpdate,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Actualiza datos personales, porcentaje de descuento o historial clínico del cliente."""
+    if cli_in.descuento_porcentaje is not None and cli_in.descuento_porcentaje > 0:
+        if usuario and (usuario.rol or "").upper() != "ADMINISTRADOR":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo un ADMINISTRADOR puede modificar el porcentaje de descuento.",
+            )
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
@@ -132,7 +153,11 @@ def actualizar_cliente(cliente_id: int, cli_in: ClienteUpdate, db: Session = Dep
 
 
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
-def desactivar_cliente(cliente_id: int, db: Session = Depends(get_db)):
+def desactivar_cliente(
+    cliente_id: int,
+    _admin=Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
     """Desactiva un cliente (soft delete)."""
     cliente = db.query(Cliente).filter(Cliente.id == cliente_id).first()
     if not cliente:

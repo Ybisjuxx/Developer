@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+frontend/build
+frontend/.dart_tool
+frontend/windows
+frontend/linux
+frontend/macos
+frontend/ios
+frontend/android
+*.zip
+*.log

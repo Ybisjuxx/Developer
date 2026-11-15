@@ -2,6 +2,7 @@ import datetime
 import uuid
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -34,6 +35,24 @@ def procesar_devolucion(dev_in: DevolucionCreate, db: Session = Depends(get_db))
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"La venta con ID {dev_in.venta_id} no existe",
         )
+
+    if venta.estado == "DEVUELTA":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La venta {venta.folio_ticket} ya fue devuelta en su totalidad",
+        )
+
+    estados_validos = {"BUEN_ESTADO", "DANADO"}
+    for item in dev_in.items:
+        if item.estado_producto.upper() not in estados_validos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"estado_producto inválido '{item.estado_producto}'. Use BUEN_ESTADO o DANADO",
+            )
+
+    # Factor para prorratear el descuento de la venta original en el reembolso
+    factor_neto = (venta.total / venta.subtotal) if venta.subtotal else 1.0
+    pedidas_por_lote: dict = {}
 
     folio_dev = f"DEV-{datetime.datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -80,16 +99,34 @@ def procesar_devolucion(dev_in: DevolucionCreate, db: Session = Depends(get_db))
                 detail=f"El lote '{lote.numero_lote}' no fue despachado en la venta {venta.folio_ticket}",
             )
 
-        if item.cantidad > despacho_original.cantidad_despachada:
+        # Cantidad ya devuelta de este lote/producto en devoluciones previas de la misma venta
+        ya_devuelto = (
+            db.query(func.coalesce(func.sum(DevolucionDetalle.cantidad), 0))
+            .join(Devolucion)
+            .filter(
+                Devolucion.venta_id == venta.id,
+                DevolucionDetalle.producto_id == producto.id,
+                DevolucionDetalle.lote_id == lote.id,
+            )
+            .scalar()
+        ) or 0
+        clave = (producto.id, lote.id)
+        pedidas_por_lote[clave] = pedidas_por_lote.get(clave, 0) + item.cantidad
+        disponible_devolver = despacho_original.cantidad_despachada - ya_devuelto
+
+        if pedidas_por_lote[clave] > disponible_devolver:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    f"No puedes devolver {item.cantidad} unidades del lote {lote.numero_lote}. "
-                    f"Solo se vendieron {despacho_original.cantidad_despachada} unidades en este ticket."
+                    f"No puedes devolver {pedidas_por_lote[clave]} unidades del lote {lote.numero_lote}. "
+                    f"Vendidas: {despacho_original.cantidad_despachada}, ya devueltas: {ya_devuelto}, "
+                    f"disponibles para devolución: {max(0, disponible_devolver)}."
                 ),
             )
 
-        monto_item = round(item.cantidad * producto.precio_venta, 2)
+        # Reembolso al precio cobrado en el ticket (no al precio actual) y con descuento prorrateado
+        precio_cobrado = despacho_original.venta_detalle.precio_unitario
+        monto_item = round(item.cantidad * precio_cobrado * factor_neto, 2)
         total_reembolso += monto_item
 
         det_dev = DevolucionDetalle(
@@ -140,10 +177,16 @@ def procesar_devolucion(dev_in: DevolucionCreate, db: Session = Depends(get_db))
 
     nueva_devolucion.total_reembolsado = round(total_reembolso, 2)
 
-    # Actualizar estado de la venta
-    venta.estado = "DEVOLUCION_PARCIAL"
-    if round(total_reembolso, 2) >= round(venta.total, 2):
-        venta.estado = "DEVUELTA"
+    # Actualizar estado de la venta según piezas vendidas vs. devueltas acumuladas
+    db.flush()
+    vendidas = sum(d.cantidad for d in venta.detalles)
+    devueltas = (
+        db.query(func.coalesce(func.sum(DevolucionDetalle.cantidad), 0))
+        .join(Devolucion)
+        .filter(Devolucion.venta_id == venta.id)
+        .scalar()
+    ) or 0
+    venta.estado = "DEVUELTA" if devueltas >= vendidas else "DEVOLUCION_PARCIAL"
 
     db.commit()
     db.refresh(nueva_devolucion)

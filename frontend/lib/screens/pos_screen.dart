@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/medico.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 import '../widgets/lector_codigo_barras_dialog.dart';
+import '../widgets/premium_ui.dart';
 import '../widgets/ticket_impresion_dialog.dart';
 
 class PosScreen extends StatefulWidget {
@@ -86,6 +88,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _modalNuevoClienteRapido() async {
+    final ts = ThemeService.instance;
     final nomCtrl = TextEditingController();
     final apePaternoCtrl = TextEditingController();
     final apeMaternoCtrl = TextEditingController();
@@ -102,11 +105,11 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.person_add_alt_1, color: Colors.teal),
-              SizedBox(width: 8),
-              Text('Registro Exprés de Cliente'),
+              Icon(Icons.person_add_alt_1, color: ts.accentPrimary),
+              const SizedBox(width: 8),
+              const Text('Registro Exprés de Cliente'),
             ],
           ),
           content: Container(
@@ -163,7 +166,7 @@ class _PosScreenState extends State<PosScreen> {
                   const SizedBox(height: 10),
                   // Sub-Agente 4: Sexo con isExpanded y TextOverflow.ellipsis
                   DropdownButtonFormField<String>(
-                    value: sexoSeleccionado,
+                    initialValue: sexoSeleccionado,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Sexo / Género (Opcional)',
@@ -184,7 +187,7 @@ class _PosScreenState extends State<PosScreen> {
                       const Text('Fecha de Nacimiento:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       const Spacer(),
                       IconButton(
-                        icon: const Icon(Icons.calendar_month, color: Colors.teal),
+                        icon: Icon(Icons.calendar_month, color: ts.accentPrimary),
                         tooltip: 'Buscar en calendario',
                         onPressed: () async {
                           final picked = await showDatePicker(
@@ -241,7 +244,10 @@ class _PosScreenState extends State<PosScreen> {
             ElevatedButton.icon(
               icon: const Icon(Icons.save),
               label: const Text('Guardar y Aplicar'),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ts.accentPrimary,
+                foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+              ),
               onPressed: () async {
                 final nom = nomCtrl.text.trim();
                 final pat = apePaternoCtrl.text.trim();
@@ -282,18 +288,18 @@ class _PosScreenState extends State<PosScreen> {
                     _compradorController.text = '$nom $apCompleto';
                   });
 
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Cliente "$nom $apCompleto" registrado con $desc% de descuento aplicado.'),
-                        backgroundColor: Colors.green,
+                        backgroundColor: ts.neonGreen,
                       ),
                     );
                   }
                 } catch (e) {
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error al registrar cliente: $e'), backgroundColor: Colors.red),
+                      SnackBar(content: Text('Error al registrar cliente: $e'), backgroundColor: ts.neonRed),
                     );
                   }
                 }
@@ -309,6 +315,7 @@ class _PosScreenState extends State<PosScreen> {
   // SUB-AGENTE 3: MODAL DE BÚSQUEDA Y CONFIRMACIÓN DE CLIENTE (TEL / FECHA NAC)
   // =========================================================================
   Future<void> _abrirBuscadorYConfirmacionCliente() async {
+    final ts = ThemeService.instance;
     final TextEditingController busquedaCtrl = TextEditingController();
     String query = '';
     Map<String, dynamic>? candidatoSeleccionado;
@@ -341,16 +348,16 @@ class _PosScreenState extends State<PosScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.person_search, color: Colors.teal, size: 24),
+                  decoration: BoxDecoration(color: ts.tintBg(ts.accentPrimary), borderRadius: BorderRadius.circular(8)),
+                  child: Icon(Icons.person_search, color: ts.accentPrimary, size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Búsqueda y Confirmación de Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('Busca por teléfono, nombre o confirma con fecha de nacimiento', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      const Text('Búsqueda y Confirmación de Cliente', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('Busca por teléfono, nombre o confirma con fecha de nacimiento', style: TextStyle(fontSize: 11, color: ts.textSecondary)),
                     ],
                   ),
                 ),
@@ -400,8 +407,8 @@ class _PosScreenState extends State<PosScreen> {
                         },
                       ),
                       TextButton.icon(
-                        icon: const Icon(Icons.person_add, size: 16, color: Colors.teal),
-                        label: const Text('Nuevo Cliente', style: TextStyle(fontSize: 12, color: Colors.teal, fontWeight: FontWeight.bold)),
+                        icon: Icon(Icons.person_add, size: 16, color: ts.accentPrimary),
+                        label: Text('Nuevo Cliente', style: TextStyle(fontSize: 12, color: ts.accentPrimary, fontWeight: FontWeight.bold)),
                         onPressed: () {
                           Navigator.of(ctx).pop();
                           _modalNuevoClienteRapido();
@@ -416,11 +423,11 @@ class _PosScreenState extends State<PosScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.search_off, size: 36, color: Colors.grey),
+                                Icon(Icons.search_off, size: 36, color: ts.textSecondary),
                                 const SizedBox(height: 8),
                                 Text(
                                   query.isEmpty ? 'No hay clientes registrados.' : 'Sin resultados para "$query"',
-                                  style: const TextStyle(color: Colors.grey),
+                                  style: TextStyle(color: ts.textSecondary),
                                 ),
                               ],
                             ),
@@ -439,22 +446,22 @@ class _PosScreenState extends State<PosScreen> {
                               return Container(
                                 decoration: BoxDecoration(
                                   color: esCandidato
-                                      ? Colors.teal.shade50
-                                      : (esActual ? Colors.green.shade50 : Colors.white),
+                                      ? ts.tintBg(ts.accentPrimary)
+                                      : (esActual ? ts.tintBg(ts.neonGreen) : ts.cardBg),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
                                     color: esCandidato
-                                        ? Colors.teal
-                                        : (esActual ? Colors.green : Colors.grey.shade300),
+                                        ? ts.accentPrimary
+                                        : (esActual ? ts.neonGreen : ts.borderColor),
                                   ),
                                 ),
                                 child: ListTile(
                                   dense: true,
                                   leading: CircleAvatar(
-                                    backgroundColor: Colors.teal.shade100,
+                                    backgroundColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.2, darkAlpha: 0.3),
                                     child: Text(
                                       '${c['nombre']?[0] ?? 'C'}${c['apellido']?[0] ?? ''}'.toUpperCase(),
-                                      style: TextStyle(color: Colors.teal.shade900, fontWeight: FontWeight.bold),
+                                      style: TextStyle(color: ts.accentPrimary, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                   title: Row(
@@ -468,12 +475,12 @@ class _PosScreenState extends State<PosScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: Colors.green.shade100,
+                                          color: ts.tintBg(ts.neonGreen),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
                                           '$desc% Desc',
-                                          style: TextStyle(fontSize: 10, color: Colors.green.shade900, fontWeight: FontWeight.bold),
+                                          style: TextStyle(fontSize: 10, color: ts.neonGreen, fontWeight: FontWeight.bold),
                                         ),
                                       ),
                                       if (c['alerta_resurtimiento_activa'] == true) ...[
@@ -481,13 +488,13 @@ class _PosScreenState extends State<PosScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.amber.shade200,
+                                            color: ts.tintBg(ts.neonAmber, lightAlpha: 0.25, darkAlpha: 0.3),
                                             borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: Colors.amber.shade800),
+                                            border: Border.all(color: ts.neonAmber),
                                           ),
                                           child: Text(
                                             '🔔 Resurtir (${c['dias_para_resurtimiento'] ?? 0}d)',
-                                            style: TextStyle(fontSize: 10, color: Colors.amber.shade900, fontWeight: FontWeight.bold),
+                                            style: TextStyle(fontSize: 10, color: ts.neonAmber, fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                       ] else if (c['tiene_padecimientos_cronicos'] == true) ...[
@@ -495,12 +502,12 @@ class _PosScreenState extends State<PosScreen> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.shade100,
+                                            color: ts.tintBg(ts.neonBlue),
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             '💊 Crónico',
-                                            style: TextStyle(fontSize: 9, color: Colors.blue.shade900, fontWeight: FontWeight.bold),
+                                            style: TextStyle(fontSize: 9, color: ts.neonBlue, fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                       ],
@@ -514,7 +521,7 @@ class _PosScreenState extends State<PosScreen> {
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.phone, size: 11, color: Colors.teal),
+                                            Icon(Icons.phone, size: 11, color: ts.accentPrimary),
                                             const SizedBox(width: 3),
                                             Text(tel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
                                           ],
@@ -523,13 +530,13 @@ class _PosScreenState extends State<PosScreen> {
                                         Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.cake, size: 11, color: Colors.purple),
+                                            Icon(Icons.cake, size: 11, color: ts.neonPurple),
                                             const SizedBox(width: 3),
                                             Text('Nac: $fechaNac', style: const TextStyle(fontSize: 11)),
                                           ],
                                         )
                                       else
-                                        const Text('Sin fecha nac.', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                        Text('Sin fecha nac.', style: TextStyle(fontSize: 10, color: ts.textSecondary)),
                                     ],
                                   ),
                                   trailing: FilledButton.tonal(
@@ -556,21 +563,21 @@ class _PosScreenState extends State<PosScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
+                        color: ts.tintBg(ts.neonAmber, lightAlpha: 0.12, darkAlpha: 0.18),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.amber.shade400),
+                        border: Border.all(color: ts.neonAmber.withValues(alpha: 0.5)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.verified_user, color: Colors.amber.shade900, size: 18),
+                              Icon(Icons.verified_user, color: ts.neonAmber, size: 18),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
                                   'Confirmar: ${candidatoSeleccionado!["nombre"]} ${candidatoSeleccionado!["apellido"]}',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.amber.shade900),
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.neonAmber),
                                 ),
                               ),
                               IconButton(
@@ -591,19 +598,19 @@ class _PosScreenState extends State<PosScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade100,
+                                color: ts.tintBg(ts.neonAmber, lightAlpha: 0.22, darkAlpha: 0.25),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.amber.shade800),
+                                border: Border.all(color: ts.neonAmber),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.notification_important, color: Colors.amber.shade900, size: 18),
+                                  Icon(Icons.notification_important, color: ts.neonAmber, size: 18),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       candidatoSeleccionado!['mensaje_alerta_resurtimiento'] ??
                                           '🔔 Sugerir resurtimiento de tratamiento crónico al paciente.',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.neonAmber),
                                     ),
                                   ),
                                 ],
@@ -620,7 +627,10 @@ class _PosScreenState extends State<PosScreen> {
                               ),
                               const SizedBox(width: 8),
                               FilledButton.icon(
-                                style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: ts.accentPrimary,
+                                  foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                                ),
                                 icon: const Icon(Icons.check_circle, size: 16),
                                 label: const Text('Confirmar y Asignar Cliente', style: TextStyle(fontSize: 12)),
                                 onPressed: () {
@@ -635,7 +645,7 @@ class _PosScreenState extends State<PosScreen> {
                                       content: Text(
                                         'Cliente "${candidatoSeleccionado!["nombre"]} ${candidatoSeleccionado!["apellido"]}" confirmado y asignado.',
                                       ),
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: ts.neonGreen,
                                     ),
                                   );
                                 },
@@ -711,6 +721,7 @@ class _PosScreenState extends State<PosScreen> {
 
   // Soporte para pistola / escáner de código de barras
   void _procesarEscaneoCodigoBarras(String valor) {
+    final ts = ThemeService.instance;
     final codigo = valor.trim();
     if (codigo.isEmpty) return;
 
@@ -728,12 +739,12 @@ class _PosScreenState extends State<PosScreen> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                Icon(Icons.check_circle, color: ts.esTemaNeon ? Colors.black : Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Text('¡Añadido: ${producto["nombre_comercial"]}!'),
               ],
             ),
-            backgroundColor: Colors.teal.shade800,
+            backgroundColor: ts.accentPrimary,
             duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
           ),
@@ -742,7 +753,7 @@ class _PosScreenState extends State<PosScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('¡${producto["nombre_comercial"]} no tiene stock disponible!'),
-            backgroundColor: Colors.orange.shade900,
+            backgroundColor: ts.neonAmber,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -759,12 +770,13 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _agregarAlCarrito(dynamic producto) {
+    final ts = ThemeService.instance;
     final int stockTotal = producto['stock_total'] ?? 0;
     if (stockTotal <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('¡${producto["nombre_comercial"]} no tiene stock disponible!'),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: ts.neonAmber,
         ),
       );
       return;
@@ -842,6 +854,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Future<void> _cobrarVenta() async {
+    final ts = ThemeService.instance;
     if (_carrito.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('El carrito está vacío')),
@@ -853,7 +866,7 @@ class _PosScreenState extends State<PosScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 48),
+          icon: Icon(Icons.warning_amber_rounded, color: ts.neonAmber, size: 48),
           title: const Text('Bloqueo Regulatorio COFEPRIS'),
           content: const Text(
             'El carrito contiene medicamentos del Grupo IV (Antibióticos) o Controlados que por Ley General de Salud '
@@ -862,6 +875,10 @@ class _PosScreenState extends State<PosScreen> {
           ),
           actions: [
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: ts.accentPrimary,
+                foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+              ),
               onPressed: () => Navigator.of(ctx).pop(),
               child: const Text('Entendido'),
             ),
@@ -875,7 +892,7 @@ class _PosScreenState extends State<PosScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('El monto recibido (\$${_montoRecibido.toStringAsFixed(2)}) es menor al total (\$${_total.toStringAsFixed(2)})'),
-          backgroundColor: Colors.red.shade800,
+          backgroundColor: ts.neonRed,
         ),
       );
       return;
@@ -931,7 +948,7 @@ class _PosScreenState extends State<PosScreen> {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            icon: const Icon(Icons.error_outline, color: Colors.red, size: 40),
+            icon: Icon(Icons.error_outline, color: ts.neonRed, size: 40),
             title: const Text('Error en el Despacho'),
             content: Text(e.toString().replaceAll('Exception: ', '')),
             actions: [
@@ -944,6 +961,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   void _abrirTicketBottomSheet() {
+    final ts = ThemeService.instance;
     _ticketSheetAbierto = true;
     showModalBottomSheet(
       context: context,
@@ -958,9 +976,10 @@ class _PosScreenState extends State<PosScreen> {
               ),
               child: Container(
                 height: MediaQuery.of(sheetContext).size.height * 0.90,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                decoration: BoxDecoration(
+                  color: ts.cardBg,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  border: ts.esOscuro ? Border(top: BorderSide(color: ts.borderColor)) : null,
                 ),
                 child: Column(
                   children: [
@@ -969,7 +988,7 @@ class _PosScreenState extends State<PosScreen> {
                       width: 44,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade400,
+                        color: ts.textSecondary.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -995,14 +1014,16 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Widget _construirBarraResumenCarritoMobile() {
+    final ts = ThemeService.instance;
     final int cantidadTotal = _carrito.fold<int>(0, (sum, item) => sum + (item['cantidad'] as int));
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ts.cardBg,
+        border: Border(top: BorderSide(color: ts.borderColor)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: ts.esOscuro ? 0.3 : 0.08),
             offset: const Offset(0, -3),
             blurRadius: 8,
           ),
@@ -1014,8 +1035,9 @@ class _PosScreenState extends State<PosScreen> {
             Badge(
               isLabelVisible: _carrito.isNotEmpty,
               label: Text('$cantidadTotal'),
-              backgroundColor: Colors.teal.shade800,
-              child: const Icon(Icons.shopping_cart, color: Colors.teal, size: 26),
+              backgroundColor: ts.accentPrimary,
+              textColor: ts.esTemaNeon ? Colors.black : Colors.white,
+              child: Icon(Icons.shopping_cart, color: ts.accentPrimary, size: 26),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1025,14 +1047,14 @@ class _PosScreenState extends State<PosScreen> {
                 children: [
                   Text(
                     '${_carrito.length} ${_carrito.length == 1 ? "artículo" : "artículos"}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: ts.textSecondary),
                   ),
                   Text(
                     '\$${_total.toStringAsFixed(2)} MXN',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.teal.shade900,
+                      color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
                     ),
                   ),
                 ],
@@ -1040,7 +1062,12 @@ class _PosScreenState extends State<PosScreen> {
             ),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: _carrito.isEmpty ? Colors.grey.shade400 : Colors.teal.shade800,
+                backgroundColor: _carrito.isEmpty
+                    ? (ts.esOscuro ? Colors.white12 : ts.borderColor)
+                    : ts.accentPrimary,
+                foregroundColor: _carrito.isEmpty
+                    ? null
+                    : (ts.esTemaNeon ? Colors.black : Colors.white),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               ),
               onPressed: _carrito.isEmpty ? null : _abrirTicketBottomSheet,
@@ -1054,6 +1081,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   Widget _construirTicketWidget({bool enBottomSheet = false, VoidCallback? onActualizar}) {
+    final ts = ThemeService.instance;
     void refrescar() {
       if (onActualizar != null) {
         onActualizar();
@@ -1062,15 +1090,27 @@ class _PosScreenState extends State<PosScreen> {
       }
     }
 
+    final bool enCarrito = _carrito.isNotEmpty;
+
     return Container(
-      color: Colors.grey.shade50,
+      decoration: BoxDecoration(
+        color: ts.surfaceBg,
+        borderRadius: enBottomSheet
+            ? const BorderRadius.vertical(top: Radius.circular(20))
+            : BorderRadius.circular(16),
+        border: Border.all(
+          color: enCarrito ? ts.accentPrimary : ts.borderColor,
+          width: enCarrito ? 1.6 : 1.2,
+        ),
+        boxShadow: ts.cardGlowShadow,
+      ),
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(Icons.receipt_long, color: Colors.teal),
+              Icon(Icons.receipt_long, color: ts.accentPrimary),
               const SizedBox(width: 8),
               Text(
                 'Ticket de Venta',
@@ -1083,7 +1123,7 @@ class _PosScreenState extends State<PosScreen> {
                     _carrito.clear();
                     refrescar();
                   },
-                  child: const Text('Vaciar', style: TextStyle(color: Colors.red, fontSize: 12)),
+                  child: Text('Vaciar', style: TextStyle(color: ts.neonRed, fontSize: 12)),
                 ),
               if (enBottomSheet)
                 IconButton(
@@ -1099,11 +1139,11 @@ class _PosScreenState extends State<PosScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.person, color: Colors.teal, size: 16),
-                  SizedBox(width: 4),
-                  Text('Cliente / Lealtad:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Icon(Icons.person, color: ts.accentPrimary, size: 16),
+                  const SizedBox(width: 4),
+                  const Text('Cliente / Lealtad:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ],
               ),
               Row(
@@ -1148,29 +1188,29 @@ class _PosScreenState extends State<PosScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: ts.cardBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: ts.borderColor),
                 ),
                 child: Row(
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 12,
-                      backgroundColor: Colors.blueGrey,
-                      child: Icon(Icons.person_outline, size: 14, color: Colors.white),
+                      backgroundColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.2, darkAlpha: 0.3),
+                      child: Icon(Icons.person_outline, size: 14, color: ts.accentPrimary),
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('👤 Público General', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('Toca para buscar por teléfono o nombre...', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                          const Text('👤 Público General', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text('Toca para buscar por teléfono o nombre...', style: TextStyle(fontSize: 10, color: ts.textSecondary)),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.search, size: 18, color: Colors.teal),
+                      icon: Icon(Icons.search, size: 18, color: ts.accentPrimary),
                       tooltip: 'Buscar cliente por teléfono o nombre',
                       onPressed: () async {
                         await _abrirBuscadorYConfirmacionCliente();
@@ -1185,16 +1225,16 @@ class _PosScreenState extends State<PosScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.teal.shade50,
+                color: ts.tintBg(ts.accentPrimary),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.teal.shade300),
+                border: Border.all(color: ts.accentPrimary.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: Colors.teal.shade700,
-                    child: const Icon(Icons.person, size: 15, color: Colors.white),
+                    backgroundColor: ts.accentPrimary,
+                    child: Icon(Icons.person, size: 15, color: ts.esTemaNeon ? Colors.black : Colors.white),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -1210,16 +1250,16 @@ class _PosScreenState extends State<PosScreen> {
                           spacing: 6,
                           children: [
                             if (_clienteSeleccionado!['telefono'] != null)
-                              Text('📞 ${_clienteSeleccionado!["telefono"]}', style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                              Text('📞 ${_clienteSeleccionado!["telefono"]}', style: TextStyle(fontSize: 10, color: ts.textSecondary)),
                             if (_clienteSeleccionado!['fecha_nacimiento'] != null)
-                              Text('🎂 ${_clienteSeleccionado!["fecha_nacimiento"]}', style: const TextStyle(fontSize: 10, color: Colors.purple)),
+                              Text('🎂 ${_clienteSeleccionado!["fecha_nacimiento"]}', style: TextStyle(fontSize: 10, color: ts.neonPurple)),
                           ],
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.swap_horiz, size: 18, color: Colors.teal),
+                    icon: Icon(Icons.swap_horiz, size: 18, color: ts.accentPrimary),
                     tooltip: 'Cambiar cliente',
                     onPressed: () async {
                       await _abrirBuscadorYConfirmacionCliente();
@@ -1227,7 +1267,7 @@ class _PosScreenState extends State<PosScreen> {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                    icon: Icon(Icons.close, size: 16, color: ts.textSecondary),
                     tooltip: 'Quitar cliente (Público General)',
                     onPressed: () {
                       _clienteSeleccionado = null;
@@ -1244,14 +1284,14 @@ class _PosScreenState extends State<PosScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.amber.shade100,
+                  color: ts.tintBg(ts.neonAmber, lightAlpha: 0.22, darkAlpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade800, width: 1.5),
+                  border: Border.all(color: ts.neonAmber, width: 1.5),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.notification_important, color: Colors.amber.shade900, size: 20),
+                    Icon(Icons.notification_important, color: ts.neonAmber, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
@@ -1262,14 +1302,14 @@ class _PosScreenState extends State<PosScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.amber.shade900,
+                              color: ts.neonAmber,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             _clienteSeleccionado!['mensaje_alerta_resurtimiento'] ??
                                 'Sugerir al paciente el resurtimiento de su tratamiento.',
-                            style: const TextStyle(fontSize: 11, color: Colors.black87),
+                            style: TextStyle(fontSize: 11, color: ts.textPrimary),
                           ),
                         ],
                       ),
@@ -1282,21 +1322,21 @@ class _PosScreenState extends State<PosScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: ts.tintBg(ts.neonGreen),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade300),
+                border: Border.all(color: ts.neonGreen.withValues(alpha: 0.5)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.loyalty, color: Colors.green, size: 14),
+                      Icon(Icons.loyalty, color: ts.neonGreen, size: 14),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           'Beneficio: ${_clienteSeleccionado!["descuento_porcentaje"]}% de Descuento aplicado',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.neonGreen),
                         ),
                       ),
                     ],
@@ -1310,12 +1350,12 @@ class _PosScreenState extends State<PosScreen> {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade100,
+                            color: ts.tintBg(ts.accentPrimary),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             '🩺 ${enf["codigo_cie"]}',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: ts.accentPrimary),
                           ),
                         );
                       }).toList(),
@@ -1332,8 +1372,8 @@ class _PosScreenState extends State<PosScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                border: Border.all(color: Colors.amber.shade300),
+                color: ts.tintBg(ts.neonAmber),
+                border: Border.all(color: ts.neonAmber.withValues(alpha: 0.5)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -1341,11 +1381,11 @@ class _PosScreenState extends State<PosScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.warning, size: 16, color: Colors.amber.shade900),
+                      Icon(Icons.warning, size: 16, color: ts.neonAmber),
                       const SizedBox(width: 6),
                       Text(
                         'Medicamento Controlado / Antibiótico',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.amber.shade900),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: ts.neonAmber),
                       ),
                     ],
                   ),
@@ -1381,20 +1421,20 @@ class _PosScreenState extends State<PosScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_shopping_cart, size: 48, color: Colors.grey.shade400),
+                        Icon(Icons.add_shopping_cart, size: 48, color: ts.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 8),
                         const Text('Selecciona productos del catálogo'),
                         const SizedBox(height: 4),
                         Text(
                           'O escanea el código de barras en la búsqueda',
-                          style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                          style: TextStyle(color: ts.textSecondary, fontSize: 11),
                         ),
                       ],
                     ),
                   )
                 : ListView.separated(
                     itemCount: _carrito.length,
-                    separatorBuilder: (_, __) => const Divider(height: 10),
+                    separatorBuilder: (_, index) => const Divider(height: 10),
                     itemBuilder: (context, index) {
                       final item = _carrito[index];
                       final p = item['producto'];
@@ -1408,7 +1448,7 @@ class _PosScreenState extends State<PosScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(p['nombre_comercial'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('\$${p["precio_venta"]} c/u', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                Text('\$${p["precio_venta"]} c/u', style: TextStyle(fontSize: 11, color: ts.textSecondary)),
                               ],
                             ),
                           ),
@@ -1501,8 +1541,8 @@ class _PosScreenState extends State<PosScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Cambio a entregar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green)),
-                  Text('\$${_cambio.toStringAsFixed(2)} MXN', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.green)),
+                  Text('Cambio a entregar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonGreen)),
+                  Text('\$${_cambio.toStringAsFixed(2)} MXN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: ts.neonGreen)),
                 ],
               ),
             ],
@@ -1512,7 +1552,7 @@ class _PosScreenState extends State<PosScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Subtotal:', style: TextStyle(fontSize: 13, color: Colors.blueGrey)),
+              Text('Subtotal:', style: TextStyle(fontSize: 13, color: ts.textSecondary)),
               Text(
                 '\$${_subtotal.toStringAsFixed(2)} MXN',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -1526,11 +1566,11 @@ class _PosScreenState extends State<PosScreen> {
               children: [
                 Text(
                   'Desc. Lealtad (${_clienteSeleccionado!["descuento_porcentaje"]}%):',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonGreen),
                 ),
                 Text(
                   '-\$${_descuento.toStringAsFixed(2)} MXN',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: ts.neonGreen),
                 ),
               ],
             ),
@@ -1542,7 +1582,11 @@ class _PosScreenState extends State<PosScreen> {
               const Text('Total a Cobrar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               Text(
                 '\$${_total.toStringAsFixed(2)} MXN',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal.shade900),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                ),
               ),
             ],
           ),
@@ -1550,7 +1594,8 @@ class _PosScreenState extends State<PosScreen> {
 
           FilledButton.icon(
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.teal.shade800,
+              backgroundColor: ts.accentPrimary,
+              foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: _procesandoVenta
@@ -1560,7 +1605,7 @@ class _PosScreenState extends State<PosScreen> {
                     refrescar();
                   },
             icon: _procesandoVenta
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: ts.esTemaNeon ? Colors.black : Colors.white))
                 : const Icon(Icons.payments),
             label: Text(_procesandoVenta ? 'Despachando FEFO...' : 'Cobrar e Imprimir Ticket'),
           ),
@@ -1571,6 +1616,7 @@ class _PosScreenState extends State<PosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1586,142 +1632,149 @@ class _PosScreenState extends State<PosScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Encabezado y Contador de Inventario
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.point_of_sale, color: Colors.teal.shade800),
-                      const SizedBox(width: 8),
-                      Text(
-                        isMobile ? 'Despacho POS' : 'Despacho y Cobro en Mostrador',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: isMobile ? 18 : 22,
-                            ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.teal.shade200),
-                        ),
-                        child: Text(
-                          '${productosVisibles.length} de ${_productos.length} medicamentos',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.teal.shade900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh),
-                        onPressed: _cargarDatos,
-                        tooltip: 'Recargar stock',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Barra de Búsqueda Inteligente + Lector de Código de Barras
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _busquedaController,
-                      focusNode: _busquedaFocus,
-                      decoration: InputDecoration(
-                        hintText: isMobile
-                            ? 'Buscar por nombre o fórmula...'
-                            : 'Buscar por nombre, sustancia activa o escanea código de barras...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_busquedaController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.clear, size: 18),
-                                onPressed: () {
-                                  _busquedaController.clear();
-                                  setState(() {});
-                                },
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.camera_alt, color: Colors.teal),
-                              tooltip: 'Escanear código de barras con la cámara',
-                              onPressed: _abrirEscanerCamara,
-                            ),
-                          ],
-                        ),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: _procesarEscaneoCodigoBarras,
+              // Encabezado y Contador de Inventario HeroUI
+              PremiumModuleHeader(
+                title: isMobile ? 'Despacho POS' : 'Despacho y Cobro en Mostrador',
+                subtitle: 'Venta asistida y control sanitario FEFO',
+                icon: Icons.point_of_sale,
+                badge: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: ts.esTemaNeon
+                        ? ts.tintBg(ts.accentPrimary)
+                        : Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ts.esTemaNeon ? ts.borderColor : Colors.white.withValues(alpha: 0.3),
                     ),
+                  ),
+                  child: Text(
+                    '${productosVisibles.length} de ${_productos.length} medicamentos',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                    ),
+                  ),
+                ),
+                actions: [
+                  IconButton(
+                    icon: Icon(Icons.refresh, color: ts.esTemaNeon ? ts.textPrimary : Colors.white),
+                    onPressed: _cargarDatos,
+                    tooltip: 'Recargar stock',
                   ),
                 ],
               ),
               const SizedBox(height: 10),
 
-              // Chips de Filtro Rápido por Clasificación Sanitaria
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+              // Contenedor de Búsqueda y Filtros HeroUI / Fragments UI
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: ts.surfaceBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: ts.borderColor, width: 1.2),
+                  boxShadow: ts.cardGlowShadow,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ChoiceChip(
-                      label: const Text('Todos'),
-                      selected: _filtroGrupo == 'TODOS',
-                      onSelected: (val) => setState(() => _filtroGrupo = 'TODOS'),
+                    // Barra de Búsqueda Inteligente + Lector de Código de Barras
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _busquedaController,
+                            focusNode: _busquedaFocus,
+                            decoration: InputDecoration(
+                              hintText: isMobile
+                                  ? 'Buscar por nombre o fórmula...'
+                                  : 'Buscar por nombre, sustancia activa o escanea código de barras...',
+                              prefixIcon: const Icon(Icons.search),
+                              filled: true,
+                              fillColor: ts.cardBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: ts.borderColor),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: ts.borderColor),
+                              ),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_busquedaController.text.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () {
+                                        _busquedaController.clear();
+                                        setState(() {});
+                                      },
+                                    ),
+                                  IconButton(
+                                    icon: Icon(Icons.camera_alt, color: ts.accentPrimary),
+                                    tooltip: 'Escanear código de barras con la cámara',
+                                    onPressed: _abrirEscanerCamara,
+                                  ),
+                                ],
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            onSubmitted: _procesarEscaneoCodigoBarras,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Venta Libre (Grupo VI)'),
-                      selected: _filtroGrupo == 'GRUPO_VI',
-                      selectedColor: Colors.teal.shade100,
-                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_VI'),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Antibióticos (Grupo IV)'),
-                      selected: _filtroGrupo == 'GRUPO_IV',
-                      selectedColor: Colors.amber.shade100,
-                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_IV'),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Controlados (Grupo I-III)'),
-                      selected: _filtroGrupo == 'CONTROLADOS',
-                      selectedColor: Colors.red.shade100,
-                      onSelected: (val) => setState(() => _filtroGrupo = 'CONTROLADOS'),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text('Crónicos (Grupo V)'),
-                      selected: _filtroGrupo == 'GRUPO_V',
-                      selectedColor: Colors.purple.shade100,
-                      onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_V'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilterChip(
-                      label: const Text('Solo con Stock'),
-                      selected: _soloConStock,
-                      onSelected: (val) => setState(() => _soloConStock = val),
+                    const SizedBox(height: 10),
+
+                    // Chips de Filtro Rápido por Clasificación Sanitaria
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Todos'),
+                            selected: _filtroGrupo == 'TODOS',
+                            onSelected: (val) => setState(() => _filtroGrupo = 'TODOS'),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Venta Libre (Grupo VI)'),
+                            selected: _filtroGrupo == 'GRUPO_VI',
+                            selectedColor: ts.tintBg(ts.accentPrimary, lightAlpha: 0.25, darkAlpha: 0.3),
+                            onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_VI'),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Antibióticos (Grupo IV)'),
+                            selected: _filtroGrupo == 'GRUPO_IV',
+                            selectedColor: ts.tintBg(ts.neonAmber, lightAlpha: 0.25, darkAlpha: 0.3),
+                            onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_IV'),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Controlados (Grupo I-III)'),
+                            selected: _filtroGrupo == 'CONTROLADOS',
+                            selectedColor: ts.tintBg(ts.neonRed, lightAlpha: 0.25, darkAlpha: 0.3),
+                            onSelected: (val) => setState(() => _filtroGrupo = 'CONTROLADOS'),
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Crónicos (Grupo V)'),
+                            selected: _filtroGrupo == 'GRUPO_V',
+                            selectedColor: ts.tintBg(ts.neonPurple, lightAlpha: 0.25, darkAlpha: 0.3),
+                            onSelected: (val) => setState(() => _filtroGrupo = 'GRUPO_V'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilterChip(
+                            label: const Text('Solo con Stock'),
+                            selected: _soloConStock,
+                            onSelected: (val) => setState(() => _soloConStock = val),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1735,7 +1788,7 @@ class _PosScreenState extends State<PosScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.search_off, size: 56, color: Colors.grey.shade400),
+                            Icon(Icons.search_off, size: 56, color: ts.textSecondary.withValues(alpha: 0.5)),
                             const SizedBox(height: 12),
                             Text(
                               'No se encontraron medicamentos para "${_busquedaController.text.trim()}"',
@@ -1744,7 +1797,7 @@ class _PosScreenState extends State<PosScreen> {
                             const SizedBox(height: 6),
                             Text(
                               'Verifica la ortografía o limpia los filtros de búsqueda.',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                              style: TextStyle(color: ts.textSecondary, fontSize: 13),
                             ),
                             const SizedBox(height: 14),
                             FilledButton.tonal(
@@ -1780,134 +1833,139 @@ class _PosScreenState extends State<PosScreen> {
                               final int stock = p['stock_total'] ?? 0;
                               final bool reqReceta = p['requiere_receta'] == true;
                               final int enCarrito = _cantidadEnCarrito(p['id']);
+                              final bool estaEnCarrito = enCarrito > 0;
 
-                              return Card(
-                                clipBehavior: Clip.antiAlias,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: BorderSide(
-                                    color: enCarrito > 0
-                                        ? Colors.teal.shade400
-                                        : Colors.grey.shade200,
-                                    width: enCarrito > 0 ? 2 : 1,
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: ts.cardBg,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: estaEnCarrito ? ts.accentPrimary : ts.borderColor,
+                                    width: estaEnCarrito ? 1.6 : 1.2,
                                   ),
+                                  boxShadow: ts.cardGlowShadow,
                                 ),
-                                child: InkWell(
-                                  onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(9.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Barra Superior: Clasificación y Stock
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: reqReceta ? Colors.amber.shade100 : Colors.teal.shade50,
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                p['grupo_farmacopea'] ?? 'GRUPO_VI',
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: reqReceta ? Colors.amber.shade900 : Colors.teal.shade900,
-                                                ),
-                                              ),
-                                            ),
-                                            Text(
-                                              'Stock: $stock',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: stock > 0 ? Colors.green.shade800 : Colors.red,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-
-                                        // Nombre comercial y sustancia
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p['nombre_comercial'],
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
-                                            ),
-                                            Text(
-                                              p['sustancia_activa'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                                            ),
-                                          ],
-                                        ),
-
-                                        // Presentación y Laboratorio
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p['presentacion'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
-                                            ),
-                                            Text(
-                                              p['laboratorio'],
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 9, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
-                                            ),
-                                          ],
-                                        ),
-
-                                        // Precio y Botón de Añadir con Badge
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                '\$${p["precio_venta"]} MXN',
-                                                style: TextStyle(
-                                                  fontSize: isMobile ? 11 : 13,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.teal.shade900,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            if (enCarrito > 0)
+                                child: Material(
+                                  color: Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(9.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          // Barra Superior: Clasificación y Stock
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.teal.shade800,
-                                                  borderRadius: BorderRadius.circular(10),
+                                                  color: reqReceta ? ts.tintBg(ts.neonAmber) : ts.tintBg(ts.accentPrimary),
+                                                  borderRadius: BorderRadius.circular(4),
                                                 ),
                                                 child: Text(
-                                                  '🛒 $enCarrito',
-                                                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                  p['grupo_farmacopea'] ?? 'GRUPO_VI',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: reqReceta ? ts.neonAmber : ts.accentPrimary,
+                                                  ),
                                                 ),
-                                              )
-                                            else
-                                              FilledButton.tonal(
-                                                style: FilledButton.styleFrom(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                                  minimumSize: const Size(32, 28),
-                                                ),
-                                                onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                                child: const Icon(Icons.add_shopping_cart, size: 14),
                                               ),
-                                          ],
-                                        ),
-                                      ],
+                                              Text(
+                                                'Stock: $stock',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: stock > 0 ? ts.neonGreen : ts.neonRed,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+
+                                          // Nombre comercial y sustancia
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                p['nombre_comercial'],
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
+                                              ),
+                                              Text(
+                                                p['sustancia_activa'],
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(fontSize: 10, color: ts.textSecondary),
+                                              ),
+                                            ],
+                                          ),
+
+                                          // Presentación y Laboratorio
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                p['presentacion'],
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(fontSize: 9, color: ts.textSecondary),
+                                              ),
+                                              Text(
+                                                p['laboratorio'],
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(fontSize: 9, color: ts.accentPrimary, fontWeight: FontWeight.w500),
+                                              ),
+                                            ],
+                                          ),
+
+                                          // Precio y Botón de Añadir con Badge
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '\$${p["precio_venta"]} MXN',
+                                                  style: TextStyle(
+                                                    fontSize: isMobile ? 11 : 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              if (enCarrito > 0)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: ts.accentPrimary,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: Text(
+                                                    '🛒 $enCarrito',
+                                                    style: TextStyle(color: ts.esTemaNeon ? Colors.black : Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                                  ),
+                                                )
+                                              else
+                                                FilledButton.tonal(
+                                                  style: FilledButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                                    minimumSize: const Size(32, 28),
+                                                  ),
+                                                  onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                                  child: const Icon(Icons.add_shopping_cart, size: 14),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1923,19 +1981,23 @@ class _PosScreenState extends State<PosScreen> {
 
         if (isMobile) {
           return Scaffold(
+            backgroundColor: ts.scaffoldBg,
             body: catalogoWidget,
             bottomNavigationBar: _construirBarraResumenCarritoMobile(),
           );
         } else {
           return Scaffold(
+            backgroundColor: ts.scaffoldBg,
             body: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(child: catalogoWidget),
-                const VerticalDivider(width: 1),
-                SizedBox(
-                  width: 370,
-                  child: _construirTicketWidget(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
+                  child: SizedBox(
+                    width: 380,
+                    child: _construirTicketWidget(),
+                  ),
                 ),
               ],
             ),

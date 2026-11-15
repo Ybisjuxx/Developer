@@ -5,12 +5,17 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Medico, Venta
 from ..schemas import MedicoCreate, MedicoOut, MedicoUpdate
+from ..security import require_roles
 
 router = APIRouter(prefix="/api/medicos", tags=["Médicos"])
 
 
 @router.post("/", response_model=MedicoOut, status_code=status.HTTP_201_CREATED)
-def crear_medico(medico_in: MedicoCreate, db: Session = Depends(get_db)):
+def crear_medico(
+    medico_in: MedicoCreate,
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Registra un nuevo médico con cédula profesional única y soporte de apellidos separados."""
     cedula_limpia = medico_in.cedula_profesional.strip().upper()
     existente = db.query(Medico).filter(Medico.cedula_profesional == cedula_limpia).first()
@@ -78,7 +83,12 @@ def obtener_medico(medico_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{medico_id}", response_model=MedicoOut)
-def actualizar_medico(medico_id: int, medico_in: MedicoUpdate, db: Session = Depends(get_db)):
+def actualizar_medico(
+    medico_id: int,
+    medico_in: MedicoUpdate,
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Actualiza datos de un médico."""
     medico = db.query(Medico).filter(Medico.id == medico_id).first()
     if not medico:
@@ -117,6 +127,7 @@ def actualizar_medico(medico_id: int, medico_in: MedicoUpdate, db: Session = Dep
 def eliminar_medico(
     medico_id: int,
     permanente: bool = Query(False, description="Si es True y no tiene ventas, lo borra físicamente"),
+    _auth=Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
     db: Session = Depends(get_db)
 ):
     """Elimina o da de baja a un médico de la farmacia."""

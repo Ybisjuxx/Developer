@@ -1,11 +1,9 @@
 import datetime
-import hashlib
 from app.database import Base, SessionLocal, engine, ensure_sqlite_schema
 from app.models import Cliente, Enfermedad, KardexMovimiento, Lote, Medico, Producto, TurnoCaja, Usuario
 
 
-def hash_pw(pw: str) -> str:
-    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+from app.security import hash_password as hash_pw
 
 
 def seed_database():

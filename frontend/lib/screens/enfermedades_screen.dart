@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/theme_service.dart';
 
 class EnfermedadesScreen extends StatefulWidget {
   const EnfermedadesScreen({super.key});
@@ -107,6 +108,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
   }
 
   Future<void> _importarDiagnostico(dynamic item) async {
+    final ts = ThemeService.instance;
     try {
       await ApiService.importarDesdeCatalogoCIE({
         'codigo_cie': item['codigo_cie'],
@@ -121,7 +123,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('¡Diagnóstico ${item["codigo_cie"]} incorporado a la farmacia!'),
-          backgroundColor: Colors.teal.shade800,
+          backgroundColor: ts.accentPrimary,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -138,13 +140,14 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al importar: ${e.toString().replaceAll("Exception: ", "")}'),
-          backgroundColor: Colors.red.shade800,
+          backgroundColor: ts.neonRed,
         ),
       );
     }
   }
 
   void _mostrarDialogoNuevoDiagnostico() {
+    final ts = ThemeService.instance;
     final codigoController = TextEditingController();
     final descController = TextEditingController();
     final catController = TextEditingController();
@@ -154,12 +157,17 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
+        builder: (modalCtx, setModalState) => AlertDialog(
+          backgroundColor: ts.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+          ),
           title: Row(
             children: [
-              Icon(Icons.medical_services_outlined, color: Colors.teal.shade800),
+              Icon(Icons.medical_services_outlined, color: ts.accentPrimary),
               const SizedBox(width: 8),
-              const Text('Registrar Diagnóstico CIE-11'),
+              Text('Registrar Diagnóstico CIE-11', style: TextStyle(color: ts.textPrimary)),
             ],
           ),
           content: Container(
@@ -185,6 +193,10 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                       ),
                       const SizedBox(width: 8),
                       FilledButton.tonalIcon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: ts.tintBg(ts.accentPrimary),
+                          foregroundColor: ts.accentPrimary,
+                        ),
                         onPressed: buscandoAutocompletar
                             ? null
                             : () async {
@@ -203,7 +215,11 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                 setModalState(() => buscandoAutocompletar = false);
                               },
                         icon: buscandoAutocompletar
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: ts.accentPrimary),
+                              )
                             : const Icon(Icons.auto_fix_high),
                         label: const Text('Completar'),
                       ),
@@ -239,9 +255,15 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancelar')),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text('Cancelar', style: TextStyle(color: ts.textSecondary)),
+            ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Colors.teal.shade800),
+              style: FilledButton.styleFrom(
+                backgroundColor: ts.accentPrimary,
+                foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+              ),
               onPressed: () async {
                 if (codigoController.text.trim().isEmpty || descController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -258,17 +280,19 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                     'comentarios_especiales': notasController.text.trim().isEmpty ? null : notasController.text.trim(),
                     'activo': true,
                   });
-                  if (!mounted) return;
-                  Navigator.of(ctx).pop();
+                  if (ctx.mounted) Navigator.of(ctx).pop();
                   _cargarEnfermedadesLocales();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Diagnóstico registrado con éxito')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Diagnóstico registrado con éxito')),
+                    );
+                  }
                 } catch (e) {
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+                    );
+                  }
                 }
               },
               child: const Text('Guardar'),
@@ -281,13 +305,19 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
+
     return Scaffold(
+      backgroundColor: ts.scaffoldBg,
       appBar: AppBar(
         title: const Text('Catálogo de Diagnósticos y Enfermedades CIE-11'),
+        backgroundColor: ts.headerBg,
+        foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.teal.shade900,
-          indicatorColor: Colors.teal.shade800,
+          labelColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: ts.accentPrimary,
           indicatorWeight: 3,
           tabs: [
             Tab(
@@ -319,10 +349,10 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                         controller: _searchLocalController,
                         decoration: InputDecoration(
                           hintText: 'Filtrar por código CIE-11 o descripción (ej: 5A11, BA00, Diabetes, Asma)...',
-                          prefixIcon: const Icon(Icons.search),
+                          prefixIcon: Icon(Icons.search, color: ts.textSecondary),
                           suffixIcon: _searchLocalController.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear),
+                                  icon: Icon(Icons.clear, color: ts.textSecondary),
                                   onPressed: () {
                                     _searchLocalController.clear();
                                     _cargarEnfermedadesLocales();
@@ -341,7 +371,8 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                     const SizedBox(width: 12),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.teal.shade800,
+                        backgroundColor: ts.accentPrimary,
+                        foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -351,6 +382,10 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                     ),
                     const SizedBox(width: 8),
                     IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: ts.tintBg(ts.accentPrimary),
+                        foregroundColor: ts.accentPrimary,
+                      ),
                       icon: const Icon(Icons.refresh),
                       tooltip: 'Actualizar lista',
                       onPressed: () => _cargarEnfermedadesLocales(query: _searchLocalController.text),
@@ -362,20 +397,24 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                   child: _isLoadingLocales
                       ? const Center(child: CircularProgressIndicator())
                       : _errorLocales != null
-                          ? Center(child: Text('Error: $_errorLocales'))
+                          ? Center(child: Text('Error: $_errorLocales', style: TextStyle(color: ts.neonRed)))
                           : _enfermedadesLocales.isEmpty
                               ? Center(
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                                      Icon(Icons.search_off, size: 48, color: ts.textSecondary.withValues(alpha: 0.5)),
                                       const SizedBox(height: 12),
-                                      const Text(
+                                      Text(
                                         'No hay diagnósticos que coincidan con la búsqueda',
-                                        style: TextStyle(fontWeight: FontWeight.bold),
+                                        style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
                                       ),
                                       const SizedBox(height: 8),
                                       FilledButton.tonal(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: ts.tintBg(ts.accentPrimary),
+                                          foregroundColor: ts.accentPrimary,
+                                        ),
                                         onPressed: () {
                                           _tabController.animateTo(1);
                                         },
@@ -386,36 +425,41 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                 )
                               : ListView.separated(
                                   itemCount: _enfermedadesLocales.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                                   itemBuilder: (context, index) {
                                     final enf = _enfermedadesLocales[index];
                                     return Card(
-                                      elevation: 0,
+                                      elevation: ts.esTemaNeon ? 0 : 1,
+                                      color: ts.cardBg,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
-                                        side: BorderSide(color: Colors.grey.shade300),
+                                        side: BorderSide(color: ts.borderColor),
                                       ),
                                       child: ListTile(
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                         leading: Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.teal.shade50,
+                                            color: ts.tintBg(ts.accentPrimary, lightAlpha: 0.12, darkAlpha: 0.22),
                                             borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.teal.shade200),
+                                            border: Border.all(color: ts.accentPrimary.withValues(alpha: 0.35)),
                                           ),
                                           child: Text(
                                             enf['codigo_cie'] ?? '',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
-                                              color: Colors.teal.shade900,
+                                              color: ts.accentPrimary,
                                             ),
                                           ),
                                         ),
                                         title: Text(
                                           enf['descripcion'] ?? '',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: ts.textPrimary,
+                                          ),
                                         ),
                                         subtitle: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,11 +468,11 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                             if (enf['categoria'] != null)
                                               Row(
                                                 children: [
-                                                  Icon(Icons.folder_outlined, size: 14, color: Colors.grey.shade600),
+                                                  Icon(Icons.folder_outlined, size: 14, color: ts.textSecondary),
                                                   const SizedBox(width: 4),
                                                   Text(
                                                     enf['categoria'],
-                                                    style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                                                    style: TextStyle(color: ts.textSecondary, fontSize: 12),
                                                   ),
                                                 ],
                                               ),
@@ -437,7 +481,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                               Text(
                                                 'Nota Sanitaria: ${enf["comentarios_especiales"]}',
                                                 style: TextStyle(
-                                                  color: Colors.amber.shade900,
+                                                  color: ts.neonAmber,
                                                   fontSize: 12,
                                                   fontStyle: FontStyle.italic,
                                                 ),
@@ -465,19 +509,19 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: ts.tintBg(ts.neonBlue),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: ts.neonBlue.withValues(alpha: 0.35)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.verified, color: Colors.blue.shade800),
+                      Icon(Icons.verified, color: ts.neonBlue),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Catálogo oficial de Clasificación Internacional de Enfermedades 11.ª Revisión (CIE-11 / OMS). '
                           'Conectado a la API oficial de terminología médica global (NIH/OMS). Busca cualquier condición y agrégala a tu farmacia.',
-                          style: TextStyle(color: Colors.blue.shade900, fontSize: 13),
+                          style: TextStyle(color: ts.textPrimary, fontSize: 13),
                         ),
                       ),
                     ],
@@ -491,10 +535,10 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                         controller: _searchCatalogoController,
                         decoration: InputDecoration(
                           hintText: 'Escribe un diagnóstico, síntoma o código CIE-11 (ej: Neumonía, Asma, 5A11, BA00, CA23)...',
-                          prefixIcon: const Icon(Icons.travel_explore),
+                          prefixIcon: Icon(Icons.travel_explore, color: ts.textSecondary),
                           suffixIcon: _searchCatalogoController.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear),
+                                  icon: Icon(Icons.clear, color: ts.textSecondary),
                                   onPressed: () {
                                     _searchCatalogoController.clear();
                                     setState(() => _catalogoResultados = []);
@@ -511,7 +555,8 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                     const SizedBox(width: 12),
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: Colors.blue.shade800,
+                        backgroundColor: ts.accentPrimary,
+                        foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -526,24 +571,24 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                   child: _isLoadingCatalogo
                       ? const Center(child: CircularProgressIndicator())
                       : _errorCatalogo != null
-                          ? Center(child: Text('Error: $_errorCatalogo'))
+                          ? Center(child: Text('Error: $_errorCatalogo', style: TextStyle(color: ts.neonRed)))
                           : _catalogoResultados.isEmpty
                               ? Center(
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.menu_book, size: 50, color: Colors.grey.shade400),
+                                      Icon(Icons.menu_book, size: 50, color: ts.textSecondary.withValues(alpha: 0.5)),
                                       const SizedBox(height: 12),
                                       Text(
                                         'Ingresa un término o código para consultar el catálogo oficial CIE-11',
-                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                                        style: TextStyle(color: ts.textSecondary, fontSize: 14),
                                       ),
                                     ],
                                   ),
                                 )
                               : ListView.separated(
                                   itemCount: _catalogoResultados.length,
-                                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                                   itemBuilder: (context, index) {
                                     final item = _catalogoResultados[index];
                                     final bool yaRegistrado = item['ya_registrado'] == true;
@@ -553,10 +598,12 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         side: BorderSide(
-                                          color: yaRegistrado ? Colors.green.shade200 : Colors.blue.shade100,
+                                          color: yaRegistrado ? ts.neonGreen.withValues(alpha: 0.45) : ts.borderColor,
                                         ),
                                       ),
-                                      color: yaRegistrado ? Colors.green.shade50.withValues(alpha: 0.3) : Colors.white,
+                                      color: yaRegistrado
+                                          ? ts.tintBg(ts.neonGreen, lightAlpha: 0.08, darkAlpha: 0.15)
+                                          : ts.cardBg,
                                       child: Padding(
                                         padding: const EdgeInsets.all(12.0),
                                         child: Row(
@@ -566,7 +613,9 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                               padding: const EdgeInsets.symmetric(vertical: 8),
                                               alignment: Alignment.center,
                                               decoration: BoxDecoration(
-                                                color: yaRegistrado ? Colors.green.shade100 : Colors.blue.shade100,
+                                                color: yaRegistrado
+                                                    ? ts.tintBg(ts.neonGreen, lightAlpha: 0.15, darkAlpha: 0.25)
+                                                    : ts.tintBg(ts.accentPrimary, lightAlpha: 0.15, darkAlpha: 0.25),
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
                                               child: Text(
@@ -574,7 +623,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 14,
-                                                  color: yaRegistrado ? Colors.green.shade900 : Colors.blue.shade900,
+                                                  color: yaRegistrado ? ts.neonGreen : ts.accentPrimary,
                                                 ),
                                               ),
                                             ),
@@ -585,12 +634,16 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                                 children: [
                                                   Text(
                                                     item['descripcion'] ?? '',
-                                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                      color: ts.textPrimary,
+                                                    ),
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
                                                     'Categoría: ${item["categoria"] ?? "General"}',
-                                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                                    style: TextStyle(color: ts.textSecondary, fontSize: 12),
                                                   ),
                                                   if (item['comentarios_especiales'] != null &&
                                                       item['comentarios_especiales'].toString().isNotEmpty) ...[
@@ -598,7 +651,7 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                                     Text(
                                                       'Guía Clínica: ${item["comentarios_especiales"]}',
                                                       style: TextStyle(
-                                                        color: Colors.teal.shade800,
+                                                        color: ts.accentPrimary,
                                                         fontSize: 11,
                                                         fontStyle: FontStyle.italic,
                                                       ),
@@ -612,18 +665,19 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.green.shade100,
+                                                  color: ts.tintBg(ts.neonGreen),
                                                   borderRadius: BorderRadius.circular(20),
+                                                  border: Border.all(color: ts.neonGreen.withValues(alpha: 0.4)),
                                                 ),
                                                 child: Row(
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
-                                                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade800),
+                                                    Icon(Icons.check_circle, size: 16, color: ts.neonGreen),
                                                     const SizedBox(width: 4),
                                                     Text(
                                                       'En Farmacia',
                                                       style: TextStyle(
-                                                        color: Colors.green.shade900,
+                                                        color: ts.neonGreen,
                                                         fontWeight: FontWeight.bold,
                                                         fontSize: 12,
                                                       ),
@@ -634,7 +688,8 @@ class _EnfermedadesScreenState extends State<EnfermedadesScreen> with SingleTick
                                             else
                                               FilledButton.icon(
                                                 style: FilledButton.styleFrom(
-                                                  backgroundColor: Colors.teal.shade800,
+                                                  backgroundColor: ts.accentPrimary,
+                                                  foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                                 ),
                                                 onPressed: () => _importarDiagnostico(item),

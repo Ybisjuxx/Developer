@@ -9,8 +9,11 @@ import 'inventario_screen.dart';
 import 'medicos_screen.dart';
 import 'pos_screen.dart';
 import 'ventas_screen.dart';
-import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
+import '../utils/app_formatters.dart';
+import '../widgets/ia_consulta_sheet.dart';
+import '../widgets/premium_ui.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,11 +32,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _auth.addListener(_onAuthChanged);
+    ThemeService.instance.addListener(_onAuthChanged);
   }
 
   @override
   void dispose() {
     _auth.removeListener(_onAuthChanged);
+    ThemeService.instance.removeListener(_onAuthChanged);
     super.dispose();
   }
 
@@ -51,14 +56,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _mostrarSelectorUsuario() {
+    final ts = ThemeService.instance;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.switch_account, color: Colors.teal),
-            SizedBox(width: 8),
-            Text('Cambiar Usuario / Rol'),
+            Icon(Icons.switch_account, color: ts.accentPrimary),
+            const SizedBox(width: 8),
+            const Text('Cambiar Usuario / Rol'),
           ],
         ),
         content: Container(
@@ -68,9 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Selecciona un perfil para operar con sus permisos normativos:',
-                style: TextStyle(fontSize: 12, color: Colors.black87),
+                style: TextStyle(fontSize: 12, color: ts.textSecondary),
               ),
               const SizedBox(height: 12),
               ...AuthService.usuariosDemostracion.map((u) {
@@ -78,25 +84,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: seleccionado ? Colors.teal.shade50 : Colors.white,
+                    color: seleccionado ? ts.tintBg(ts.accentPrimary) : ts.surfaceBg,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: seleccionado ? Colors.teal : Colors.grey.shade300),
+                    border: Border.all(color: seleccionado ? ts.accentPrimary : ts.borderColor),
                   ),
                   child: ListTile(
                     dense: true,
                     leading: CircleAvatar(
-                      backgroundColor: _obtenerColorRol(u.rol).withValues(alpha: 0.2),
-                      child: Icon(Icons.person, color: _obtenerColorRol(u.rol), size: 20),
+                      backgroundColor: AppFormatters.colorPorRol(u.rol).withValues(alpha: 0.2),
+                      child: Icon(Icons.person, color: AppFormatters.colorPorRol(u.rol), size: 20),
                     ),
-                    title: Text(u.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    subtitle: Text(u.rol, style: TextStyle(color: _obtenerColorRol(u.rol), fontSize: 11, fontWeight: FontWeight.bold)),
-                    trailing: seleccionado ? const Icon(Icons.check_circle, color: Colors.teal) : null,
-                    onTap: () {
-                      _auth.cambiarUsuario(u);
+                    title: Text(u.nombreCompleto, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary)),
+                    subtitle: Text(u.rol, style: TextStyle(color: AppFormatters.colorPorRol(u.rol), fontSize: 11, fontWeight: FontWeight.bold)),
+                    trailing: seleccionado ? Icon(Icons.check_circle, color: ts.accentPrimary) : null,
+                    onTap: () async {
                       Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Sesión activa: ${u.nombreCompleto} (${u.rol})')),
-                      );
+                      await _auth.loginRapidoDemo(u.username);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Sesión activa: ${u.nombreCompleto} (${u.rol})')),
+                        );
+                      }
                     },
                   ),
                 );
@@ -105,362 +113,53 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _confirmarCerrarSesion();
+            },
+            icon: const Icon(Icons.logout, color: Colors.red, size: 16),
+            label: const Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
+          ),
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cerrar')),
         ],
       ),
     );
   }
 
-  Color _obtenerColorRol(String rol) {
-    switch (rol) {
-      case 'ADMINISTRADOR':
-        return Colors.purple.shade700;
-      case 'RESPONSABLE_SANITARIO':
-        return Colors.blue.shade700;
-      case 'CAJERO':
-      default:
-        return Colors.teal.shade700;
-    }
+  void _confirmarCerrarSesion() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.logout, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Cerrar Sesión'),
+          ],
+        ),
+        content: Text('¿Deseas cerrar la sesión activa de ${_auth.usuarioActual.nombreCompleto}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _auth.logout();
+            },
+            child: const Text('Cerrar Sesión'),
+          ),
+        ],
+      ),
+    );
   }
 
   // =========================================================================
   // SUB-AGENTE 5: MODAL DE CHAT CON IA PARA BÚSQUEDA Y SUSTITUTOS
   // =========================================================================
-  void _abrirChatConsultaIa() {
-    final TextEditingController chatController = TextEditingController();
-    final List<Map<String, dynamic>> conversacion = [
-      {
-        'remitente': 'ia',
-        'texto':
-            '¡Hola! Soy tu **Asistente Farmacéutico IA** de FarmaControl.\n\n'
-            'Puedo verificar si tenemos un medicamento en stock o buscar **sustitutos bioequivalentes y alternativas terapéuticas** en nuestro catálogo si no está disponible.',
-        'sustitutos': <dynamic>[],
-        'aviso': null,
-      }
-    ];
-    bool esperandoIa = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setChatState) {
-          final isWide = MediaQuery.of(context).size.width > 700;
-
-          void enviarConsulta([String? textoDirecto]) async {
-            final query = (textoDirecto ?? chatController.text).trim();
-            if (query.isEmpty || esperandoIa) return;
-
-            chatController.clear();
-            setChatState(() {
-              conversacion.add({
-                'remitente': 'usuario',
-                'texto': query,
-                'sustitutos': <dynamic>[],
-                'aviso': null,
-              });
-              esperandoIa = true;
-            });
-
-            try {
-              final res = await ApiService.consultarIaMedicamentos(query);
-              setChatState(() {
-                conversacion.add({
-                  'remitente': 'ia',
-                  'texto': res['respuesta_ia'] ?? 'Análisis farmacológico completado.',
-                  'sustitutos': res['sustitutos_en_stock'] ?? <dynamic>[],
-                  'aviso': res['aviso_sanitario'],
-                });
-                esperandoIa = false;
-              });
-            } catch (e) {
-              setChatState(() {
-                conversacion.add({
-                  'remitente': 'ia',
-                  'texto': '⚠️ No se pudo procesar la consulta con el motor IA: $e',
-                  'sustitutos': <dynamic>[],
-                  'aviso': null,
-                });
-                esperandoIa = false;
-              });
-            }
-          }
-
-          return AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.teal.shade200),
-                  ),
-                  child: const Icon(Icons.smart_toy, color: Colors.teal, size: 24),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Asistente Farmacéutico IA',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                      ),
-                      Text(
-                        'Búsqueda de medicamentos, bioequivalencia y sustitutos en stock',
-                        style: TextStyle(fontSize: 11, color: Colors.blueGrey),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(ctx).pop(),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: isWide ? 620 : double.maxFinite,
-              height: MediaQuery.of(context).size.height * 0.65,
-              child: Column(
-                children: [
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-
-                  // Sugerencias rápidas de consulta
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _chipSugerencia('¿Tempra o Paracetamol?', () => enviarConsulta('Tempra')),
-                        const SizedBox(width: 6),
-                        _chipSugerencia('¿Sustitutos de Amoxicilina?', () => enviarConsulta('Sustitutos de Amoxicilina')),
-                        const SizedBox(width: 6),
-                        _chipSugerencia('¿Antihistamínico para alergia?', () => enviarConsulta('Antihistamínico para alergia')),
-                        const SizedBox(width: 6),
-                        _chipSugerencia('¿Alternativas a Flanax / Naproxeno?', () => enviarConsulta('Alternativas a Flanax')),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Área de mensajes del chat
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: conversacion.length + (esperandoIa ? 1 : 0),
-                      itemBuilder: (context, idx) {
-                        if (idx == conversacion.length && esperandoIa) {
-                          return Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Row(
-                              children: [
-                                const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Analizando catálogo de farmacia y bioequivalencia...',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        final msg = conversacion[idx];
-                        final bool esUsuario = msg['remitente'] == 'usuario';
-                        final List sustitutos = msg['sustitutos'] ?? [];
-                        final String? aviso = msg['aviso'];
-
-                        return Align(
-                          alignment: esUsuario ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            constraints: BoxConstraints(maxWidth: isWide ? 520 : 340),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: esUsuario ? Colors.teal.shade700 : Colors.grey.shade100,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(14),
-                                topRight: const Radius.circular(14),
-                                bottomLeft: esUsuario ? const Radius.circular(14) : Radius.zero,
-                                bottomRight: esUsuario ? Radius.zero : const Radius.circular(14),
-                              ),
-                              border: Border.all(
-                                color: esUsuario ? Colors.teal.shade800 : Colors.grey.shade300,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      esUsuario ? Icons.person : Icons.smart_toy,
-                                      size: 14,
-                                      color: esUsuario ? Colors.white70 : Colors.teal.shade800,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      esUsuario ? 'Tú (Farmacéutico)' : 'Asistente IA',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: esUsuario ? Colors.white70 : Colors.teal.shade900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  msg['texto'] ?? '',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: esUsuario ? Colors.white : Colors.black87,
-                                    height: 1.35,
-                                  ),
-                                ),
-
-                                // Tarjetas de sustitutos en stock directo
-                                if (sustitutos.isNotEmpty) ...[
-                                  const SizedBox(height: 10),
-                                  const Text(
-                                    '📦 Fármacos disponibles en inventario:',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  ...sustitutos.map((s) {
-                                    return Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.teal.shade200),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '${s["nombre_comercial"]} (${s["sustancia_activa"]})',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                                ),
-                                                Text(
-                                                  '${s["presentacion"]} • Lab: ${s["laboratorio"]}',
-                                                  style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  'Stock: ${s["stock_disponible"]} pzas • \$${s["precio_venta"]} MXN',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.teal.shade900,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          FilledButton.tonal(
-                                            style: FilledButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            ),
-                                            onPressed: () {
-                                              Navigator.of(ctx).pop();
-                                              _cambiarPestana(1); // Ir a Punto de Venta
-                                            },
-                                            child: const Text('Cobrar', style: TextStyle(fontSize: 11)),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                ],
-
-                                // Aviso Sanitario COFEPRIS
-                                if (aviso != null) ...[
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.shade50,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.amber.shade300),
-                                    ),
-                                    child: Text(
-                                      aviso,
-                                      style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Caja de entrada de consulta
-                  Container(
-                    padding: const EdgeInsets.only(top: 8, bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: chatController,
-                            onSubmitted: (_) => enviarConsulta(),
-                            decoration: const InputDecoration(
-                              hintText: 'Pregunta por un fármaco o sustituto...',
-                              prefixIcon: Icon(Icons.search),
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.teal.shade800,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          ),
-                          onPressed: esperandoIa ? null : () => enviarConsulta(),
-                          icon: const Icon(Icons.send, size: 18),
-                          label: const Text('Consultar'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _chipSugerencia(String label, VoidCallback onTap) {
-    return ActionChip(
-      avatar: const Icon(Icons.bubble_chart, size: 14, color: Colors.teal),
-      label: Text(label, style: const TextStyle(fontSize: 11)),
-      onPressed: onTap,
-      backgroundColor: Colors.teal.shade50,
-      side: BorderSide(color: Colors.teal.shade200),
-    );
-  }
-
   Widget _construirPantallaActual(int index) {
     switch (index) {
       case 0:
@@ -512,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Scaffold(
           key: _scaffoldKey,
           // Sub-Agente 4: Drawer siempre accesible en móviles y pantallas reducidas
-          drawer: Drawer(
+          drawer: isDesktop ? null : Drawer(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
@@ -556,19 +255,28 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           appBar: AppBar(
-            backgroundColor: Colors.teal.shade900,
+            backgroundColor: ThemeService.instance.headerBg,
             foregroundColor: Colors.white,
-            elevation: 2,
+            elevation: 0,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: ThemeService.instance.headerGradient,
+              ),
+            ),
             title: isDesktop
                 ? Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.tealAccent.shade700,
+                          color: ThemeService.instance.accentPrimary,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.local_pharmacy, color: Colors.black87, size: 22),
+                        child: Icon(
+                          Icons.local_pharmacy,
+                          color: ThemeService.instance.esTemaNeon ? Colors.black : Colors.white,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       const Text(
@@ -580,14 +288,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade800,
+                            color: Colors.white.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.teal.shade700),
+                            border: Border.all(color: ThemeService.instance.accentPrimary.withValues(alpha: 0.45)),
                           ),
                           child: Text(
                             titles[_selectedIndex],
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, color: Colors.tealAccent, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ThemeService.instance.esTemaNeon
+                                  ? ThemeService.instance.accentPrimary
+                                  : Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
@@ -596,11 +310,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Sub-Agente 5: Botón Destacado de Consulta con IA
                       FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.tealAccent.shade700,
-                          foregroundColor: Colors.black87,
+                          backgroundColor: ThemeService.instance.accentPrimary,
+                          foregroundColor: ThemeService.instance.esTemaNeon ? Colors.black : Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        onPressed: _abrirChatConsultaIa,
+                        onPressed: () => showConsultaIaModal(context, onNavigate: _cambiarPestana),
                         icon: const Icon(Icons.smart_toy, size: 18),
                         label: const Text(
                           'Consulta IA',
@@ -616,16 +330,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade800,
+                            color: Colors.white.withValues(alpha: 0.10),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.tealAccent.shade400.withValues(alpha: 0.5)),
+                            border: Border.all(color: ThemeService.instance.accentPrimary.withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               CircleAvatar(
                                 radius: 9,
-                                backgroundColor: _obtenerColorRol(user.rol),
+                                backgroundColor: AppFormatters.colorPorRol(user.rol),
                                 child: const Icon(Icons.person, size: 12, color: Colors.white),
                               ),
                               const SizedBox(width: 6),
@@ -660,6 +374,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: const Icon(Icons.logout, size: 18, color: Colors.white70),
+                        tooltip: 'Cerrar Sesión',
+                        onPressed: _confirmarCerrarSesion,
+                      ),
                     ],
                   )
                 : Row(
@@ -693,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     IconButton(
                       icon: const Icon(Icons.smart_toy, color: Colors.tealAccent, size: 20),
                       tooltip: 'Consulta IA Farmacéutica',
-                      onPressed: _abrirChatConsultaIa,
+                      onPressed: () => showConsultaIaModal(context, onNavigate: _cambiarPestana),
                     ),
                     InkWell(
                       onTap: _mostrarSelectorUsuario,
@@ -702,10 +422,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                         child: CircleAvatar(
                           radius: 12,
-                          backgroundColor: _obtenerColorRol(user.rol),
+                          backgroundColor: AppFormatters.colorPorRol(user.rol),
                           child: const Icon(Icons.person, size: 14, color: Colors.white),
                         ),
                       ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white70, size: 18),
+                      tooltip: 'Cerrar Sesión',
+                      onPressed: _confirmarCerrarSesion,
                     ),
                     const Padding(
                       padding: EdgeInsets.only(right: 12, left: 4),
@@ -715,98 +440,105 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
           ),
-          body: Row(
-            children: [
-              // Sub-Agente 4: Menú vertical con Scroll para nunca cortarse al agrandar texto
-              if (isDesktop)
-                SizedBox(
-                  width: 95,
-                  child: LayoutBuilder(
-                    builder: (context, railConstraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: railConstraints.maxHeight),
-                          child: IntrinsicHeight(
-                            child: NavigationRail(
-                              selectedIndex: _selectedIndex,
-                              onDestinationSelected: _cambiarPestana,
-                              labelType: NavigationRailLabelType.all,
-                              selectedIconTheme: IconThemeData(color: Colors.teal.shade900, size: 24),
-                              unselectedIconTheme: IconThemeData(color: Colors.grey.shade600, size: 22),
-                              selectedLabelTextStyle: TextStyle(
-                                color: Colors.teal.shade900,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: ThemeService.instance.shellGradient,
+            ),
+            child: Row(
+              children: [
+                // Arc UI Workspace Shell: Menú lateral integrado sobre el marco degradado
+                if (isDesktop)
+                  SizedBox(
+                    width: 112,
+                    child: LayoutBuilder(
+                      builder: (context, railConstraints) {
+                        return SingleChildScrollView(
+                          clipBehavior: Clip.none,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: railConstraints.maxHeight),
+                            child: IntrinsicHeight(
+                              child: RibbonNavRail(
+                                selectedIndex: _selectedIndex,
+                                onDestinationSelected: _cambiarPestana,
+                                destinations: const [
+                                  RibbonNavItem(
+                                    icon: Icons.dashboard_outlined,
+                                    selectedIcon: Icons.dashboard,
+                                    label: 'Tablero',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.point_of_sale_outlined,
+                                    selectedIcon: Icons.point_of_sale,
+                                    label: 'Cobrar',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.people_alt_outlined,
+                                    selectedIcon: Icons.people_alt,
+                                    label: 'Clientes',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.inventory_2_outlined,
+                                    selectedIcon: Icons.inventory_2,
+                                    label: 'Inventario',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.receipt_long_outlined,
+                                    selectedIcon: Icons.receipt_long,
+                                    label: 'Ventas',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.calculate_outlined,
+                                    selectedIcon: Icons.calculate,
+                                    label: 'Corte Caja',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.assignment_return_outlined,
+                                    selectedIcon: Icons.assignment_return,
+                                    label: 'Devolución',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.medical_information_outlined,
+                                    selectedIcon: Icons.medical_information,
+                                    label: 'Médicos',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.healing_outlined,
+                                    selectedIcon: Icons.healing,
+                                    label: 'CIE-11',
+                                  ),
+                                  RibbonNavItem(
+                                    icon: Icons.settings_outlined,
+                                    selectedIcon: Icons.settings,
+                                    label: 'Ajustes',
+                                  ),
+                                ],
                               ),
-                              unselectedLabelTextStyle: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 11,
-                              ),
-                              destinations: const [
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.dashboard_outlined),
-                                  selectedIcon: Icon(Icons.dashboard),
-                                  label: Text('Tablero'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.point_of_sale_outlined),
-                                  selectedIcon: Icon(Icons.point_of_sale),
-                                  label: Text('Cobrar'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.people_alt_outlined),
-                                  selectedIcon: Icon(Icons.people_alt),
-                                  label: Text('Clientes'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.inventory_2_outlined),
-                                  selectedIcon: Icon(Icons.inventory_2),
-                                  label: Text('Inventario'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.receipt_long_outlined),
-                                  selectedIcon: Icon(Icons.receipt_long),
-                                  label: Text('Ventas'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.calculate_outlined),
-                                  selectedIcon: Icon(Icons.calculate),
-                                  label: Text('Corte Caja'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.assignment_return_outlined),
-                                  selectedIcon: Icon(Icons.assignment_return),
-                                  label: Text('Devolución'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.medical_information_outlined),
-                                  selectedIcon: Icon(Icons.medical_information),
-                                  label: Text('Médicos'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.healing_outlined),
-                                  selectedIcon: Icon(Icons.healing),
-                                  label: Text('CIE-11'),
-                                ),
-                                NavigationRailDestination(
-                                  icon: Icon(Icons.settings_outlined),
-                                  selectedIcon: Icon(Icons.settings),
-                                  label: Text('Ajustes'),
-                                ),
-                              ],
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
+                  ),
+                Expanded(
+                  child: Container(
+                    margin: isDesktop ? const EdgeInsets.fromLTRB(4, 10, 12, 12) : EdgeInsets.zero,
+                    decoration: BoxDecoration(
+                      color: ThemeService.instance.scaffoldBg,
+                      borderRadius: isDesktop ? BorderRadius.circular(20) : BorderRadius.zero,
+                      border: isDesktop
+                          ? Border.all(color: ThemeService.instance.borderColor, width: 1.2)
+                          : null,
+                      boxShadow: isDesktop ? ThemeService.instance.cardGlowShadow : null,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: isDesktop ? BorderRadius.circular(19) : BorderRadius.zero,
+                      child: _construirPantallaActual(_selectedIndex),
+                    ),
                   ),
                 ),
-              if (isDesktop) const VerticalDivider(thickness: 1, width: 1),
-              Expanded(
-                child: _construirPantallaActual(_selectedIndex),
-              ),
-            ],
+              ],
+            ),
           ),
           bottomNavigationBar: isDesktop
               ? null
@@ -819,29 +551,30 @@ class _HomeScreenState extends State<HomeScreen> {
                       _cambiarPestana(idx);
                     }
                   },
-                  indicatorColor: Colors.teal.shade100,
-                  destinations: const [
+                  indicatorColor: ThemeService.instance.accentPrimary.withValues(alpha: 0.20),
+                  backgroundColor: ThemeService.instance.cardBg,
+                  destinations: [
                     NavigationDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard, color: Colors.teal),
+                      icon: const Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard, color: ThemeService.instance.accentPrimary),
                       label: 'Tablero',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.point_of_sale_outlined),
-                      selectedIcon: Icon(Icons.point_of_sale, color: Colors.teal),
+                      icon: const Icon(Icons.point_of_sale_outlined),
+                      selectedIcon: Icon(Icons.point_of_sale, color: ThemeService.instance.accentPrimary),
                       label: 'Cobrar',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.people_alt_outlined),
-                      selectedIcon: Icon(Icons.people_alt, color: Colors.teal),
+                      icon: const Icon(Icons.people_alt_outlined),
+                      selectedIcon: Icon(Icons.people_alt, color: ThemeService.instance.accentPrimary),
                       label: 'Clientes',
                     ),
                     NavigationDestination(
-                      icon: Icon(Icons.inventory_2_outlined),
-                      selectedIcon: Icon(Icons.inventory_2, color: Colors.teal),
+                      icon: const Icon(Icons.inventory_2_outlined),
+                      selectedIcon: Icon(Icons.inventory_2, color: ThemeService.instance.accentPrimary),
                       label: 'Inventario',
                     ),
-                    NavigationDestination(
+                    const NavigationDestination(
                       icon: Icon(Icons.menu),
                       label: 'Más Módulos',
                     ),
@@ -854,13 +587,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _drawerItem(int index, IconData icon, String title) {
     final bool seleccionado = _selectedIndex == index;
+    final ts = ThemeService.instance;
     return ListTile(
-      leading: Icon(icon, color: seleccionado ? Colors.teal : Colors.blueGrey),
+      leading: Icon(icon, color: seleccionado ? ts.accentPrimary : ts.textSecondary),
       title: Text(
         title,
         style: TextStyle(
           fontWeight: seleccionado ? FontWeight.bold : FontWeight.normal,
-          color: seleccionado ? Colors.teal.shade900 : Colors.black87,
+          color: seleccionado ? ts.accentPrimary : ts.textPrimary,
         ),
       ),
       selected: seleccionado,
@@ -871,3 +605,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+

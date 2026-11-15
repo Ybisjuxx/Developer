@@ -1,6 +1,13 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .security import decrypt_pii
+
+
+class StrictInputModel(BaseModel):
+    """Bloquea campos no declarados (anti-Mass Assignment) y recorta espacios."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 # ============================================================================
@@ -15,9 +22,10 @@ class UsuarioBase(BaseModel):
 
 class UsuarioCreate(UsuarioBase):
     password: str = Field(..., min_length=4, max_length=50)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class UsuarioUpdate(BaseModel):
+class UsuarioUpdate(StrictInputModel):
     nombre_completo: Optional[str] = None
     password: Optional[str] = None
     rol: Optional[str] = None
@@ -30,7 +38,7 @@ class UsuarioOut(UsuarioBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(StrictInputModel):
     username: str
     password: str
 
@@ -58,10 +66,10 @@ class MedicoBase(BaseModel):
 
 
 class MedicoCreate(MedicoBase):
-    pass
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class MedicoUpdate(BaseModel):
+class MedicoUpdate(StrictInputModel):
     nombres: Optional[str] = None
     apellidos: Optional[str] = None
     apellido_paterno: Optional[str] = None
@@ -92,10 +100,10 @@ class EnfermedadBase(BaseModel):
 
 
 class EnfermedadCreate(EnfermedadBase):
-    pass
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class EnfermedadUpdate(BaseModel):
+class EnfermedadUpdate(StrictInputModel):
     codigo_cie: Optional[str] = None
     descripcion: Optional[str] = None
     categoria: Optional[str] = None
@@ -134,10 +142,11 @@ class ClienteBase(BaseModel):
 
 
 class ClienteCreate(ClienteBase):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     enfermedades_ids: List[int] = []
 
 
-class ClienteUpdate(BaseModel):
+class ClienteUpdate(StrictInputModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
     apellido_paterno: Optional[str] = None
@@ -187,6 +196,7 @@ class LoteBase(BaseModel):
 
 
 class LoteCreate(LoteBase):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     producto_id: int
 
 
@@ -221,14 +231,14 @@ class LoteCaducidadAlertaOut(BaseModel):
 
 
 
-class LoteAjusteInput(BaseModel):
+class LoteAjusteInput(StrictInputModel):
     nuevo_stock: int = Field(..., ge=0)
     motivo: str = Field(..., min_length=3)
     usuario: str = Field(default="Administrador")
     rol_usuario: str = Field(default="ADMINISTRADOR")
 
 
-class LoteBajaInput(BaseModel):
+class LoteBajaInput(StrictInputModel):
     motivo: str = Field(..., min_length=3)
     usuario: str = Field(default="Administrador")
     rol_usuario: str = Field(default="ADMINISTRADOR")
@@ -246,11 +256,39 @@ class ProductoBase(BaseModel):
     grupo_farmacopea: str = Field(default="GRUPO_VI", max_length=20)
     requiere_receta: bool = False
     precio_venta: float = Field(..., ge=0)
+    familia_terapeutica: Optional[str] = Field(None, max_length=100)
+    indicacion_terapeutica: Optional[str] = None
+    concentracion_valor: Optional[float] = None
+    concentracion_unidad: Optional[str] = Field(None, max_length=20)
+    forma_farmaceutica: Optional[str] = Field(None, max_length=50)
+    via_administracion: Optional[str] = Field(None, max_length=30)
+    es_generico_intercambiable: bool = False
+    requiere_revision_manual: bool = False
+    sustancia_id: Optional[int] = None
     activo: bool = True
 
 
 class ProductoCreate(ProductoBase):
-    pass
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class ProductoUpdate(StrictInputModel):
+    nombre_comercial: Optional[str] = Field(None, min_length=2, max_length=150)
+    sustancia_activa: Optional[str] = Field(None, min_length=2, max_length=200)
+    presentacion: Optional[str] = Field(None, min_length=2, max_length=100)
+    laboratorio: Optional[str] = Field(None, min_length=2, max_length=100)
+    grupo_farmacopea: Optional[str] = Field(None, max_length=20)
+    requiere_receta: Optional[bool] = None
+    precio_venta: Optional[float] = Field(None, ge=0)
+    familia_terapeutica: Optional[str] = Field(None, max_length=100)
+    indicacion_terapeutica: Optional[str] = None
+    concentracion_valor: Optional[float] = None
+    concentracion_unidad: Optional[str] = Field(None, max_length=20)
+    forma_farmaceutica: Optional[str] = Field(None, max_length=50)
+    via_administracion: Optional[str] = Field(None, max_length=30)
+    es_generico_intercambiable: Optional[bool] = None
+    requiere_revision_manual: Optional[bool] = None
+    activo: Optional[bool] = None
 
 
 class ProductoOut(ProductoBase):
@@ -264,12 +302,12 @@ class ProductoOut(ProductoBase):
 # ============================================================================
 # VENTAS Y DESPACHO FEFO
 # ============================================================================
-class VentaItemInput(BaseModel):
+class VentaItemInput(StrictInputModel):
     producto_id: int
     cantidad: int = Field(..., gt=0)
 
 
-class VentaCreate(BaseModel):
+class VentaCreate(StrictInputModel):
     cliente_id: Optional[int] = None
     comprador_nombre: Optional[str] = "Público General"
     comprador_identificacion: Optional[str] = None
@@ -356,13 +394,18 @@ class VentaOut(BaseModel):
     uuid_fiscal: Optional[str] = None
     detalles: List[VentaDetalleOut] = []
     devoluciones: List[DevolucionOut] = []
-    model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("comprador_identificacion", mode="before")
+    @classmethod
+    def _decrypt_identificacion(cls, v: Optional[str]) -> Optional[str]:
+        return decrypt_pii(v)
+
+    model_config = ConfigDict(from_attributes=True)
 
 # ============================================================================
 # FACTURACIÓN ELECTRÓNICA (CFDI 4.0)
 # ============================================================================
-class FacturaCreate(BaseModel):
+class FacturaCreate(StrictInputModel):
     rfc_receptor: str = Field(..., min_length=12, max_length=15)
     razon_social_receptor: str = Field(..., min_length=2, max_length=200)
     regimen_fiscal_receptor: str = Field(..., min_length=3, max_length=100)
@@ -412,14 +455,14 @@ class FacturaOut(BaseModel):
 # ============================================================================
 # DEVOLUCIONES Y MERMAS
 # ============================================================================
-class DevolucionItemInput(BaseModel):
+class DevolucionItemInput(StrictInputModel):
     producto_id: int
     lote_id: int
     cantidad: int = Field(..., gt=0)
     estado_producto: str = Field(default="BUEN_ESTADO")  # BUEN_ESTADO, DANADO
 
 
-class DevolucionCreate(BaseModel):
+class DevolucionCreate(StrictInputModel):
     venta_id: int
     motivo: str = Field(..., min_length=3)
     metodo_reembolso: str = Field(default="EFECTIVO")
@@ -448,14 +491,14 @@ MermaOut = MermaSanitariaOut
 # ============================================================================
 # CORTES DE CAJA Y TURNOS
 # ============================================================================
-class TurnoAperturaInput(BaseModel):
+class TurnoAperturaInput(StrictInputModel):
     cajero_nombre: str = Field(..., min_length=2, max_length=150)
     monto_apertura: float = Field(..., ge=0)
     usuario_id: Optional[int] = None
     notas: Optional[str] = None
 
 
-class TurnoCierreInput(BaseModel):
+class TurnoCierreInput(StrictInputModel):
     monto_cierre_efectivo: float = Field(..., ge=0)
     notas: Optional[str] = None
 
@@ -493,7 +536,7 @@ class TurnoResumenOut(BaseModel):
 # ============================================================================
 # KARDEX
 # ============================================================================
-class KardexObservacionInput(BaseModel):
+class KardexObservacionInput(StrictInputModel):
     observaciones: str = Field(..., min_length=3)
     es_irregular: bool = False
     usuario_auditor: Optional[str] = "Auditor"
@@ -541,7 +584,7 @@ class ReporteVentasMensualOut(BaseModel):
 # ============================================================================
 # CONSULTA DE MEDICAMENTOS Y SUSTITUTOS CON IA
 # ============================================================================
-class IaConsultaInput(BaseModel):
+class IaConsultaInput(StrictInputModel):
     consulta: str = Field(..., min_length=2, max_length=500)
     historial: Optional[List[dict]] = None
 
@@ -555,10 +598,28 @@ class SustitutoSugeridoOut(BaseModel):
     laboratorio: str
     precio_venta: float
     stock_disponible: int
-    tipo_sustitucion: str  # BIOEQUIVALENTE_DIRECTO, MISMA_FAMILIA_TERAPEUTICA, ALTERNATIVA_CLINICA
+    tipo_sustitucion: Literal[
+        "INTERCAMBIABLE",
+        "MISMA_SUSTANCIA_OTRA_PRESENTACION",
+        "CONSULTAR_MEDICO",
+    ]
+    accion_requerida: Literal[
+        "OFRECER_AL_CLIENTE",
+        "CONFIRMAR_FARMACEUTICO",
+        "CONSULTAR_MEDICO",
+    ]
+    advertencias: List[str] = []
+    visible_para_cajero: bool = True
     motivo_sugerencia: str
     requiere_receta: bool
     grupo_farmacopea: str
+    familia_terapeutica: Optional[str] = None
+    indicacion_terapeutica: Optional[str] = None
+    concentracion_valor: Optional[float] = None
+    concentracion_unidad: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    via_administracion: Optional[str] = None
+    es_generico_intercambiable: bool = False
 
 
 class IaConsultaOut(BaseModel):

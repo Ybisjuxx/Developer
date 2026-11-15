@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 
 class CajaScreen extends StatefulWidget {
   const CajaScreen({super.key});
@@ -97,10 +98,11 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
       );
 
       if (mounted) {
+        final ts = ThemeService.instance;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('¡Turno de caja abierto con éxito! Fondo: \$$monto MXN'),
-            backgroundColor: Colors.teal.shade800,
+            backgroundColor: ts.accentPrimary,
           ),
         );
         _notasAperturaController.clear();
@@ -108,15 +110,17 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
       }
     } catch (e) {
       if (mounted) {
+        final ts = ThemeService.instance;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error abriendo turno: $e'), backgroundColor: Colors.red.shade800),
+          SnackBar(content: Text('Error abriendo turno: $e'), backgroundColor: ts.neonRed),
         );
       }
     }
   }
 
   void _mostrarDialogoCierre() {
+    final ts = ThemeService.instance;
     final esperado = (_resumenTurno?['efectivo_esperado_en_caja'] as num? ?? 0.0).toDouble();
     _dineroFisicoController.text = esperado.toStringAsFixed(2);
 
@@ -127,14 +131,21 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
           builder: (context, setModalState) {
             final contado = double.tryParse(_dineroFisicoController.text.trim()) ?? 0.0;
             final diferencia = contado - esperado;
+            final Color diffColor = diferencia == 0
+                ? ts.neonGreen
+                : (diferencia > 0 ? ts.neonBlue : ts.neonRed);
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              backgroundColor: ts.cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
+              ),
               title: Row(
                 children: [
-                  Icon(Icons.point_of_sale, color: Colors.orange.shade800),
+                  Icon(Icons.point_of_sale, color: ts.neonAmber),
                   const SizedBox(width: 8),
-                  const Text('Arqueo de Caja y Corte Z'),
+                  Text('Arqueo de Caja y Corte Z', style: TextStyle(color: ts.textPrimary)),
                 ],
               ),
               content: Container(
@@ -147,19 +158,19 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
+                        color: ts.surfaceBg,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.teal.shade200),
+                        border: Border.all(color: ts.borderColor),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Fondo Inicial: \$${_turnoActivo?["monto_apertura"]} MXN'),
-                          Text('Ventas en Efectivo: \$${_turnoActivo?["ventas_efectivo"]} MXN'),
-                          const Divider(),
+                          Text('Fondo Inicial: \$${_turnoActivo?["monto_apertura"]} MXN', style: TextStyle(color: ts.textPrimary)),
+                          Text('Ventas en Efectivo: \$${_turnoActivo?["ventas_efectivo"]} MXN', style: TextStyle(color: ts.textPrimary)),
+                          Divider(color: ts.borderColor),
                           Text(
                             'Efectivo Esperado en Gaveta: \$${esperado.toStringAsFixed(2)} MXN',
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal.shade900, fontSize: 15),
+                            style: TextStyle(fontWeight: FontWeight.bold, color: ts.accentPrimary, fontSize: 15),
                           ),
                         ],
                       ),
@@ -168,6 +179,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     TextField(
                       controller: _dineroFisicoController,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: ts.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Efectivo Físico Contado (\$ MXN)',
                         prefixIcon: Icon(Icons.payments_outlined),
@@ -178,6 +190,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     const SizedBox(height: 12),
                     TextField(
                       controller: _notasCierreController,
+                      style: TextStyle(color: ts.textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Observaciones de cierre (opcional)',
                         prefixIcon: Icon(Icons.notes),
@@ -188,19 +201,9 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: diferencia == 0
-                            ? Colors.green.shade50
-                            : diferencia > 0
-                                ? Colors.blue.shade50
-                                : Colors.red.shade50,
+                        color: ts.tintBg(diffColor, lightAlpha: 0.10, darkAlpha: 0.20),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: diferencia == 0
-                              ? Colors.green
-                              : diferencia > 0
-                                  ? Colors.blue
-                                  : Colors.red,
-                        ),
+                        border: Border.all(color: diffColor.withValues(alpha: 0.5)),
                       ),
                       child: Row(
                         children: [
@@ -210,11 +213,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                                 : diferencia > 0
                                     ? Icons.add_circle
                                     : Icons.warning,
-                            color: diferencia == 0
-                                ? Colors.green
-                                : diferencia > 0
-                                    ? Colors.blue
-                                    : Colors.red,
+                            color: diffColor,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -226,11 +225,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                                       : 'Faltante en Caja: -\$${(-diferencia).toStringAsFixed(2)} MXN',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: diferencia == 0
-                                    ? Colors.green.shade900
-                                    : diferencia > 0
-                                        ? Colors.blue.shade900
-                                        : Colors.red.shade900,
+                                color: diffColor,
                               ),
                             ),
                           ),
@@ -243,10 +238,13 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancelar'),
+                  child: Text('Cancelar', style: TextStyle(color: ts.textSecondary)),
                 ),
                 FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ts.neonRed,
+                    foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                  ),
                   icon: const Icon(Icons.lock, size: 18),
                   label: const Text('Confirmar Corte Z y Cerrar'),
                   onPressed: () async {
@@ -271,10 +269,11 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
       );
 
       if (mounted) {
+        final ts = ThemeService.instance;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('¡Turno de caja cerrado exitosamente! Corte Z ID #${turnoCerrado["id"]}'),
-            backgroundColor: Colors.teal.shade900,
+            backgroundColor: ts.accentPrimary,
           ),
         );
         _notasCierreController.clear();
@@ -282,9 +281,10 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
       }
     } catch (e) {
       if (mounted) {
+        final ts = ThemeService.instance;
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error cerrando turno: $e'), backgroundColor: Colors.red.shade800),
+          SnackBar(content: Text('Error cerrando turno: $e'), backgroundColor: ts.neonRed),
         );
       }
     }
@@ -292,40 +292,114 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final ts = ThemeService.instance;
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Cabecera con pestañas
-            Row(
-              children: [
-                Expanded(
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    labelColor: Colors.teal.shade900,
-                    indicatorColor: Colors.teal,
-                    tabs: const [
-                      Tab(icon: Icon(Icons.point_of_sale), text: 'Turno Activo y Arqueo'),
-                      Tab(icon: Icon(Icons.history), text: 'Historial de Cortes Z'),
+            // Cabecera de módulo HeroUI / Fragments UI
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              decoration: BoxDecoration(
+                gradient: ts.heroBannerGradient,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: ts.borderColor, width: 1.2),
+                boxShadow: ts.cardGlowShadow,
+              ),
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 10,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: ts.esTemaNeon
+                              ? ts.accentPrimary.withValues(alpha: 0.16)
+                              : Colors.white.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: ts.esTemaNeon
+                                ? ts.accentPrimary.withValues(alpha: 0.45)
+                                : Colors.white.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.point_of_sale,
+                          color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Control de Caja y Cortes Z',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: ts.esTemaNeon ? ts.textPrimary : Colors.white,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Arqueo de turnos, corte Z ciego, balance de gaveta y registro de ventas.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: ts.esTemaNeon ? ts.textSecondary : Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _cargarDatosCaja,
-                  tooltip: 'Actualizar balance',
-                ),
-              ],
+                  IconButton(
+                    icon: Icon(
+                      Icons.refresh,
+                      color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                    ),
+                    onPressed: _cargarDatosCaja,
+                    tooltip: 'Actualizar balance de caja',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Pestañas de navegación
+            Container(
+              decoration: BoxDecoration(
+                color: ts.cardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: ts.borderColor, width: 1.0),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                labelColor: ts.accentPrimary,
+                unselectedLabelColor: ts.textSecondary,
+                indicatorColor: ts.accentPrimary,
+                indicatorWeight: 3,
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(icon: Icon(Icons.point_of_sale, size: 18), text: 'Turno Activo y Arqueo'),
+                  Tab(icon: Icon(Icons.history, size: 18), text: 'Historial de Cortes Z'),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? Center(child: Text('Error: $_error'))
+                      ? Center(child: Text('Error: $_error', style: TextStyle(color: ts.neonRed)))
                       : TabBarView(
                           controller: _tabController,
                           children: [
@@ -341,6 +415,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildPestanaTurnoActivo() {
+    final ts = ThemeService.instance;
     if (_turnoActivo == null) {
       return Center(
         child: SingleChildScrollView(
@@ -348,11 +423,10 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
             constraints: const BoxConstraints(maxWidth: 500),
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: ts.cardBg,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
+              border: Border.all(color: ts.borderColor, width: 1.2),
+              boxShadow: ts.cardGlowShadow,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -360,25 +434,26 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
               children: [
                 CircleAvatar(
                   radius: 36,
-                  backgroundColor: Colors.amber.shade100,
-                  child: Icon(Icons.lock_open, size: 40, color: Colors.amber.shade900),
+                  backgroundColor: ts.tintBg(ts.neonAmber, lightAlpha: 0.15, darkAlpha: 0.25),
+                  child: Icon(Icons.lock_open, size: 40, color: ts.neonAmber),
                 ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   'No hay ningún turno de caja abierto',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: ts.textPrimary),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Para registrar ventas y cobrar en el mostrador, abre un turno ingresando el fondo de caja inicial.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  style: TextStyle(color: ts.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 TextField(
                   controller: _fondoAperturaController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: ts.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Fondo Inicial en Efectivo (\$ MXN)',
                     prefixIcon: Icon(Icons.attach_money),
@@ -388,6 +463,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 12),
                 TextField(
                   controller: _notasAperturaController,
+                  style: TextStyle(color: ts.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Notas de apertura (opcional)',
                     prefixIcon: Icon(Icons.notes),
@@ -396,7 +472,8 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.teal.shade800,
+                    backgroundColor: ts.accentPrimary,
+                    foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   icon: const Icon(Icons.play_arrow),
@@ -419,12 +496,14 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Banner de Estado
+          // Banner de Estado Activo con HeroUI
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [Colors.teal.shade800, Colors.teal.shade600]),
-              borderRadius: BorderRadius.circular(12),
+              gradient: ts.heroBannerGradient,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: ts.borderColor, width: 1.2),
+              boxShadow: ts.cardGlowShadow,
             ),
             child: LayoutBuilder(
               builder: (context, bConstraints) {
@@ -437,35 +516,65 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                       children: [
                         Text(
                           'Turno Abierto #${turno["id"]}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                          style: TextStyle(
+                            color: ts.esTemaNeon ? ts.textPrimary : Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.greenAccent,
+                            color: ts.neonGreen,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Text('ACTIVO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       'Cajero: ${turno["cajero_nombre"]} | Apertura: ${turno["fecha_apertura"].toString().replaceFirst("T", " ").substring(0, 16)}',
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                      style: TextStyle(
+                        color: ts.esTemaNeon ? ts.textSecondary : Colors.white.withValues(alpha: 0.85),
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 );
 
                 final corteBtn = FilledButton.icon(
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.amber.shade900,
-                    foregroundColor: Colors.white,
+                    backgroundColor: ts.esTemaNeon ? ts.neonAmber : Colors.white,
+                    foregroundColor: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor,
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  icon: const Icon(Icons.calculate, size: 18),
-                  label: const Text('Corte Z / Arqueo'),
+                  icon: Icon(Icons.calculate, size: 18, color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor),
+                  label: Text(
+                    'Corte Z / Arqueo',
+                    style: TextStyle(fontWeight: FontWeight.bold, color: ts.esTemaNeon ? Colors.black : ts.colorActual.accentColor),
+                  ),
                   onPressed: _mostrarDialogoCierre,
+                );
+
+                final avatarBox = Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: ts.esTemaNeon
+                        ? ts.accentPrimary.withValues(alpha: 0.16)
+                        : Colors.white.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ts.esTemaNeon
+                          ? ts.accentPrimary.withValues(alpha: 0.45)
+                          : Colors.white.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: Icon(Icons.storefront, color: ts.esTemaNeon ? ts.accentPrimary : Colors.white, size: 24),
                 );
 
                 if (isNarrow) {
@@ -474,10 +583,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     children: [
                       Row(
                         children: [
-                          const CircleAvatar(
-                            backgroundColor: Colors.white24,
-                            child: Icon(Icons.storefront, color: Colors.white),
-                          ),
+                          avatarBox,
                           const SizedBox(width: 12),
                           Expanded(child: infoColumn),
                         ],
@@ -489,10 +595,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                 } else {
                   return Row(
                     children: [
-                      const CircleAvatar(
-                        backgroundColor: Colors.white24,
-                        child: Icon(Icons.storefront, color: Colors.white),
-                      ),
+                      avatarBox,
                       const SizedBox(width: 14),
                       Expanded(child: infoColumn),
                       corteBtn,
@@ -514,12 +617,12 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  _buildKpiCard('Fondo Inicial', '\$${turno["monto_apertura"]} MXN', Icons.account_balance_wallet, Colors.blue, cardWidth: cardWidth),
-                  _buildKpiCard('Ventas Efectivo', '\$${turno["ventas_efectivo"]} MXN', Icons.payments, Colors.green, cardWidth: cardWidth),
-                  _buildKpiCard('Ventas Tarjetas', '\$${turno["ventas_tarjeta"]} MXN', Icons.credit_card, Colors.purple, cardWidth: cardWidth),
-                  _buildKpiCard('Transferencias', '\$${turno["ventas_transferencia"]} MXN', Icons.swap_horiz, Colors.orange, cardWidth: cardWidth),
-                  _buildKpiCard('Total Vendido', '\$${turno["total_ventas"]} MXN ($totalTickets tickets)', Icons.receipt, Colors.teal, cardWidth: cardWidth),
-                  _buildKpiCard('Efectivo Esperado', '\$${efectivoEsperado.toStringAsFixed(2)} MXN', Icons.savings, Colors.indigo, esDestacado: true, cardWidth: cardWidth),
+                  _buildKpiCard('Fondo Inicial', '\$${turno["monto_apertura"]} MXN', Icons.account_balance_wallet, ts.neonBlue, cardWidth: cardWidth),
+                  _buildKpiCard('Ventas Efectivo', '\$${turno["ventas_efectivo"]} MXN', Icons.payments, ts.neonGreen, cardWidth: cardWidth),
+                  _buildKpiCard('Ventas Tarjetas', '\$${turno["ventas_tarjeta"]} MXN', Icons.credit_card, ts.neonPurple, cardWidth: cardWidth),
+                  _buildKpiCard('Transferencias', '\$${turno["ventas_transferencia"]} MXN', Icons.swap_horiz, ts.neonAmber, cardWidth: cardWidth),
+                  _buildKpiCard('Total Vendido', '\$${turno["total_ventas"]} MXN ($totalTickets tickets)', Icons.receipt, ts.accentPrimary, cardWidth: cardWidth),
+                  _buildKpiCard('Efectivo Esperado', '\$${efectivoEsperado.toStringAsFixed(2)} MXN', Icons.savings, ts.accentPrimary, esDestacado: true, cardWidth: cardWidth),
                 ],
               );
             },
@@ -529,17 +632,16 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildKpiCard(String titulo, String valor, IconData icono, MaterialColor color, {bool esDestacado = false, double? cardWidth}) {
+  Widget _buildKpiCard(String titulo, String valor, IconData icono, Color color, {bool esDestacado = false, double? cardWidth}) {
+    final ts = ThemeService.instance;
     return Container(
       width: cardWidth ?? 210,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: esDestacado ? color.shade50 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: esDestacado ? color.shade400 : Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2)),
-        ],
+        color: esDestacado ? ts.tintBg(color, lightAlpha: 0.12, darkAlpha: 0.22) : ts.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: esDestacado ? color : ts.borderColor, width: 1.2),
+        boxShadow: ts.cardGlowShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,17 +649,25 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(titulo, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
-              Icon(icono, color: color.shade800, size: 20),
+              Text(titulo, style: TextStyle(fontSize: 12, color: ts.textSecondary, fontWeight: FontWeight.w600)),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icono, color: color, size: 18),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             valor,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: esDestacado ? color.shade900 : Colors.black87,
+              fontWeight: FontWeight.w800,
+              color: esDestacado ? color : ts.textPrimary,
+              letterSpacing: -0.2,
             ),
           ),
         ],
@@ -566,8 +676,9 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildPestanaHistorial() {
+    final ts = ThemeService.instance;
     if (_historialTurnos.isEmpty) {
-      return const Center(child: Text('No hay registros de cortes de caja previos'));
+      return Center(child: Text('No hay registros de cortes de caja previos', style: TextStyle(color: ts.textSecondary)));
     }
 
     return ListView.builder(
@@ -577,23 +688,36 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
         final bool estaCerrado = t['estado'] == 'CERRADO';
         final double diferencia = (t['diferencia_efectivo'] as num? ?? 0.0).toDouble();
 
-        return Card(
+        final Color statusColor = estaCerrado ? ts.accentPrimary : ts.neonAmber;
+        final Color diffColor = diferencia == 0
+            ? ts.neonGreen
+            : (diferencia > 0 ? ts.neonBlue : ts.neonRed);
+
+        return Container(
           margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: ts.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: ts.borderColor, width: 1.2),
+            boxShadow: ts.cardGlowShadow,
+          ),
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: CircleAvatar(
-              backgroundColor: estaCerrado ? Colors.teal.shade50 : Colors.amber.shade50,
+              backgroundColor: ts.tintBg(statusColor, lightAlpha: 0.12, darkAlpha: 0.22),
               child: Icon(
                 estaCerrado ? Icons.check_circle : Icons.timelapse,
-                color: estaCerrado ? Colors.teal : Colors.amber.shade800,
+                color: statusColor,
               ),
             ),
             title: Text(
               'Corte #${t["id"]} - ${t["cajero_nombre"]}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
             ),
             subtitle: Text(
               'Apertura: ${t["fecha_apertura"].toString().replaceFirst("T", " ").substring(0, 16)}\n'
               '${estaCerrado ? "Cierre: ${t['fecha_cierre'].toString().replaceFirst('T', ' ').substring(0, 16)}" : "EN CURSO"}',
+              style: TextStyle(color: ts.textSecondary),
             ),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -601,7 +725,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
               children: [
                 Text(
                   'Vendido: \$${t["total_ventas"]} MXN',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
                 ),
                 if (estaCerrado)
                   Text(
@@ -613,11 +737,7 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: diferencia == 0
-                          ? Colors.green.shade800
-                          : diferencia > 0
-                              ? Colors.blue.shade800
-                              : Colors.red.shade800,
+                      color: diffColor,
                     ),
                   ),
               ],

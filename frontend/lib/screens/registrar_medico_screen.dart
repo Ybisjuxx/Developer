@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/medico.dart';
 import '../services/api_service.dart';
+import '../services/theme_service.dart';
 
 class RegistrarMedicoScreen extends StatefulWidget {
   final Medico? medicoAEditar;
@@ -61,6 +62,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
   Future<void> _guardarMedico() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final ts = ThemeService.instance;
     setState(() => _isLoading = true);
 
     final pat = _apellidoPaternoController.text.trim();
@@ -88,7 +90,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Médico "${actualizado.nombreCompleto}" actualizado con éxito'),
-            backgroundColor: Colors.teal.shade700,
+            backgroundColor: ts.accentPrimary,
           ),
         );
       } else {
@@ -97,7 +99,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Médico "${nuevo.nombreCompleto}" registrado con éxito'),
-            backgroundColor: Colors.teal.shade700,
+            backgroundColor: ts.accentPrimary,
           ),
         );
       }
@@ -107,7 +109,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.error_outline, color: Colors.red, size: 40),
+          icon: Icon(Icons.error_outline, color: ts.neonRed, size: 40),
           title: Text(_esEdicion ? 'Error al Actualizar' : 'Error de Registro'),
           content: Text(e.toString().replaceAll('Exception: ', '')),
           actions: [
@@ -126,11 +128,13 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final ts = ThemeService.instance;
 
     return Scaffold(
+      backgroundColor: ts.scaffoldBg,
       appBar: AppBar(
         title: Text(_esEdicion ? 'Editar Médico' : 'Registrar Médico'),
-        backgroundColor: Colors.teal.shade800,
+        backgroundColor: ts.headerBg,
         foregroundColor: Colors.white,
       ),
       body: Center(
@@ -139,8 +143,12 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Card(
-              elevation: 3,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: ts.esTemaNeon ? 0 : 3,
+              color: ts.cardBg,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: ts.borderColor),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: Form(
@@ -152,7 +160,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                         children: [
                           Icon(
                             _esEdicion ? Icons.edit_note : Icons.badge_outlined,
-                            color: theme.colorScheme.primary,
+                            color: ts.accentPrimary,
                             size: 30,
                           ),
                           const SizedBox(width: 12),
@@ -162,6 +170,7 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                                 : 'Alta Sanitaria de Profesional Médico',
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
+                              color: ts.textPrimary,
                             ),
                           ),
                         ],
@@ -169,9 +178,9 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                       const SizedBox(height: 8),
                       Text(
                         'Ingrese los datos correspondientes a la cédula profesional para habilitar la prescripción de medicamentos controlados y antibióticos.',
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                        style: theme.textTheme.bodySmall?.copyWith(color: ts.textSecondary),
                       ),
-                      const Divider(height: 32),
+                      Divider(height: 32, color: ts.borderColor),
 
                       // Nombre(s)
                       TextFormField(
@@ -308,12 +317,16 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                       // Switch Cédula Vigente
                       SwitchListTile(
                         value: _vigente,
+                        activeThumbColor: ts.accentPrimary,
                         onChanged: (val) => setState(() => _vigente = val),
-                        title: const Text('Cédula Vigente y Activa'),
-                        subtitle: const Text('Habilita al médico para autorizar surtido de recetas en POS'),
+                        title: Text('Cédula Vigente y Activa', style: TextStyle(color: ts.textPrimary)),
+                        subtitle: Text(
+                          'Habilita al médico para autorizar surtido de recetas en POS',
+                          style: TextStyle(color: ts.textSecondary),
+                        ),
                         secondary: Icon(
                           _vigente ? Icons.check_circle_outline : Icons.cancel_outlined,
-                          color: _vigente ? Colors.teal : Colors.grey,
+                          color: _vigente ? ts.neonGreen : ts.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -323,21 +336,29 @@ class _RegistrarMedicoScreenState extends State<RegistrarMedicoScreen> {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: ts.textSecondary,
+                              side: BorderSide(color: ts.borderColor),
+                            ),
                             onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
                             child: const Text('Cancelar'),
                           ),
                           const SizedBox(width: 16),
                           FilledButton.icon(
                             style: FilledButton.styleFrom(
-                              backgroundColor: Colors.teal.shade800,
+                              backgroundColor: ts.accentPrimary,
+                              foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                             ),
                             onPressed: _isLoading ? null : _guardarMedico,
                             icon: _isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     width: 18,
                                     height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: ts.esTemaNeon ? Colors.black : Colors.white,
+                                    ),
                                   )
                                 : Icon(_esEdicion ? Icons.save : Icons.save_outlined),
                             label: Text(_isLoading

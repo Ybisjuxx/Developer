@@ -1,5 +1,17 @@
 import datetime
+import os
+import shutil
 import sys
+import tempfile
+
+# Ejecutar siempre contra una COPIA temporal de la BD para no alterar farmacia.db del repositorio
+if "DATABASE_URL" not in os.environ:
+    _origen = os.path.join(os.path.dirname(os.path.abspath(__file__)), "farmacia.db")
+    _tmp = os.path.join(tempfile.mkdtemp(prefix="farmacontrol_it_"), "farmacia.db")
+    if os.path.exists(_origen):
+        shutil.copy(_origen, _tmp)
+    os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}"
+
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -211,11 +223,17 @@ def test_endpoints():
     res_users = client.get("/api/auth/usuarios")
     assert res_users.status_code == 200
     user_test = res_users.json()[0]
+    nombre_original = user_test["nombre_completo"]
     res_update_user = client.put(f"/api/auth/usuarios/{user_test['id']}", json={
-        "nombre_completo": f"{user_test['nombre_completo']} (Actualizado)",
+        "nombre_completo": f"{nombre_original} (Actualizado)",
     })
     assert res_update_user.status_code == 200
-    print(f"[OK] Usuario #{user_test['id']} actualizado correctamente en configuración.")
+    # Restaurar nombre original para no contaminar la base de datos
+    res_restore_user = client.put(f"/api/auth/usuarios/{user_test['id']}", json={
+        "nombre_completo": nombre_original,
+    })
+    assert res_restore_user.status_code == 200
+    print(f"[OK] Usuario #{user_test['id']} actualizado y restaurado correctamente en configuración.")
 
     # 14. Test Sub-Agente 5: Comentarios y Detección de Irregularidades en Kardex
     print("\n[TEST] 14. Probando Sub-Agente 5: Comentarios de Auditoría en Kardex...")

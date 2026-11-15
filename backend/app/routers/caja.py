@@ -4,10 +4,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import TurnoCaja, Venta
+from ..models import TurnoCaja, Usuario, Venta
 from ..schemas import TurnoCajaApertura, TurnoCajaCierre, TurnoCajaOut, TurnoResumenOut
+from ..security import get_current_user_optional
 
 router = APIRouter(prefix="/api/caja", tags=["Cortes de Caja y Turnos"])
+
+
+def _verificar_acceso_turno(turno: TurnoCaja, usuario: Optional[Usuario]) -> None:
+    if usuario and (usuario.rol or "").upper() == "CAJERO":
+        if turno.usuario_id is not None and turno.usuario_id != usuario.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No puedes consultar ni cerrar el turno de otro usuario.",
+            )
 
 
 @router.get("/turno-activo", response_model=Optional[TurnoCajaOut])
@@ -51,7 +61,10 @@ def abrir_turno(apertura: TurnoCajaApertura, db: Session = Depends(get_db)):
 
 
 @router.get("/resumen", response_model=TurnoResumenOut)
-def obtener_resumen_turno_actual(db: Session = Depends(get_db)):
+def obtener_resumen_turno_actual(
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Genera el arqueo en tiempo real del turno abierto para verificar balances."""
     turno = (
         db.query(TurnoCaja)
@@ -64,6 +77,7 @@ def obtener_resumen_turno_actual(db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No hay ningún turno de caja abierto en este momento",
         )
+    _verificar_acceso_turno(turno, usuario)
 
     ventas_turno = db.query(Venta).filter(Venta.turno_id == turno.id).all()
     total_tickets = len(ventas_turno)
@@ -95,7 +109,11 @@ def obtener_resumen_turno_actual(db: Session = Depends(get_db)):
 
 
 @router.post("/cerrar", response_model=TurnoCajaOut)
-def cerrar_turno(cierre: TurnoCajaCierre, db: Session = Depends(get_db)):
+def cerrar_turno(
+    cierre: TurnoCajaCierre,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """
     Cierra el turno de caja actual (Corte Z):
     Compara el dinero físico contado contra el dinero esperado (fondo inicial + ventas en efectivo)
@@ -112,6 +130,7 @@ def cerrar_turno(cierre: TurnoCajaCierre, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No hay ningún turno de caja abierto para cerrar",
         )
+    _verificar_acceso_turno(turno, usuario)
 
     # Calcular ventas definitivas
     ventas_turno = db.query(Venta).filter(Venta.turno_id == turno.id).all()
@@ -141,11 +160,17 @@ def cerrar_turno(cierre: TurnoCajaCierre, db: Session = Depends(get_db)):
 
 
 @router.get("/historial", response_model=List[TurnoCajaOut])
-def listar_historial_turnos(limit: int = 30, db: Session = Depends(get_db)):
-    """Lista los turnos de caja previos (Cortes Z históricos)."""
+def listar_historial_turnos(
+    limit: int = 30,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
+    """Lista los turnos de caja previos (Cortes Z históricos, con RLS para cajero)."""
+    query = db.query(TurnoCaja)
+    if usuario and (usuario.rol or "").upper() == "CAJERO":
+        query = query.filter((TurnoCaja.usuario_id == usuario.id) | (TurnoCaja.cajero_nombre == usuario.nombre_completo))
     return (
-        db.query(TurnoCaja)
-        .order_by(TurnoCaja.fecha_apertura.desc())
+        query.order_by(TurnoCaja.fecha_apertura.desc())
         .limit(limit)
         .all()
     )
