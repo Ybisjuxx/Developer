@@ -192,6 +192,10 @@ class LoteBase(BaseModel):
     dosis_valor: Optional[str] = None
     dosis_unidad: Optional[str] = None
     fecha_ingreso: Optional[date] = None
+    proveedor_nombre: Optional[str] = Field(default="Distribuidor General", max_length=120)
+    piezas_solicitadas: Optional[int] = Field(default=None, ge=0)
+    horas_entrega_lead_time: Optional[float] = Field(default=24.0, ge=0)
+    costo_unitario_anterior: Optional[float] = Field(default=None, ge=0)
     activo: bool = True
 
 
@@ -317,6 +321,11 @@ class VentaCreate(StrictInputModel):
     monto_recibido: float = Field(default=0.0, ge=0)
     turno_id: Optional[int] = None
     cajero_nombre: Optional[str] = "Cajero Principal"
+    tiempo_atencion_seg: int = Field(default=140, ge=1, le=7200)
+    folio_receta: Optional[str] = Field(default=None, max_length=60)
+    receta_retenida: bool = False
+    receta_sin_errores: bool = True
+    receta_surtida_completa: bool = True
     items: List[VentaItemInput] = Field(..., min_length=1)
 
 
@@ -629,4 +638,63 @@ class IaConsultaOut(BaseModel):
     disponible_en_stock: bool
     sustitutos_en_stock: List[SustitutoSugeridoOut] = []
     aviso_sanitario: str
+
+
+# ============================================================================
+# BITÁCORA COFEPRIS, DOCUMENTOS SANITARIOS Y PARÁMETROS FINANCIEROS
+# ============================================================================
+class BitacoraAmbientalCreate(StrictInputModel):
+    turno: str = Field(default="MATUTINO", max_length=20)
+    zona: str = Field(default="ANAQUEL_GENERAL", max_length=30)
+    temperatura_c: float = Field(..., ge=-30.0, le=60.0)
+    humedad_relativa_pct: float = Field(..., ge=0.0, le=100.0)
+    observaciones: Optional[str] = Field(default=None, max_length=400)
+
+
+class BitacoraAmbientalOut(BaseModel):
+    id: int
+    fecha_registro: datetime
+    turno: str
+    zona: str
+    temperatura_c: float
+    humedad_relativa_pct: float
+    dentro_norma: bool
+    responsable_nombre: str
+    observaciones: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentoSanitarioCreate(StrictInputModel):
+    tipo_documento: str = Field(..., min_length=3, max_length=60)
+    folio_documento: str = Field(..., min_length=2, max_length=80)
+    fecha_emision: date
+    fecha_vencimiento: date
+    activo: bool = True
+
+
+class DocumentoSanitarioOut(BaseModel):
+    id: int
+    tipo_documento: str
+    folio_documento: str
+    fecha_emision: date
+    fecha_vencimiento: date
+    activo: bool
+    dias_restantes: int = 0
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParametroFinancieroUpdate(StrictInputModel):
+    anio: int = Field(..., ge=2020, le=2100)
+    mes: int = Field(..., ge=1, le=12)
+    gastos_fijos_mensuales: float = Field(..., ge=0.0)
+    nomina_mensual: float = Field(..., ge=0.0)
+
+
+class ParametroFinancieroOut(BaseModel):
+    anio: int
+    mes: int
+    gastos_fijos_mensuales: float
+    nomina_mensual: float
+    actualizado_por: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
 

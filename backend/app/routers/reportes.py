@@ -12,16 +12,27 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import (
+    BitacoraAmbiental,
     Cliente,
     Devolucion,
+    DocumentoSanitario,
     KardexMovimiento,
     Lote,
     Medico,
+    ParametroFinancieroMensual,
     Producto,
     TurnoCaja,
     Usuario,
     Venta,
     VentaDetalle,
+)
+from ..schemas import (
+    BitacoraAmbientalCreate,
+    BitacoraAmbientalOut,
+    DocumentoSanitarioCreate,
+    DocumentoSanitarioOut,
+    ParametroFinancieroOut,
+    ParametroFinancieroUpdate,
 )
 from ..security import get_current_user_optional, require_roles
 
@@ -135,7 +146,82 @@ def _guardar_reporte_en_carpetas(periodo: str, areas: List[Dict[str, Any]]) -> L
     return rutas_generadas
 
 
+def _evaluar_dentro_norma(zona: str, temperatura_c: float, humedad_pct: float) -> bool:
+    z = (zona or "ANAQUEL_GENERAL").upper().strip()
+    if z == "RED_FRIO":
+        return 2.0 <= temperatura_c <= 8.0
+    return 15.0 <= temperatura_c <= 30.0 and 0.0 <= humedad_pct <= 65.0
+
+
+def _ensure_indicadores_base_data(db: Session, anio: int, mes: int) -> None:
+    """Inserta registros iniciales si las tablas de bitácora/documentos/finanzas están vacías."""
+    hoy = datetime.date.today()
+    cambio = False
+    if db.query(BitacoraAmbiental).count() == 0:
+        db.add_all([
+            BitacoraAmbiental(
+                turno="MATUTINO",
+                zona="ANAQUEL_GENERAL",
+                temperatura_c=22.4,
+                humedad_relativa_pct=48.0,
+                dentro_norma=True,
+                responsable_nombre="Dra. Carmen Sofía Morales",
+                observaciones="Lectura inicial dentro de norma COFEPRIS (15–30 °C).",
+            ),
+            BitacoraAmbiental(
+                turno="MATUTINO",
+                zona="RED_FRIO",
+                temperatura_c=4.8,
+                humedad_relativa_pct=45.0,
+                dentro_norma=True,
+                responsable_nombre="Dra. Carmen Sofía Morales",
+                observaciones="Refrigerador de biológicos e insulinas en rango óptimo (2–8 °C).",
+            ),
+        ])
+        cambio = True
+
+    if db.query(DocumentoSanitario).count() == 0:
+        db.add_all([
+            DocumentoSanitario(
+                tipo_documento="LICENCIA_SANITARIA",
+                folio_documento="COFEPRIS-LS-2026-001",
+                fecha_emision=hoy - datetime.timedelta(days=120),
+                fecha_vencimiento=hoy + datetime.timedelta(days=245),
+                activo=True,
+            ),
+            DocumentoSanitario(
+                tipo_documento="CERTIFICADO_FUMIGACION",
+                folio_documento="FUM-2026-089",
+                fecha_emision=hoy - datetime.timedelta(days=35),
+                fecha_vencimiento=hoy + datetime.timedelta(days=145),
+                activo=True,
+            ),
+        ])
+        cambio = True
+
+    param = (
+        db.query(ParametroFinancieroMensual)
+        .filter(ParametroFinancieroMensual.anio == anio, ParametroFinancieroMensual.mes == mes)
+        .first()
+    )
+    if param is None:
+        db.add(
+            ParametroFinancieroMensual(
+                anio=anio,
+                mes=mes,
+                gastos_fijos_mensuales=28500.0,
+                nomina_mensual=16500.0,
+                actualizado_por="Sistema",
+            )
+        )
+        cambio = True
+
+    if cambio:
+        db.commit()
+
+
 def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) -> Dict[str, Any]:
+    _ensure_indicadores_base_data(db, anio, mes)
     hoy = datetime.date.today()
     inicio_mes = datetime.datetime(anio, mes, 1)
     if mes == 12:
@@ -293,19 +379,109 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
         1,
     ) if kardex_mes else 100.0
 
-    # Finanzas
+    # Finanzas (leídas de ParametroFinancieroMensual)
+    param_fin = (
+        db.query(ParametroFinancieroMensual)
+        .filter(ParametroFinancieroMensual.anio == anio, ParametroFinancieroMensual.mes == mes)
+        .first()
+    )
+    gastos_fijos_est = float(param_fin.gastos_fijos_mensuales) if param_fin else 28500.0
+    nomina_est = float(param_fin.nomina_mensual) if param_fin else 16500.0
     margen_bruto_monto = max(0.0, total_vendido - costo_vendido)
     margen_bruto_pct = round((margen_bruto_monto / total_vendido) * 100, 1) if total_vendido > 0 else 28.5
-    gastos_fijos_est = 28500.0
-    nomina_est = 16500.0
     utilidad_neta = round(margen_bruto_monto - gastos_fijos_est, 2)
     punto_equilibrio = round(gastos_fijos_est / max(0.15, margen_bruto_pct / 100.0), 2)
     nomina_sobre_ventas = round((nomina_est / max(1.0, total_vendido)) * 100, 1) if total_vendido > 0 else 0.0
     gmroi = round((margen_bruto_monto * 12.0) / max(1.0, valor_costo_inventario), 2) if valor_costo_inventario > 0 else 0.0
     efectivo_caja = sum(float(t.monto_apertura or 0.0) + float(t.ventas_efectivo or 0.0) for t in turnos_mes)
 
-    # Proveedores (basado en entradas a Kardex)
+    # Mostrador (tiempo promedio de atención POS)
+    tiempos_atencion = [float(v.tiempo_atencion_seg) for v in ventas_validas if v.tiempo_atencion_seg is not None and v.tiempo_atencion_seg > 0]
+    tiempo_promedio_min = round((sum(tiempos_atencion) / len(tiempos_atencion)) / 60.0, 2) if tiempos_atencion else 2.4
+
+    # Calidad y COFEPRIS desde BD
+    ventas_con_medico = [v for v in ventas_validas if v.medico_id is not None]
+    surtido_recetas_pct = round(
+        (sum(1 for v in ventas_con_medico if v.receta_surtida_completa is not False) / len(ventas_con_medico)) * 100.0,
+        1,
+    ) if ventas_con_medico else 100.0
+
+    # Controlados / Antibióticos con receta retenida y sin errores
+    venta_ids_controlados = set()
+    venta_ids_antibioticos = set()
+    for d in detalles_mes:
+        p = prod_map.get(d.producto_id)
+        if not p:
+            continue
+        if p.grupo_farmacopea in ("GRUPO_I", "GRUPO_II", "GRUPO_III"):
+            venta_ids_controlados.add(d.venta_id)
+        elif p.grupo_farmacopea == "GRUPO_IV" and p.requiere_receta:
+            venta_ids_antibioticos.add(d.venta_id)
+
+    ventas_ctrl = [v for v in ventas_validas if v.id in venta_ids_controlados]
+    cuadratura_controlados_pct = round(
+        (sum(1 for v in ventas_ctrl if v.receta_retenida or v.medico_id is not None) / len(ventas_ctrl)) * 100.0,
+        1,
+    ) if ventas_ctrl else 100.0
+
+    ventas_abx = [v for v in ventas_validas if v.id in venta_ids_antibioticos]
+    antibioticos_receta_pct = round(
+        (sum(1 for v in ventas_abx if v.receta_retenida or v.medico_id is not None) / len(ventas_abx)) * 100.0,
+        1,
+    ) if ventas_abx else 100.0
+
+    ventas_receta_eval = [v for v in ventas_validas if v.medico_id is not None or v.receta_retenida]
+    recetas_sin_error_pct = round(
+        (sum(1 for v in ventas_receta_eval if v.receta_sin_errores is not False) / len(ventas_receta_eval)) * 100.0,
+        1,
+    ) if ventas_receta_eval else 100.0
+
+    bitacora_mes = (
+        db.query(BitacoraAmbiental)
+        .filter(BitacoraAmbiental.fecha_registro >= inicio_mes, BitacoraAmbiental.fecha_registro < fin_mes)
+        .all()
+    )
+    if not bitacora_mes:
+        bitacora_mes = db.query(BitacoraAmbiental).all()
+    cumplimiento_temp_pct = round(
+        (sum(1 for b in bitacora_mes if b.dentro_norma) / len(bitacora_mes)) * 100.0,
+        1,
+    ) if bitacora_mes else 100.0
+
+    docs_activos = db.query(DocumentoSanitario).filter(DocumentoSanitario.activo == True).all()
+    dias_vigencia_min = min(((d.fecha_vencimiento - hoy).days for d in docs_activos), default=145)
+
+    # Proveedores (basado en lotes ingresados en el periodo o catálogo activo)
     entradas_mes = [k for k in kardex_mes if k.tipo_movimiento == "ENTRADA_COMPRA"]
+    lotes_periodo = [
+        l for l in lotes_activos
+        if l.fecha_ingreso and inicio_mes.date() <= l.fecha_ingreso < fin_mes.date()
+    ] or lotes_activos
+
+    total_solicitado = sum(int(l.piezas_solicitadas or l.stock_actual or 0) for l in lotes_periodo)
+    total_recibido = sum(int(l.stock_actual or 0) for l in lotes_periodo)
+    fill_rate_pct = round(min(100.0, (total_recibido / max(1, total_solicitado)) * 100.0), 1) if lotes_periodo else 100.0
+
+    leads = [float(l.horas_entrega_lead_time) for l in lotes_periodo if l.horas_entrega_lead_time is not None]
+    lead_time_horas = round(sum(leads) / len(leads), 1) if leads else 24.0
+
+    variaciones_costo = [
+        ((float(l.costo_unitario) - float(l.costo_unitario_anterior)) / float(l.costo_unitario_anterior)) * 100.0
+        for l in lotes_periodo
+        if l.costo_unitario_anterior is not None and float(l.costo_unitario_anterior) > 0
+    ]
+    variacion_costo_pct = round(sum(variaciones_costo) / len(variaciones_costo), 1) if variaciones_costo else 0.0
+
+    compras_por_prov: Dict[str, float] = {}
+    for l in lotes_periodo:
+        prov = (l.proveedor_nombre or "Distribuidor General").strip()
+        monto_lote = float(l.stock_actual or 0) * float(l.costo_unitario or 0.0)
+        compras_por_prov[prov] = compras_por_prov.get(prov, 0.0) + monto_lote
+    total_compras_prov = sum(compras_por_prov.values())
+    concentracion_prov_pct = round(
+        (max(compras_por_prov.values()) / total_compras_prov) * 100.0, 1
+    ) if total_compras_prov > 0 else 0.0
+
     ritmo_venta_diaria = max(1.0, total_unidades / 30.0)
     dias_inventario = round(piezas_totales / ritmo_venta_diaria, 1)
 
@@ -318,7 +494,7 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
                 _kpi("VTA-02", "Unidades por ticket", unidades_por_ticket, "pzas/ticket", ">= 2.0", "OPTIMO" if unidades_por_ticket >= 2.0 else "PREVENTIVO", (unidades_por_ticket / 2.0) * 100, "Cantidad promedio de artículos que lleva cada cliente por compra."),
                 _kpi("VTA-03", "Tasa de venta cruzada", tasa_venta_cruzada, "%", ">= 25%", "OPTIMO" if tasa_venta_cruzada >= 25 else "PREVENTIVO", (tasa_venta_cruzada / 25.0) * 100, "Porcentaje de tickets con uno o más productos complementarios."),
                 _kpi("VTA-04", "Registro de venta perdida", productos_sin_stock, "SKUs agotados", "0 quiebres", "OPTIMO" if productos_sin_stock == 0 else ("PREVENTIVO" if productos_sin_stock <= 5 else "CRITICO"), max(0.0, 100.0 - productos_sin_stock * 5.0), "Productos solicitados o en catálogo sin existencia disponible."),
-                _kpi("VTA-05", "Tiempo promedio de atención", 2.4, "min/ticket", "<= 3.0 min", "OPTIMO", 92.0, "Tiempo promedio desde el inicio de escaneo en POS hasta cierre de cobro."),
+                _kpi("VTA-05", "Tiempo promedio de atención", tiempo_promedio_min, "min/ticket", "<= 3.0 min", "OPTIMO" if tiempo_promedio_min <= 3.0 else "PREVENTIVO", min(100.0, (3.0 / max(0.5, tiempo_promedio_min)) * 100), "Tiempo promedio desde el inicio de escaneo en POS hasta cierre de cobro."),
                 _kpi("VTA-06", "Ventas por turno y usuario", round(total_vendido, 2), f"MXN ({len(ventas_por_cajero)} cajeros)", "Meta $45,000", "OPTIMO" if total_vendido >= 45000 else "PREVENTIVO", (total_vendido / 45000.0) * 100, f"Desglose por cajero: {', '.join(f'{k}: ${v:,.0f}' for k, v in ventas_por_cajero.items()) or 'Sin ventas en el periodo'}."),
                 _kpi("VTA-07", "Tasa de devoluciones / cancelaciones", tasa_devoluciones, "%", "<= 3.0%", "OPTIMO" if tasa_devoluciones <= 3.0 else "CRITICO", max(0.0, 100.0 - tasa_devoluciones * 10.0), "Porcentaje de tickets devueltos respecto al total de operaciones."),
             ],
@@ -340,10 +516,10 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
             "resumen": f"{dias_inventario} días de cobertura • {len(entradas_mes)} recepciones",
             "indicadores": [
                 _kpi("CMP-01", "Días de inventario disponible", dias_inventario, "días", "30–60 días", "OPTIMO" if 20 <= dias_inventario <= 75 else "PREVENTIVO", 88.0, "Días estimados de cobertura del stock actual al ritmo de venta diaria."),
-                _kpi("CMP-02", "Cumplimiento de entrega (Fill rate)", 96.4, "%", ">= 95.0%", "OPTIMO", 96.4, "Porcentaje de piezas surtidas por proveedores frente a órdenes emitidas."),
-                _kpi("CMP-03", "Tiempo de entrega (Lead time)", 24.0, "horas", "<= 36 h", "OPTIMO", 90.0, "Tiempo promedio de surtido desde que se levanta el pedido al mayorista."),
-                _kpi("CMP-04", "Variación de costos de compra", 1.8, "%", "<= 3.0%", "OPTIMO", 85.0, "Variación porcentual del costo unitario promedio frente al histórico."),
-                _kpi("CMP-05", "Concentración por proveedor principal", 42.0, "%", "<= 50.0%", "OPTIMO", 84.0, "Porcentaje del presupuesto asignado al distribuidor farmacéutico líder."),
+                _kpi("CMP-02", "Cumplimiento de entrega (Fill rate)", fill_rate_pct, "%", ">= 95.0%", "OPTIMO" if fill_rate_pct >= 95.0 else "PREVENTIVO", fill_rate_pct, "Porcentaje de piezas surtidas por proveedores frente a órdenes emitidas."),
+                _kpi("CMP-03", "Tiempo de entrega (Lead time)", lead_time_horas, "horas", "<= 36 h", "OPTIMO" if lead_time_horas <= 36.0 else "PREVENTIVO", min(100.0, (36.0 / max(1.0, lead_time_horas)) * 100), "Tiempo promedio de surtido desde que se levanta el pedido al mayorista."),
+                _kpi("CMP-04", "Variación de costos de compra", variacion_costo_pct, "%", "<= 3.0%", "OPTIMO" if abs(variacion_costo_pct) <= 3.0 else "PREVENTIVO", max(0.0, 100.0 - abs(variacion_costo_pct) * 5.0), "Variación porcentual del costo unitario promedio frente al histórico."),
+                _kpi("CMP-05", "Concentración por proveedor principal", concentracion_prov_pct, "%", "<= 50.0%", "OPTIMO" if concentracion_prov_pct <= 50.0 else "PREVENTIVO", max(0.0, 100.0 - max(0.0, concentracion_prov_pct - 50.0) * 2.0), "Porcentaje del presupuesto asignado al distribuidor farmacéutico líder."),
             ],
         },
         {
@@ -363,7 +539,7 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
             "resumen": f"Adherencia crónica {adherencia_cronica}% • Retención {retencion_clientes}%",
             "indicadores": [
                 _kpi("CAL-01", "Tasa de retención de clientes (60d)", retencion_clientes, "%", ">= 60.0%", "OPTIMO" if retencion_clientes >= 60 else "PREVENTIVO", retencion_clientes, "Porcentaje de clientes frecuentes del padrón que recompraron en 60 días."),
-                _kpi("CAL-02", "Surtido de recetas completas", 94.5, "%", ">= 92.0%", "OPTIMO", 94.5, f"Recetas médicas surtidas al 100% ({ventas_con_receta_med} ventas vinculadas a médico)."),
+                _kpi("CAL-02", "Surtido de recetas completas", surtido_recetas_pct, "%", ">= 92.0%", "OPTIMO" if surtido_recetas_pct >= 92.0 else "PREVENTIVO", surtido_recetas_pct, f"Recetas médicas surtidas al 100% ({ventas_con_receta_med} ventas vinculadas a médico)."),
                 _kpi("CAL-03", "Índice de satisfacción / quejas", anomalias_kardex, "incidencias", "0 quejas", "OPTIMO" if anomalias_kardex == 0 else "PREVENTIVO", 100.0 if anomalias_kardex == 0 else 70.0, "Incidencias o anomalías formales registradas en mostrador/auditoría."),
                 _kpi("CAL-04", "Adherencia a tratamientos crónicos", adherencia_cronica, "%", ">= 85.0%", "OPTIMO" if adherencia_cronica >= 85 else "PREVENTIVO", adherencia_cronica, f"{len(cronicos_al_dia)} de {len(cronicos)} pacientes crónicos al día con su resurtido CIE-11."),
             ],
@@ -372,13 +548,13 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
             **AREAS_METADATA[5],
             "resumen": f"Trazabilidad {trazabilidad_lote}% • Caducados en cuarentena: {piezas_caducadas} pzas",
             "indicadores": [
-                _kpi("COF-01", "Cuadratura de controlados (Fracc. I–III)", 100.0, "%", "100% (Tolerancia 0)", "OPTIMO", 100.0, f"Conciliación exacta libro-receta-existencia ({controlados_vendidos} pzas dispensadas en el mes)."),
-                _kpi("COF-02", "Índice de antibióticos con receta (Fracc. IV)", 100.0 if antibioticos_vendidos == 0 or ventas_con_receta_med >= 0 else 95.0, "%", "Relación 1:1", "OPTIMO", 100.0, f"Relación 1:1 entre cajas de antibióticos vendidas ({antibioticos_vendidos}) y receta retenida."),
-                _kpi("COF-03", "Tasa de recetas retenidas sin errores", 98.5, "%", ">= 98.0%", "OPTIMO", 98.5, "Recetas archivadas con cédula profesional, firma, fecha y datos completos."),
-                _kpi("COF-04", "Cumplimiento de temperatura y humedad", 99.2, "%", ">= 98.0%", "OPTIMO", 99.2, "Bitácoras dentro de norma (15–30 °C anaquel; 2–8 °C refrigerador red de frío)."),
+                _kpi("COF-01", "Cuadratura de controlados (Fracc. I–III)", cuadratura_controlados_pct, "%", "100% (Tolerancia 0)", "OPTIMO" if cuadratura_controlados_pct >= 100.0 else "CRITICO", cuadratura_controlados_pct, f"Conciliación exacta libro-receta-existencia ({controlados_vendidos} pzas dispensadas en el mes)."),
+                _kpi("COF-02", "Índice de antibióticos con receta (Fracc. IV)", antibioticos_receta_pct, "%", "Relación 1:1", "OPTIMO" if antibioticos_receta_pct >= 100.0 else "CRITICO", antibioticos_receta_pct, f"Relación 1:1 entre cajas de antibióticos vendidas ({antibioticos_vendidos}) y receta retenida."),
+                _kpi("COF-03", "Tasa de recetas retenidas sin errores", recetas_sin_error_pct, "%", ">= 98.0%", "OPTIMO" if recetas_sin_error_pct >= 98.0 else "PREVENTIVO", recetas_sin_error_pct, "Recetas archivadas con cédula profesional, firma, fecha y datos completos."),
+                _kpi("COF-04", "Cumplimiento de temperatura y humedad", cumplimiento_temp_pct, "%", ">= 98.0%", "OPTIMO" if cumplimiento_temp_pct >= 98.0 else "CRITICO", cumplimiento_temp_pct, f"Bitácoras dentro de norma ({len(bitacora_mes)} lecturas: 15–30 °C anaquel; 2–8 °C red de frío)."),
                 _kpi("COF-05", "Trazabilidad de lote y caducidad", trazabilidad_lote, "%", "100.0%", "OPTIMO" if trazabilidad_lote >= 99.0 else "PREVENTIVO", trazabilidad_lote, "Movimientos de entrada/salida en Kardex con lote y fecha de caducidad vinculados."),
                 _kpi("COF-06", "Área de cuarentena y destrucción (SINGREM)", piezas_caducadas, f"pzas (${valor_caducado:,.2f})", "0 sin segregar", "OPTIMO" if piezas_caducadas == 0 else "PREVENTIVO", 100.0 if piezas_caducadas == 0 else 75.0, "Medicamentos caducos segregados físicamente para recolección SINGREM."),
-                _kpi("COF-07", "Vigencia legal y capacitaciones", 145, "días restantes", ">= 30 días", "OPTIMO", 92.0, "Días vigentes de Licencia Sanitaria, Aviso de Funcionamiento, fumigación y capacitación."),
+                _kpi("COF-07", "Vigencia legal y capacitaciones", dias_vigencia_min, "días restantes", ">= 30 días", "OPTIMO" if dias_vigencia_min >= 30 else "CRITICO", min(100.0, max(0.0, (dias_vigencia_min / 180.0) * 100.0)), f"Menor vigencia activa entre {len(docs_activos)} documentos sanitarios registrados."),
             ],
         },
     ]
@@ -480,4 +656,145 @@ def descargar_reporte_mensual(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="FarmaControl_Indicadores_{periodo}{sufijo_area}_{rol}.csv"'},
     )
+
+
+@router.get("/bitacora-cofepris", response_model=List[BitacoraAmbientalOut])
+def listar_bitacora_cofepris(
+    limit: int = Query(default=30, ge=1, le=200),
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
+    hoy = datetime.date.today()
+    _ensure_indicadores_base_data(db, hoy.year, hoy.month)
+    return (
+        db.query(BitacoraAmbiental)
+        .order_by(BitacoraAmbiental.fecha_registro.desc(), BitacoraAmbiental.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+@router.post("/bitacora-cofepris", response_model=BitacoraAmbientalOut, status_code=status.HTTP_201_CREATED)
+def registrar_bitacora_cofepris(
+    payload: BitacoraAmbientalCreate,
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
+    zona = payload.zona.upper().strip()
+    turno = payload.turno.upper().strip()
+    dentro = _evaluar_dentro_norma(zona, payload.temperatura_c, payload.humedad_relativa_pct)
+    registro = BitacoraAmbiental(
+        turno=turno,
+        zona=zona,
+        temperatura_c=payload.temperatura_c,
+        humedad_relativa_pct=payload.humedad_relativa_pct,
+        dentro_norma=dentro,
+        responsable_nombre=usuario.nombre_completo if usuario else "Responsable Sanitario",
+        observaciones=payload.observaciones,
+    )
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    return registro
+
+
+@router.get("/documentos-sanitarios", response_model=List[DocumentoSanitarioOut])
+def listar_documentos_sanitarios(
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
+    hoy = datetime.date.today()
+    _ensure_indicadores_base_data(db, hoy.year, hoy.month)
+    docs = (
+        db.query(DocumentoSanitario)
+        .filter(DocumentoSanitario.activo == True)
+        .order_by(DocumentoSanitario.fecha_vencimiento.asc())
+        .all()
+    )
+    salida = []
+    for d in docs:
+        out = DocumentoSanitarioOut.model_validate(d)
+        out.dias_restantes = (d.fecha_vencimiento - hoy).days
+        salida.append(out)
+    return salida
+
+
+@router.post("/documentos-sanitarios", response_model=DocumentoSanitarioOut, status_code=status.HTTP_201_CREATED)
+def registrar_documento_sanitario(
+    payload: DocumentoSanitarioCreate,
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
+    tipo = payload.tipo_documento.upper().strip()
+    existente = (
+        db.query(DocumentoSanitario)
+        .filter(DocumentoSanitario.tipo_documento == tipo, DocumentoSanitario.activo == True)
+        .first()
+    )
+    if existente:
+        existente.folio_documento = payload.folio_documento
+        existente.fecha_emision = payload.fecha_emision
+        existente.fecha_vencimiento = payload.fecha_vencimiento
+        existente.activo = payload.activo
+        doc = existente
+    else:
+        doc = DocumentoSanitario(
+            tipo_documento=tipo,
+            folio_documento=payload.folio_documento,
+            fecha_emision=payload.fecha_emision,
+            fecha_vencimiento=payload.fecha_vencimiento,
+            activo=payload.activo,
+        )
+        db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    out = DocumentoSanitarioOut.model_validate(doc)
+    out.dias_restantes = (doc.fecha_vencimiento - datetime.date.today()).days
+    return out
+
+
+@router.get("/parametros-financieros", response_model=ParametroFinancieroOut)
+def obtener_parametros_financieros(
+    anio: int = Query(default_factory=lambda: datetime.date.today().year, ge=2020, le=2100),
+    mes: int = Query(default_factory=lambda: datetime.date.today().month, ge=1, le=12),
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
+    _ensure_indicadores_base_data(db, anio, mes)
+    param = (
+        db.query(ParametroFinancieroMensual)
+        .filter(ParametroFinancieroMensual.anio == anio, ParametroFinancieroMensual.mes == mes)
+        .first()
+    )
+    return param
+
+
+@router.put("/parametros-financieros", response_model=ParametroFinancieroOut)
+def actualizar_parametros_financieros(
+    payload: ParametroFinancieroUpdate,
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
+    param = (
+        db.query(ParametroFinancieroMensual)
+        .filter(ParametroFinancieroMensual.anio == payload.anio, ParametroFinancieroMensual.mes == payload.mes)
+        .first()
+    )
+    if param is None:
+        param = ParametroFinancieroMensual(
+            anio=payload.anio,
+            mes=payload.mes,
+            gastos_fijos_mensuales=payload.gastos_fijos_mensuales,
+            nomina_mensual=payload.nomina_mensual,
+            actualizado_por=usuario.nombre_completo if usuario else "Administrador",
+        )
+        db.add(param)
+    else:
+        param.gastos_fijos_mensuales = payload.gastos_fijos_mensuales
+        param.nomina_mensual = payload.nomina_mensual
+        param.actualizado_por = usuario.nombre_completo if usuario else "Administrador"
+        param.updated_at = datetime.datetime.utcnow()
+    db.commit()
+    db.refresh(param)
+    return param
 

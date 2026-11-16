@@ -185,6 +185,17 @@ def registrar_lote(
         datos["laboratorio_fabricante"] = producto.laboratorio
     if not datos.get("fecha_ingreso"):
         datos["fecha_ingreso"] = datetime.date.today()
+    if not datos.get("proveedor_nombre"):
+        datos["proveedor_nombre"] = "Distribuidor General"
+    if datos.get("costo_unitario_anterior") is None:
+        lote_previo = (
+            db.query(Lote)
+            .filter(Lote.producto_id == lote_in.producto_id)
+            .order_by(Lote.id.desc())
+            .first()
+        )
+        if lote_previo is not None:
+            datos["costo_unitario_anterior"] = float(lote_previo.costo_unitario or 0.0)
 
     # Dosis separada de la dosificación: Tableta | 100 | mg
     d_valor = (datos.get("dosis_valor") or "").strip()

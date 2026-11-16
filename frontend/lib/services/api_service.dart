@@ -859,4 +859,67 @@ class ApiService {
       throw Exception(errorData['detail'] ?? 'Error al consultar asistente IA');
     }
   }
+
+  static Future<List<dynamic>> getBitacoraCofepris({int limit = 20}) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/bitacora-cofepris?limit=$limit');
+    final response = await _get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+    }
+    throw Exception('Error al cargar bitácora COFEPRIS: ${response.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> registrarBitacoraCofepris(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/bitacora-cofepris');
+    final response = await _post(uri, body: jsonEncode(data));
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    final err = jsonDecode(utf8.decode(response.bodyBytes));
+    throw Exception(err['detail'] ?? 'Error al registrar lectura ambiental');
+  }
+
+  static Future<List<dynamic>> getDocumentosSanitarios() async {
+    final uri = Uri.parse('$baseUrl/api/reportes/documentos-sanitarios');
+    final response = await _get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
+    }
+    throw Exception('Error al cargar documentos sanitarios: ${response.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> registrarDocumentoSanitario(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/documentos-sanitarios');
+    final response = await _post(uri, body: jsonEncode(data));
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    final err = jsonDecode(utf8.decode(response.bodyBytes));
+    throw Exception(err['detail'] ?? 'Error al guardar documento sanitario');
+  }
+
+  static Future<Map<String, dynamic>> getParametrosFinancieros({int? anio, int? mes}) async {
+    final now = DateTime.now();
+    final uri = Uri.parse('$baseUrl/api/reportes/parametros-financieros').replace(
+      queryParameters: {
+        'anio': (anio ?? now.year).toString(),
+        'mes': (mes ?? now.month).toString(),
+      },
+    );
+    final response = await _get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    throw Exception('Error al cargar parámetros financieros: ${response.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> actualizarParametrosFinancieros(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/parametros-financieros');
+    final response = await _put(uri, body: jsonEncode(data));
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    final err = jsonDecode(utf8.decode(response.bodyBytes));
+    throw Exception(err['detail'] ?? 'Error al actualizar parámetros financieros');
+  }
 }

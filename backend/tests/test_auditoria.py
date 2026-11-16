@@ -454,3 +454,61 @@ def test_seguridad_20_puntos(client, producto_factory):
     assert r_out.status_code == 204
     r_revoked = anon.get("/api/clientes/", headers={"Authorization": f"Bearer {tok_temp}"})
     assert r_revoked.status_code == 401
+
+
+def test_indicadores_35_conectados_bd(client):
+    from datetime import date, timedelta
+
+    hoy = date.today()
+
+    # 1. Registrar lectura ambiental COFEPRIS dentro de norma
+    r_bit = client.post(
+        "/api/reportes/bitacora-cofepris",
+        json={
+            "turno": "MATUTINO",
+            "zona": "ANAQUEL_GENERAL",
+            "temperatura_c": 21.5,
+            "humedad_relativa_pct": 48.0,
+            "observaciones": "Lectura de prueba auditoría",
+        },
+    )
+    assert r_bit.status_code == 201, r_bit.text
+    assert r_bit.json()["dentro_norma"] is True
+
+    # 2. Actualizar parámetros financieros del mes actual
+    r_fin = client.put(
+        "/api/reportes/parametros-financieros",
+        json={
+            "anio": hoy.year,
+            "mes": hoy.month,
+            "gastos_fijos_mensuales": 18500.0,
+            "nomina_mensual": 24000.0,
+        },
+    )
+    assert r_fin.status_code == 200, r_fin.text
+    assert r_fin.json()["gastos_fijos_mensuales"] == 18500.0
+
+    # 3. Registrar documento sanitario vigente
+    r_doc = client.post(
+        "/api/reportes/documentos-sanitarios",
+        json={
+            "tipo_documento": "AVISO_FUNCIONAMIENTO",
+            "folio_documento": "COF-2026-TEST-01",
+            "fecha_emision": str(hoy - timedelta(days=30)),
+            "fecha_vencimiento": str(hoy + timedelta(days=180)),
+            "activo": True,
+        },
+    )
+    assert r_doc.status_code == 201, r_doc.text
+    assert r_doc.json()["dias_restantes"] >= 179
+
+    # 4. Consultar indicadores mensuales y verificar cálculo dinámico de los 35 KPIs
+    r_ind = client.get(f"/api/reportes/indicadores-mensuales?anio={hoy.year}&mes={hoy.month}")
+    assert r_ind.status_code == 200, r_ind.text
+    data = r_ind.json()
+    kpis = {item["codigo"]: item for cat in data["areas"] for item in cat["indicadores"]}
+    assert len(kpis) == 35
+    assert "COF-04" in kpis and kpis["COF-04"]["valor"] == 100.0
+    assert "COF-07" in kpis and kpis["COF-07"]["valor"] >= 30
+    assert "FIN-03" in kpis and kpis["FIN-03"]["valor"] is not None
+

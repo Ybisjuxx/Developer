@@ -708,6 +708,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     final loteController = TextEditingController();
     final fechaCaducidadController = TextEditingController();
     final costoController = TextEditingController(text: '0.0');
+    final proveedorController = TextEditingController(text: 'Distribuidor General');
+    final piezasSolicitadasController = TextEditingController();
+    final horasEntregaController = TextEditingController(text: '24');
     final stockController = TextEditingController(text: '10');
 
     // Sub-Agente 6: Dosis separada de la dosificación (Forma | Cantidad | Unidad)
@@ -1297,6 +1300,44 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                         isDense: true,
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: proveedorController,
+                      decoration: const InputDecoration(
+                        labelText: 'Proveedor / Distribuidor (opcional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.local_shipping_outlined),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: piezasSolicitadasController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Piezas Solicitadas',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: horasEntregaController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Lead Time (hrs)',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1362,6 +1403,12 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                       'dosis_unidad': dosisUnidadController.text.trim(),
                       'dosificacion': dosisVistaPrevia,
                       'fecha_ingreso': fechaIngresoController.text.trim(),
+                      'proveedor_nombre': proveedorController.text.trim().isEmpty
+                          ? 'Distribuidor General'
+                          : proveedorController.text.trim(),
+                      if (int.tryParse(piezasSolicitadasController.text.trim()) != null)
+                        'piezas_solicitadas': int.parse(piezasSolicitadasController.text.trim()),
+                      'horas_entrega_lead_time': double.tryParse(horasEntregaController.text.trim()) ?? 24.0,
                       'activo': true,
                     });
 

@@ -66,6 +66,16 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN fecha_factura DATETIME")
                 if "uuid_fiscal" not in existing_cols:
                     conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN uuid_fiscal VARCHAR(60)")
+                if "tiempo_atencion_seg" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN tiempo_atencion_seg INTEGER DEFAULT 140")
+                if "folio_receta" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN folio_receta VARCHAR(60)")
+                if "receta_retenida" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN receta_retenida BOOLEAN DEFAULT 0")
+                if "receta_sin_errores" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN receta_sin_errores BOOLEAN DEFAULT 1")
+                if "receta_surtida_completa" not in existing_cols:
+                    conn.exec_driver_sql("ALTER TABLE ventas ADD COLUMN receta_surtida_completa BOOLEAN DEFAULT 1")
                 conn.commit()
 
             # 2. Columnas de auditoría e irregularidades en kardex_movimientos
@@ -145,6 +155,14 @@ def ensure_sqlite_schema(engine):
                 conn.commit()
                 if "fecha_ingreso" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
+                if "proveedor_nombre" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN proveedor_nombre VARCHAR(120) DEFAULT 'Distribuidor General'")
+                if "piezas_solicitadas" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN piezas_solicitadas INTEGER")
+                if "horas_entrega_lead_time" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN horas_entrega_lead_time FLOAT DEFAULT 24.0")
+                if "costo_unitario_anterior" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN costo_unitario_anterior FLOAT")
                 conn.commit()
 
             # 5. Columnas en tabla medicos (apellido_paterno, apellido_materno)

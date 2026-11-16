@@ -32,6 +32,11 @@ class _PosScreenState extends State<PosScreen> {
   // Carrito de compras
   final List<Map<String, dynamic>> _carrito = [];
   final _compradorController = TextEditingController(text: 'Público General');
+  final _folioRecetaController = TextEditingController();
+  DateTime? _inicioAtencionVenta;
+  bool _recetaRetenida = true;
+  bool _recetaSinErrores = true;
+  bool _recetaSurtidaCompleta = true;
   final _montoRecibidoController = TextEditingController();
   String _metodoPago = 'EFECTIVO';
   Medico? _medicoSeleccionado;
@@ -57,6 +62,7 @@ class _PosScreenState extends State<PosScreen> {
     _busquedaController.dispose();
     _busquedaFocus.dispose();
     _compradorController.dispose();
+    _folioRecetaController.dispose();
     _montoRecibidoController.dispose();
     super.dispose();
   }
@@ -795,6 +801,7 @@ class _PosScreenState extends State<PosScreen> {
       }
     } else {
       setState(() {
+        _inicioAtencionVenta ??= DateTime.now();
         _carrito.add({
           'producto': producto,
           'cantidad': 1,
@@ -900,6 +907,12 @@ class _PosScreenState extends State<PosScreen> {
 
     setState(() => _procesandoVenta = true);
 
+    final int tiempoAtencionSeg = _inicioAtencionVenta != null
+        ? DateTime.now().difference(_inicioAtencionVenta!).inSeconds.clamp(1, 7200)
+        : 140;
+    final bool tieneReceta = _medicoSeleccionado != null ||
+        _carrito.any((it) => it['producto']?['requiere_receta'] == true);
+
     final payload = {
       'cliente_id': _clienteSeleccionado?['id'],
       'comprador_nombre': _clienteSeleccionado != null
@@ -911,6 +924,11 @@ class _PosScreenState extends State<PosScreen> {
       'metodo_pago': _metodoPago,
       'monto_recibido': _metodoPago == 'EFECTIVO' ? _montoRecibido : _total,
       'cajero_nombre': AuthService.currentUser.nombreCompleto,
+      'tiempo_atencion_seg': tiempoAtencionSeg,
+      if (_folioRecetaController.text.trim().isNotEmpty) 'folio_receta': _folioRecetaController.text.trim(),
+      'receta_retenida': tieneReceta ? _recetaRetenida : false,
+      'receta_sin_errores': _recetaSinErrores,
+      'receta_surtida_completa': _recetaSurtidaCompleta,
       'items': _carrito.map((item) {
         return {
           'producto_id': item['producto']['id'],
@@ -925,6 +943,8 @@ class _PosScreenState extends State<PosScreen> {
 
       setState(() {
         _carrito.clear();
+        _inicioAtencionVenta = null;
+        _folioRecetaController.clear();
         _clienteSeleccionado = null;
         _compradorController.text = 'Público General';
         _medicoSeleccionado = null;
@@ -1407,6 +1427,49 @@ class _PosScreenState extends State<PosScreen> {
                       _medicoSeleccionado = val;
                       refrescar();
                     },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _folioRecetaController,
+                    decoration: const InputDecoration(
+                      labelText: 'Folio de receta (COFEPRIS)',
+                      hintText: 'Ej. REC-2026-001',
+                      isDense: true,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      FilterChip(
+                        label: const Text('Receta retenida', style: TextStyle(fontSize: 11)),
+                        selected: _recetaRetenida,
+                        onSelected: (v) {
+                          _recetaRetenida = v;
+                          refrescar();
+                        },
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      FilterChip(
+                        label: const Text('Sin errores', style: TextStyle(fontSize: 11)),
+                        selected: _recetaSinErrores,
+                        onSelected: (v) {
+                          _recetaSinErrores = v;
+                          refrescar();
+                        },
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      FilterChip(
+                        label: const Text('Surtida 100%', style: TextStyle(fontSize: 11)),
+                        selected: _recetaSurtidaCompleta,
+                        onSelected: (v) {
+                          _recetaSurtidaCompleta = v;
+                          refrescar();
+                        },
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                   ),
                 ],
               ),

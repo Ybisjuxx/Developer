@@ -257,6 +257,10 @@ class Lote(Base):
     dosis_valor = Column(String(50), nullable=True)  # Valor numérico manual (ej: 100)
     dosis_unidad = Column(String(50), nullable=True)  # Unidad manual (ej: mg, ml, mcg, g, UI)
     fecha_ingreso = Column(Date, default=datetime.date.today, nullable=True)
+    proveedor_nombre = Column(String(120), nullable=True, default="Distribuidor General")
+    piezas_solicitadas = Column(Integer, nullable=True)
+    horas_entrega_lead_time = Column(Float, nullable=True, default=24.0)
+    costo_unitario_anterior = Column(Float, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
@@ -328,6 +332,11 @@ class Venta(Base):
     turno_id = Column(Integer, ForeignKey("turnos_caja.id"), nullable=True)
     cajero_nombre = Column(String(150), default="Cajero Principal", nullable=False)
     estado = Column(String(20), default="COMPLETADA", nullable=False)  # COMPLETADA, DEVOLUCION_PARCIAL, DEVUELTA
+    tiempo_atencion_seg = Column(Integer, nullable=True, default=140)
+    folio_receta = Column(String(60), nullable=True)
+    receta_retenida = Column(Boolean, nullable=False, default=False)
+    receta_sin_errores = Column(Boolean, nullable=False, default=True)
+    receta_surtida_completa = Column(Boolean, nullable=False, default=True)
 
     # Facturación Electrónica (CFDI 4.0)
     facturada = Column(Boolean, default=False, nullable=False)
@@ -416,3 +425,41 @@ class DevolucionDetalle(Base):
     devolucion = relationship("Devolucion", back_populates="detalles")
     producto = relationship("Producto")
     lote = relationship("Lote")
+
+
+class BitacoraAmbiental(Base):
+    __tablename__ = "bitacora_ambiental"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
+    turno = Column(String(20), nullable=False, default="MATUTINO")  # MATUTINO, VESPERTINO, NOCTURNO
+    zona = Column(String(30), nullable=False, default="ANAQUEL_GENERAL")  # ANAQUEL_GENERAL, RED_FRIO
+    temperatura_c = Column(Float, nullable=False)
+    humedad_relativa_pct = Column(Float, nullable=False)
+    dentro_norma = Column(Boolean, nullable=False, default=True)
+    responsable_nombre = Column(String(150), nullable=False, default="Responsable Sanitario")
+    observaciones = Column(Text, nullable=True)
+
+
+class DocumentoSanitario(Base):
+    __tablename__ = "documentos_sanitarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tipo_documento = Column(String(60), nullable=False, index=True)
+    folio_documento = Column(String(80), nullable=False)
+    fecha_emision = Column(Date, nullable=False)
+    fecha_vencimiento = Column(Date, nullable=False, index=True)
+    activo = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class ParametroFinancieroMensual(Base):
+    __tablename__ = "parametros_financieros_mensuales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    anio = Column(Integer, nullable=False, index=True)
+    mes = Column(Integer, nullable=False, index=True)
+    gastos_fijos_mensuales = Column(Float, nullable=False, default=28500.0)
+    nomina_mensual = Column(Float, nullable=False, default=16500.0)
+    actualizado_por = Column(String(150), nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)

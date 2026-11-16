@@ -6,6 +6,24 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.5.0] - 2026-11-15 (Conexión Completa de los 35 Indicadores KPI a Base de Datos y Captura COFEPRIS/Finanzas)
+
+### 📊 Indicadores Dinámicos y Nuevos Modelos (`backend/app/models.py`, `database.py`, `routers/reportes.py`)
+- **Conexión de los 13 KPIs restantes a SQLite (`VTA-05`, `CMP-02..05`, `FIN-02..04`, `CAL-02`, `COF-01`, `COF-03`, `COF-04`, `COF-07`):**
+  - Nuevas tablas: `bitacora_ambiental` (`BitacoraAmbiental`), `documentos_sanitarios` (`DocumentoSanitario`) y `parametros_financieros_mensuales` (`ParametroFinancieroMensual`).
+  - Nuevas columnas con migración automática no destructiva en `ensure_sqlite_schema`: `lotes` (`proveedor_nombre`, `piezas_solicitadas`, `horas_entrega_lead_time`, `costo_unitario_anterior`) y `ventas` (`tiempo_atencion_seg`, `folio_receta`, `receta_retenida`, `receta_sin_errores`, `receta_surtida_completa`).
+  - Nuevos endpoints REST con RBAC estricto y validación `StrictInputModel`: `GET/POST /api/reportes/bitacora-cofepris`, `GET/POST /api/reportes/documentos-sanitarios` y `GET/PUT /api/reportes/parametros-financieros`.
+
+### 🖥️ Captura Operativa en Frontend (`frontend/lib/`)
+- **Configuración → Bitácora COFEPRIS y Finanzas (`widgets/cofepris_finanzas_tab.dart`, `screens/configuracion_screen.dart`):**
+  - Nueva 3.ª pestaña para registro diario de temperatura/humedad (anaquel general y red de frío), documentos sanitarios con alerta de vigencia y gastos fijos/nómina mensuales.
+- **Inventario (`screens/inventario_screen.dart`):**
+  - Campos opcionales de `Proveedor`, `Piezas solicitadas` y `Lead Time (hrs)` en el alta de lotes.
+- **Punto de Venta (`screens/pos_screen.dart`):**
+  - Cronómetro silencioso de tiempo de atención (`tiempo_atencion_seg`) y controles de receta (`folio_receta`, `Receta retenida`, `Sin errores`, `Surtida 100%`) para medicamentos controlados/antibióticos.
+
+---
+
 ## [1.4.8] - 2026-11-13 (Auditoría de Seguridad, Autenticación Robusta PBKDF2/HMAC y Endurecimiento Operativo)
 
 ### 🔐 Seguridad, Criptografía y Control de Acceso RBAC (`backend/app/security.py`, `routers/auth.py`, `routers/inventario.py`)
