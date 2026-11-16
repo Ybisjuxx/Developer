@@ -658,16 +658,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
                               children: [
                                 Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(Icons.warning_amber_rounded, color: ts.neonAmber),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'Lotes con Prioridad de Despacho (FEFO)',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ts.textPrimary),
+                                    Flexible(
+                                      child: Text(
+                                        'Lotes con Prioridad de Despacho (FEFO)',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ts.textPrimary),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -754,12 +760,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.receipt_long, color: ts.accentPrimary),
-                                    const SizedBox(width: 8),
-                                    Text('Últimas Ventas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ts.textPrimary)),
-                                  ],
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.receipt_long, color: ts.accentPrimary),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          'Últimas Ventas',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: ts.textPrimary),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                                 TextButton(
                                   onPressed: () => widget.onNavigate(4), // Ir a Ventas
