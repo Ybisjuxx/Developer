@@ -512,3 +512,56 @@ def test_indicadores_35_conectados_bd(client):
     assert "COF-07" in kpis and kpis["COF-07"]["valor"] >= 30
     assert "FIN-03" in kpis and kpis["FIN-03"]["valor"] is not None
 
+
+def test_bitacora_rangos_y_gastos_operativos_fechados(client):
+    from datetime import date
+
+    hoy = date.today()
+
+    # 1. Consultar bitácora filtrada por rango=hoy, 7dias y mes
+    for rango in ("hoy", "7dias", "mes"):
+        r_b = client.get(f"/api/reportes/bitacora-cofepris?rango={rango}")
+        assert r_b.status_code == 200, r_b.text
+        assert isinstance(r_b.json(), list)
+
+    # 2. Registrar gastos operativos fechados (Nómina + Renta)
+    r_g1 = client.post(
+        "/api/reportes/gastos-operativos",
+        json={
+            "fecha_gasto": str(hoy),
+            "categoria": "NOMINA",
+            "concepto": "Nómina quincenal mostrador",
+            "monto": 12000.0,
+            "metodo_pago": "TRANSFERENCIA",
+        },
+    )
+    assert r_g1.status_code == 201, r_g1.text
+    g1_id = r_g1.json()["id"]
+
+    r_g2 = client.post(
+        "/api/reportes/gastos-operativos",
+        json={
+            "fecha_gasto": str(hoy),
+            "categoria": "RENTA",
+            "concepto": "Renta local comercial",
+            "monto": 8000.0,
+            "metodo_pago": "TRANSFERENCIA",
+            "comprobante_folio": "FAC-RENTA-11",
+        },
+    )
+    assert r_g2.status_code == 201, r_g2.text
+
+    # 3. Consultar resumen desglosado del mes
+    r_list = client.get("/api/reportes/gastos-operativos?rango=mes")
+    assert r_list.status_code == 200, r_list.text
+    res = r_list.json()
+    assert res["total_nomina"] >= 12000.0
+    assert res["total_otros_gastos"] >= 8000.0
+    assert res["total_monto"] >= 20000.0
+    assert "NOMINA" in res["por_categoria"] and "RENTA" in res["por_categoria"]
+
+    # 4. Eliminar gasto individual
+    r_del = client.delete(f"/api/reportes/gastos-operativos/{g1_id}")
+    assert r_del.status_code == 204
+
+

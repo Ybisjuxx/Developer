@@ -698,3 +698,27 @@ class ParametroFinancieroOut(BaseModel):
     actualizado_por: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
+
+class GastoOperativoCreate(StrictInputModel):
+    fecha_gasto: date
+    categoria: str = Field(default="OTROS", max_length=40)
+    concepto: str = Field(..., min_length=2, max_length=180)
+    monto: float = Field(..., gt=0.0)
+    metodo_pago: str = Field(default="EFECTIVO", max_length=30)
+    comprobante_folio: Optional[str] = Field(default=None, max_length=80)
+
+
+class GastoOperativoOut(BaseModel):
+    id: int
+    fecha_gasto: date
+    anio: int
+    mes: int
+    categoria: str
+    concepto: str
+    monto: float
+    metodo_pago: str
+    comprobante_folio: Optional[str] = None
+    registrado_por: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+

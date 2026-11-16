@@ -463,3 +463,19 @@ class ParametroFinancieroMensual(Base):
     nomina_mensual = Column(Float, nullable=False, default=16500.0)
     actualizado_por = Column(String(150), nullable=True)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+
+class GastoOperativo(Base):
+    __tablename__ = "gastos_operativos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    fecha_gasto = Column(Date, nullable=False, index=True)
+    anio = Column(Integer, nullable=False, index=True)
+    mes = Column(Integer, nullable=False, index=True)
+    categoria = Column(String(40), nullable=False, default="OTROS")
+    concepto = Column(String(180), nullable=False)
+    monto = Column(Float, nullable=False)
+    metodo_pago = Column(String(30), nullable=False, default="EFECTIVO")
+    comprobante_folio = Column(String(80), nullable=True)
+    registrado_por = Column(String(150), nullable=False, default="Administrador")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)

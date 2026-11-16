@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
-import '../widgets/cofepris_finanzas_tab.dart';
 import '../widgets/premium_ui.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
@@ -22,7 +21,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _cargarUsuarios();
   }
 
@@ -340,7 +339,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> with SingleTi
                     tabs: const [
                       Tab(icon: Icon(Icons.palette_outlined), text: 'Personalización Visual e Interfaz'),
                       Tab(icon: Icon(Icons.manage_accounts_outlined), text: 'Usuarios y Permisos de Acceso'),
-                      Tab(icon: Icon(Icons.thermostat_rounded), text: 'Bitácora COFEPRIS y Finanzas'),
                     ],
                   ),
                 ),
@@ -351,7 +349,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> with SingleTi
                     children: [
                       _buildTabPersonalizacion(),
                       _buildTabUsuarios(),
-                      const CofeprisFinanzasTab(),
                     ],
                   ),
                 ),

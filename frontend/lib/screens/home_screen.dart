@@ -3,7 +3,7 @@ import 'caja_screen.dart';
 import 'clientes_screen.dart';
 import 'configuracion_screen.dart';
 import 'dashboard_screen.dart';
-import 'devoluciones_screen.dart';
+import 'registros_bitacoras_screen.dart';
 import 'enfermedades_screen.dart';
 import 'inventario_screen.dart';
 import 'medicos_screen.dart';
@@ -175,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 5:
         return const CajaScreen();
       case 6:
-        return const DevolucionesScreen();
+        return const RegistrosBitacorasScreen();
       case 7:
         return const MedicosScreen();
       case 8:
@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'Inventario, Caducidades y Kardex',
       'Historial de Ventas y Tickets',
       'Corte de Caja y Turnos (Arqueo)',
-      'Devoluciones y Mermas Sanitarias',
+      'Registros, Bitácoras y Devoluciones',
       'Directorio de Médicos',
       'Catálogo de Diagnósticos CIE-11',
       'Configuración del Sistema y Usuarios',
@@ -247,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _drawerItem(3, Icons.inventory_2, 'Inventario y Caducidades FEFO'),
                 _drawerItem(4, Icons.receipt_long, 'Historial de Ventas'),
                 _drawerItem(5, Icons.calculate, 'Corte de Caja (Arqueo)'),
-                _drawerItem(6, Icons.assignment_return, 'Devoluciones y Mermas'),
+                _drawerItem(6, Icons.fact_check, 'Registros y Bitácoras'),
                 _drawerItem(7, Icons.medical_information, 'Directorio Médico'),
                 _drawerItem(8, Icons.healing, 'Catálogo CIE-11'),
                 _drawerItem(9, Icons.settings, 'Configuración y Usuarios'),
@@ -493,9 +493,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     label: 'Corte Caja',
                                   ),
                                   RibbonNavItem(
-                                    icon: Icons.assignment_return_outlined,
-                                    selectedIcon: Icons.assignment_return,
-                                    label: 'Devolución',
+                                    icon: Icons.fact_check_outlined,
+                                    selectedIcon: Icons.fact_check,
+                                    label: 'Bitácoras',
                                   ),
                                   RibbonNavItem(
                                     icon: Icons.medical_information_outlined,

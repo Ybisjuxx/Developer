@@ -16,6 +16,7 @@ from ..models import (
     Cliente,
     Devolucion,
     DocumentoSanitario,
+    GastoOperativo,
     KardexMovimiento,
     Lote,
     Medico,
@@ -31,6 +32,8 @@ from ..schemas import (
     BitacoraAmbientalOut,
     DocumentoSanitarioCreate,
     DocumentoSanitarioOut,
+    GastoOperativoCreate,
+    GastoOperativoOut,
     ParametroFinancieroOut,
     ParametroFinancieroUpdate,
 )
@@ -379,14 +382,26 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
         1,
     ) if kardex_mes else 100.0
 
-    # Finanzas (leídas de ParametroFinancieroMensual)
+    # Finanzas (prioriza desglose fechado en GastoOperativo; fallback a ParametroFinancieroMensual)
+    gastos_mes = (
+        db.query(GastoOperativo)
+        .filter(GastoOperativo.anio == anio, GastoOperativo.mes == mes)
+        .all()
+    )
     param_fin = (
         db.query(ParametroFinancieroMensual)
         .filter(ParametroFinancieroMensual.anio == anio, ParametroFinancieroMensual.mes == mes)
         .first()
     )
-    gastos_fijos_est = float(param_fin.gastos_fijos_mensuales) if param_fin else 28500.0
-    nomina_est = float(param_fin.nomina_mensual) if param_fin else 16500.0
+    if gastos_mes:
+        gastos_fijos_est = round(sum(float(g.monto or 0.0) for g in gastos_mes), 2)
+        nomina_est = round(
+            sum(float(g.monto or 0.0) for g in gastos_mes if (g.categoria or "").upper() == "NOMINA"),
+            2,
+        )
+    else:
+        gastos_fijos_est = float(param_fin.gastos_fijos_mensuales) if param_fin else 28500.0
+        nomina_est = float(param_fin.nomina_mensual) if param_fin else 16500.0
     margen_bruto_monto = max(0.0, total_vendido - costo_vendido)
     margen_bruto_pct = round((margen_bruto_monto / total_vendido) * 100, 1) if total_vendido > 0 else 28.5
     utilidad_neta = round(margen_bruto_monto - gastos_fijos_est, 2)
@@ -660,15 +675,41 @@ def descargar_reporte_mensual(
 
 @router.get("/bitacora-cofepris", response_model=List[BitacoraAmbientalOut])
 def listar_bitacora_cofepris(
-    limit: int = Query(default=30, ge=1, le=200),
+    rango: Optional[str] = Query(default=None, description="hoy, 7dias, mes"),
+    fecha_inicio: Optional[datetime.date] = Query(default=None),
+    fecha_fin: Optional[datetime.date] = Query(default=None),
+    zona: Optional[str] = Query(default=None),
+    limit: int = Query(default=60, ge=1, le=500),
     usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
     db: Session = Depends(get_db),
 ):
     hoy = datetime.date.today()
     _ensure_indicadores_base_data(db, hoy.year, hoy.month)
+    q = db.query(BitacoraAmbiental)
+
+    if rango:
+        rango_norm = rango.strip().lower()
+        if rango_norm == "hoy":
+            fecha_inicio = hoy
+            fecha_fin = hoy
+        elif rango_norm == "7dias":
+            fecha_inicio = hoy - datetime.timedelta(days=6)
+            fecha_fin = hoy
+        elif rango_norm == "mes":
+            fecha_inicio = hoy.replace(day=1)
+            fecha_fin = hoy
+
+    if fecha_inicio is not None:
+        dt_ini = datetime.datetime.combine(fecha_inicio, datetime.time.min)
+        q = q.filter(BitacoraAmbiental.fecha_registro >= dt_ini)
+    if fecha_fin is not None:
+        dt_fin = datetime.datetime.combine(fecha_fin + datetime.timedelta(days=1), datetime.time.min)
+        q = q.filter(BitacoraAmbiental.fecha_registro < dt_fin)
+    if zona:
+        q = q.filter(BitacoraAmbiental.zona == zona.strip().upper())
+
     return (
-        db.query(BitacoraAmbiental)
-        .order_by(BitacoraAmbiental.fecha_registro.desc(), BitacoraAmbiental.id.desc())
+        q.order_by(BitacoraAmbiental.fecha_registro.desc(), BitacoraAmbiental.id.desc())
         .limit(limit)
         .all()
     )
@@ -797,4 +838,91 @@ def actualizar_parametros_financieros(
     db.commit()
     db.refresh(param)
     return param
+
+
+@router.get("/gastos-operativos")
+def listar_gastos_operativos(
+    rango: Optional[str] = Query(default=None, description="hoy, 7dias, mes"),
+    anio: Optional[int] = Query(default=None, ge=2020, le=2100),
+    mes: Optional[int] = Query(default=None, ge=1, le=12),
+    categoria: Optional[str] = Query(default=None),
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
+    hoy = datetime.date.today()
+    q = db.query(GastoOperativo)
+
+    if rango:
+        rango_norm = rango.strip().lower()
+        if rango_norm == "hoy":
+            q = q.filter(GastoOperativo.fecha_gasto == hoy)
+        elif rango_norm == "7dias":
+            q = q.filter(GastoOperativo.fecha_gasto >= hoy - datetime.timedelta(days=6), GastoOperativo.fecha_gasto <= hoy)
+        elif rango_norm == "mes":
+            q = q.filter(GastoOperativo.anio == hoy.year, GastoOperativo.mes == hoy.month)
+    else:
+        if anio is not None:
+            q = q.filter(GastoOperativo.anio == anio)
+        if mes is not None:
+            q = q.filter(GastoOperativo.mes == mes)
+
+    if categoria:
+        q = q.filter(GastoOperativo.categoria == categoria.strip().upper())
+
+    rows = q.order_by(GastoOperativo.fecha_gasto.desc(), GastoOperativo.id.desc()).all()
+    por_categoria: Dict[str, float] = {}
+    total_monto = 0.0
+    total_nomina = 0.0
+    for r in rows:
+        cat = (r.categoria or "OTROS").upper()
+        monto = float(r.monto or 0.0)
+        por_categoria[cat] = round(por_categoria.get(cat, 0.0) + monto, 2)
+        total_monto += monto
+        if cat == "NOMINA":
+            total_nomina += monto
+
+    return {
+        "total_monto": round(total_monto, 2),
+        "total_nomina": round(total_nomina, 2),
+        "total_otros_gastos": round(total_monto - total_nomina, 2),
+        "por_categoria": por_categoria,
+        "items": [GastoOperativoOut.model_validate(r).model_dump() for r in rows],
+    }
+
+
+@router.post("/gastos-operativos", response_model=GastoOperativoOut, status_code=status.HTTP_201_CREATED)
+def registrar_gasto_operativo(
+    payload: GastoOperativoCreate,
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
+    gasto = GastoOperativo(
+        fecha_gasto=payload.fecha_gasto,
+        anio=payload.fecha_gasto.year,
+        mes=payload.fecha_gasto.month,
+        categoria=payload.categoria.upper().strip(),
+        concepto=payload.concepto.strip(),
+        monto=round(float(payload.monto), 2),
+        metodo_pago=payload.metodo_pago.upper().strip(),
+        comprobante_folio=payload.comprobante_folio.strip() if payload.comprobante_folio else None,
+        registrado_por=usuario.nombre_completo if usuario else "Administrador",
+    )
+    db.add(gasto)
+    db.commit()
+    db.refresh(gasto)
+    return gasto
+
+
+@router.delete("/gastos-operativos/{gasto_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_gasto_operativo(
+    gasto_id: int,
+    usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR")),
+    db: Session = Depends(get_db),
+):
+    gasto = db.query(GastoOperativo).filter(GastoOperativo.id == gasto_id).first()
+    if not gasto:
+        raise HTTPException(status_code=404, detail="Gasto operativo no encontrado.")
+    db.delete(gasto)
+    db.commit()
+    return None
 

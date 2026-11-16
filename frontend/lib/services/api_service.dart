@@ -860,8 +860,15 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> getBitacoraCofepris({int limit = 20}) async {
-    final uri = Uri.parse('$baseUrl/api/reportes/bitacora-cofepris?limit=$limit');
+  static Future<List<dynamic>> getBitacoraCofepris({
+    String? rango,
+    String? zona,
+    int limit = 100,
+  }) async {
+    final params = <String, String>{'limit': limit.toString()};
+    if (rango != null && rango.isNotEmpty) params['rango'] = rango;
+    if (zona != null && zona.isNotEmpty) params['zona'] = zona;
+    final uri = Uri.parse('$baseUrl/api/reportes/bitacora-cofepris').replace(queryParameters: params);
     final response = await _get(uri);
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes)) as List<dynamic>;
@@ -921,5 +928,42 @@ class ApiService {
     }
     final err = jsonDecode(utf8.decode(response.bodyBytes));
     throw Exception(err['detail'] ?? 'Error al actualizar parámetros financieros');
+  }
+
+  static Future<Map<String, dynamic>> getGastosOperativos({
+    String? rango,
+    int? anio,
+    int? mes,
+    String? categoria,
+  }) async {
+    final params = <String, String>{};
+    if (rango != null && rango.isNotEmpty) params['rango'] = rango;
+    if (anio != null) params['anio'] = anio.toString();
+    if (mes != null) params['mes'] = mes.toString();
+    if (categoria != null && categoria.isNotEmpty) params['categoria'] = categoria;
+    final uri = Uri.parse('$baseUrl/api/reportes/gastos-operativos').replace(queryParameters: params);
+    final response = await _get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    throw Exception('Error al cargar gastos operativos: ${response.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> registrarGastoOperativo(Map<String, dynamic> data) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/gastos-operativos');
+    final response = await _post(uri, body: jsonEncode(data));
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes));
+    }
+    final err = jsonDecode(utf8.decode(response.bodyBytes));
+    throw Exception(err['detail'] ?? 'Error al registrar gasto operativo');
+  }
+
+  static Future<void> eliminarGastoOperativo(int id) async {
+    final uri = Uri.parse('$baseUrl/api/reportes/gastos-operativos/$id');
+    final response = await _delete(uri);
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Error al eliminar gasto operativo: ${response.statusCode}');
+    }
   }
 }
