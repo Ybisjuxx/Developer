@@ -861,7 +861,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               runSpacing: 12,
               children: [
                 Row(
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
@@ -872,18 +872,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Icon(Icons.bar_chart_rounded, color: ts.neonBlue, size: 24),
                     ),
                     const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Evolución de Ventas Mes a Mes',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: ts.textPrimary),
-                        ),
-                        Text(
-                          'Desglose anual comparativo de ingresos y volumen de tickets',
-                          style: TextStyle(fontSize: 12, color: ts.textSecondary),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Evolución de Ventas Mes a Mes',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: ts.textPrimary),
+                          ),
+                          Text(
+                            'Desglose anual comparativo de ingresos y volumen de tickets',
+                            style: TextStyle(fontSize: 12, color: ts.textSecondary),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -979,23 +981,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Center(child: Text('No hay datos disponibles para este año.', style: TextStyle(color: ts.textSecondary))),
               )
             else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Container(
-                  constraints: const BoxConstraints(minWidth: 540),
-                  padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8, right: 8),
-                  decoration: BoxDecoration(
-                    color: ts.surfaceBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: ts.borderColor),
-                  ),
-                  child: Column(
-                    children: [
-                      // Área de barras (12 columnas)
-                      SizedBox(
-                        height: 190,
-                        width: 520,
-                        child: Row(
+              LayoutBuilder(
+                builder: (context, chartConstraints) {
+                  final double innerW = chartConstraints.maxWidth - 18;
+                  final double targetW = innerW < 440 ? 440 : innerW;
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(top: 16, bottom: 8, left: 8, right: 8),
+                    decoration: BoxDecoration(
+                      color: ts.surfaceBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ts.borderColor),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Column(
+                        children: [
+                          // Área de barras (12 columnas)
+                          SizedBox(
+                            height: 190,
+                            width: targetW,
+                            child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: List.generate(meses.length, (index) {
                           final m = meses[index];
@@ -1140,20 +1146,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         final double v = (m['total_ventas'] as num? ?? 0.0).toDouble();
                         final int t = m['cantidad_tickets'] as int? ?? 0;
                         final String comp = m['mes_nombre_completo'] ?? '';
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        return Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6,
+                              runSpacing: 2,
                               children: [
                                 Icon(Icons.info_outline, size: 16, color: ts.accentPrimary),
-                                const SizedBox(width: 6),
                                 Text(
                                   'Detalle de $comp $_anioReporte:',
                                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: ts.textPrimary),
                                 ),
-                                const SizedBox(width: 8),
                                 Text(
-                                  'Total: \$${v.toStringAsFixed(2)} MXN  •  $t tickets emitidos',
+                                  'Total: \$${v.toStringAsFixed(2)} MXN • $t tickets',
                                   style: TextStyle(color: ts.textSecondary, fontSize: 13),
                                 ),
                               ],
@@ -1173,7 +1183,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ],
                 ),
               ),
-            ),
+                  );
+                },
+              ),
           ],
         ),
     );
@@ -1369,7 +1381,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             runSpacing: 12,
             children: [
               Row(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -1389,51 +1401,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: const Icon(Icons.analytics_rounded, color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Centro de Indicadores Mensuales por Área',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: ts.textPrimary,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: esAdmin
-                                  ? ts.neonPurple.withValues(alpha: 0.18)
-                                  : ts.neonGreen.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: esAdmin ? ts.neonPurple : ts.neonGreen,
-                                width: 1,
-                              ),
-                            ),
-                            child: Text(
-                              esAdmin ? 'RBAC: AUDITORÍA TOTAL (6 ÁREAS)' : 'RBAC: SANITARIO / CLÍNICO (3 ÁREAS)',
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              'Centro de Indicadores Mensuales por Área',
                               style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: esAdmin ? ts.neonPurple : ts.neonGreen,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: ts.textPrimary,
+                                letterSpacing: -0.2,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Monitor integral mensual: $totalAreas áreas operativas • $totalKpis indicadores estratégicos (Periodo $periodoTexto)',
-                        style: TextStyle(fontSize: 12, color: ts.textSecondary),
-                      ),
-                    ],
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: esAdmin
+                                    ? ts.neonPurple.withValues(alpha: 0.18)
+                                    : ts.neonGreen.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: esAdmin ? ts.neonPurple : ts.neonGreen,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                esAdmin ? 'RBAC: AUDITORÍA TOTAL (6 ÁREAS)' : 'RBAC: SANITARIO / CLÍNICO (3 ÁREAS)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: esAdmin ? ts.neonPurple : ts.neonGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Monitor integral mensual: $totalAreas áreas operativas • $totalKpis indicadores estratégicos (Periodo $periodoTexto)',
+                          style: TextStyle(fontSize: 12, color: ts.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
