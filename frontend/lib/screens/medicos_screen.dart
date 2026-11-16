@@ -174,11 +174,12 @@ class _MedicosScreenState extends State<MedicosScreen> {
   @override
   Widget build(BuildContext context) {
     final ts = ThemeService.instance;
+    final bool isMobile = MediaQuery.sizeOf(context).width < 600;
 
     return Scaffold(
       backgroundColor: ts.scaffoldBg,
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(isMobile ? 12.0 : 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -189,7 +190,10 @@ class _MedicosScreenState extends State<MedicosScreen> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Buscar médico por nombre, apellidos, especialidad o cédula...',
+                      isDense: isMobile,
+                      hintText: isMobile
+                          ? 'Buscar médico, especialidad o cédula...'
+                          : 'Buscar médico por nombre, apellidos, especialidad o cédula...',
                       prefixIcon: Icon(Icons.search, color: ts.textSecondary),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
@@ -201,17 +205,20 @@ class _MedicosScreenState extends State<MedicosScreen> {
                             )
                           : null,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: isMobile ? 10 : 14),
                     ),
                     onSubmitted: (val) => _cargarMedicos(query: val),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: isMobile ? 8 : 12),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
                     backgroundColor: ts.accentPrimary,
                     foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 20,
+                      vertical: isMobile ? 12 : 16,
+                    ),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   onPressed: () async {
@@ -222,12 +229,12 @@ class _MedicosScreenState extends State<MedicosScreen> {
                       _cargarMedicos();
                     }
                   },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Registrar Médico'),
+                  icon: Icon(Icons.add, size: isMobile ? 18 : 20),
+                  label: Text(isMobile ? 'Nuevo' : 'Registrar Médico'),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isMobile ? 10 : 16),
 
             // Contenido
             Expanded(
@@ -285,7 +292,105 @@ class _MedicosScreenState extends State<MedicosScreen> {
                                       borderRadius: BorderRadius.circular(12),
                                       side: BorderSide(color: ts.borderColor),
                                     ),
-                                    child: Padding(
+                                    child: isMobile
+                                        ? InkWell(
+                                            borderRadius: BorderRadius.circular(12),
+                                            onTap: () => _editarMedico(m),
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                              child: Row(
+                                                crossAxisAlignment: CrossAxisAlignment.center,
+                                                children: [
+                                                  CircleAvatar(
+                                                    radius: 18,
+                                                    backgroundColor: m.vigente
+                                                        ? ts.tintBg(ts.accentPrimary, lightAlpha: 0.15, darkAlpha: 0.25)
+                                                        : ts.surfaceAltBg,
+                                                    foregroundColor: m.vigente ? ts.accentPrimary : ts.textSecondary,
+                                                    child: Text(
+                                                      m.nombres.isNotEmpty ? m.nombres[0] : 'M',
+                                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                'Dr(a). ${m.nombreCompleto}',
+                                                                style: TextStyle(
+                                                                  fontWeight: FontWeight.bold,
+                                                                  fontSize: 13.5,
+                                                                  color: ts.textPrimary,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(width: 6),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                              decoration: BoxDecoration(
+                                                                color: m.vigente ? ts.tintBg(ts.neonGreen) : ts.tintBg(ts.neonRed),
+                                                                borderRadius: BorderRadius.circular(8),
+                                                              ),
+                                                              child: Text(
+                                                                m.vigente ? 'Vigente' : 'Inactivo',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.w700,
+                                                                  color: m.vigente ? ts.neonGreen : ts.neonRed,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          'Céd. ${m.cedulaProfesional} • ${m.especialidad ?? "Medicina General"}',
+                                                          style: TextStyle(color: ts.textSecondary, fontSize: 11.5),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                        if (m.telefono != null || m.institucionEmisora != null)
+                                                          Text(
+                                                            [
+                                                              if (m.institucionEmisora != null) m.institucionEmisora!,
+                                                              if (m.telefono != null) m.telefono!,
+                                                            ].join(' • '),
+                                                            style: TextStyle(color: ts.accentPrimary, fontSize: 11),
+                                                            maxLines: 1,
+                                                            overflow: TextOverflow.ellipsis,
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                                    color: ts.accentPrimary,
+                                                    padding: const EdgeInsets.all(6),
+                                                    constraints: const BoxConstraints(),
+                                                    tooltip: 'Editar',
+                                                    onPressed: () => _editarMedico(m),
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.delete_outline, size: 18),
+                                                    color: ts.neonRed,
+                                                    padding: const EdgeInsets.all(6),
+                                                    constraints: const BoxConstraints(),
+                                                    tooltip: 'Eliminar',
+                                                    onPressed: () => _confirmarEliminarMedico(m),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        : Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 4.0),
                                       child: ListTile(
                                         leading: CircleAvatar(
