@@ -135,8 +135,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error de autenticación');
+      throw Exception(_extractErrorDetail(response, 'Error de autenticación'));
     }
   }
 
@@ -196,8 +195,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al abrir turno');
+      throw Exception(_extractErrorDetail(response, 'Error al abrir turno'));
     }
   }
 
@@ -207,8 +205,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al obtener resumen de caja');
+      throw Exception(_extractErrorDetail(response, 'Error al obtener resumen de caja'));
     }
   }
 
@@ -228,8 +225,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al cerrar turno');
+      throw Exception(_extractErrorDetail(response, 'Error al cerrar turno'));
     }
   }
 
@@ -256,8 +252,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al procesar devolución');
+      throw Exception(_extractErrorDetail(response, 'Error al procesar devolución'));
     }
   }
 
@@ -312,9 +307,7 @@ class ApiService {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       return Medico.fromJson(data);
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      final detail = errorData['detail'] ?? 'Error desconocido del servidor';
-      throw Exception(detail);
+      throw Exception(_extractErrorDetail(response, 'Error desconocido del servidor'));
     }
   }
 
@@ -329,9 +322,7 @@ class ApiService {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
       return Medico.fromJson(data);
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      final detail = errorData['detail'] ?? 'Error al actualizar médico';
-      throw Exception(detail);
+      throw Exception(_extractErrorDetail(response, 'Error al actualizar médico'));
     }
   }
 
@@ -345,8 +336,7 @@ class ApiService {
       }
       return {'mensaje': 'Médico eliminado/desactivado correctamente'};
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al eliminar médico');
+      throw Exception(_extractErrorDetail(response, 'Error al eliminar médico'));
     }
   }
 
@@ -377,8 +367,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al crear producto');
+      throw Exception(_extractErrorDetail(response, 'Error al crear producto'));
     }
   }
 
@@ -392,8 +381,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al registrar lote');
+      throw Exception(_extractErrorDetail(response, 'Error al registrar lote'));
     }
   }
 
@@ -430,8 +418,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al procesar la venta');
+      throw Exception(_extractErrorDetail(response, 'Error al procesar la venta'));
     }
   }
 
@@ -442,8 +429,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Ticket no encontrado');
+      throw Exception(_extractErrorDetail(response, 'Ticket no encontrado'));
     }
   }
 
@@ -457,8 +443,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al emitir factura electrónica');
+      throw Exception(_extractErrorDetail(response, 'Error al emitir factura electrónica'));
     }
   }
 
@@ -469,8 +454,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al consultar factura');
+      throw Exception(_extractErrorDetail(response, 'Error al consultar factura'));
     }
   }
 
@@ -481,8 +465,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return utf8.decode(response.bodyBytes);
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al descargar XML');
+      throw Exception(_extractErrorDetail(response, 'Error al descargar XML'));
     }
   }
 
@@ -495,8 +478,7 @@ class ApiService {
     } else if (response.statusCode == 404) {
       return null;
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al verificar código de barras');
+      throw Exception(_extractErrorDetail(response, 'Error al verificar código de barras'));
     }
   }
 
@@ -527,8 +509,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al crear enfermedad');
+      throw Exception(_extractErrorDetail(response, 'Error al crear enfermedad'));
     }
   }
 
@@ -543,8 +524,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al buscar en catálogo CIE');
+      throw Exception(_extractErrorDetail(response, 'Error al buscar en catálogo CIE'));
     }
   }
 
@@ -558,8 +538,7 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al importar diagnóstico');
+      throw Exception(_extractErrorDetail(response, 'Error al importar diagnóstico'));
     }
   }
 
@@ -573,8 +552,7 @@ class ApiService {
     if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al auto-registrar diagnóstico');
+      throw Exception(_extractErrorDetail(response, 'Error al auto-registrar diagnóstico'));
     }
   }
 
@@ -616,8 +594,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al registrar cliente');
+      throw Exception(_extractErrorDetail(response, 'Error al registrar cliente'));
     }
   }
 
@@ -631,16 +608,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al actualizar cliente');
-    }
-  }
-
-  static Future<void> desactivarCliente(int id) async {
-    final uri = Uri.parse('$baseUrl/api/clientes/$id');
-    final response = await _delete(uri);
-    if (response.statusCode != 204 && response.statusCode != 200) {
-      throw Exception('Error al desactivar cliente: ${response.statusCode}');
+      throw Exception(_extractErrorDetail(response, 'Error al actualizar cliente'));
     }
   }
 
@@ -678,8 +646,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al ajustar stock');
+      throw Exception(_extractErrorDetail(response, 'Error al ajustar stock'));
     }
   }
 
@@ -702,8 +669,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al dar de baja lote');
+      throw Exception(_extractErrorDetail(response, 'Error al dar de baja lote'));
     }
   }
 
@@ -721,8 +687,7 @@ class ApiService {
     if (response.statusCode == 201) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al crear usuario');
+      throw Exception(_extractErrorDetail(response, 'Error al crear usuario'));
     }
   }
 
@@ -736,8 +701,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al actualizar usuario');
+      throw Exception(_extractErrorDetail(response, 'Error al actualizar usuario'));
     }
   }
 
@@ -771,8 +735,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al agregar observación al kardex');
+      throw Exception(_extractErrorDetail(response, 'Error al agregar observación al kardex'));
     }
   }
 
@@ -872,8 +835,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     } else {
-      final errorData = jsonDecode(utf8.decode(response.bodyBytes));
-      throw Exception(errorData['detail'] ?? 'Error al consultar asistente IA');
+      throw Exception(_extractErrorDetail(response, 'Error al consultar asistente IA'));
     }
   }
 

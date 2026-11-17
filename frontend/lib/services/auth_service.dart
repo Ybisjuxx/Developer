@@ -137,10 +137,4 @@ class AuthService extends ChangeNotifier {
     final password = credencialesDemostracion[username] ?? 'admin123';
     await login(username, password);
   }
-
-  /// Método retrocompatible para cambio de usuario
-  void cambiarUsuario(UsuarioSesion nuevoUsuario) {
-    _usuarioActual = nuevoUsuario;
-    notifyListeners();
-  }
 }

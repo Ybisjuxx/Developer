@@ -13,7 +13,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.orm import relationship
-from .database import Base
+from .database import Base, utc_now
 
 
 # Tabla pivote para historial clínico del cliente (Diagnósticos CIE-10 asociados)
@@ -41,7 +41,7 @@ class Cliente(Base):
     sexo = Column(String(20), nullable=True)  # MASCULINO, FEMENINO, OTRO
     notas_clinicas = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     # Sub-Agente 1: Seguimiento de Pacientes Crónicos y Resurtimiento Preventivo (semanas de anticipación)
     ultima_visita = Column(DateTime, nullable=True)
@@ -125,7 +125,7 @@ class Usuario(Base):
     nombre_completo = Column(String(150), nullable=False)
     rol = Column(String(30), default="CAJERO", nullable=False)  # CAJERO, ADMINISTRADOR, RESPONSABLE_SANITARIO
     activo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     turnos = relationship("TurnoCaja", back_populates="usuario")
 
@@ -144,7 +144,7 @@ class Medico(Base):
     telefono = Column(String(20), nullable=True)
     correo = Column(String(100), nullable=True)
     vigente = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     ventas = relationship("Venta", back_populates="medico")
 
@@ -165,7 +165,7 @@ class Enfermedad(Base):
     categoria = Column(String(100), nullable=True)
     comentarios_especiales = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
 
@@ -181,7 +181,7 @@ class Sustancia(Base):
     clasificado_por = Column(String(150), nullable=True)
     fecha_clasificacion = Column(DateTime, nullable=True)
     consultas_recibidas = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     productos = relationship("Producto", back_populates="sustancia_rel")
     tareas = relationship("TareaClasificacionFarmaceutica", back_populates="sustancia", cascade="all, delete-orphan")
@@ -197,7 +197,7 @@ class ParSustitucion(Base):
     advertencias = Column(Text, nullable=True)  # JSON list
     validado_por = Column(String(150), nullable=True)
     fecha_validacion = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
 class TareaClasificacionFarmaceutica(Base):
@@ -207,7 +207,7 @@ class TareaClasificacionFarmaceutica(Base):
     sustancia_id = Column(Integer, ForeignKey("sustancias.id"), nullable=False)
     mensaje = Column(String(255), nullable=False)
     estado = Column(String(20), default="PENDIENTE", nullable=False)  # PENDIENTE | COMPLETADA
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     sustancia = relationship("Sustancia", back_populates="tareas")
 
@@ -234,7 +234,7 @@ class Producto(Base):
     familia_terapeutica = Column(String(100), nullable=True)
     indicacion_terapeutica = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     sustancia_rel = relationship("Sustancia", back_populates="productos")
     lotes = relationship("Lote", back_populates="producto", cascade="all, delete-orphan")
@@ -262,7 +262,7 @@ class Lote(Base):
     horas_entrega_lead_time = Column(Float, nullable=True, default=24.0)
     costo_unitario_anterior = Column(Float, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     producto = relationship("Producto", back_populates="lotes")
     despachos = relationship("VentaDetalleLote", back_populates="lote")
@@ -285,7 +285,7 @@ class KardexMovimiento(Base):
     observaciones_auditoria = Column(Text, nullable=True)
     es_irregular = Column(Boolean, default=False, nullable=False)
     usuario_auditor = Column(String(150), nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     lote = relationship("Lote", back_populates="movimientos_kardex")
 
@@ -297,7 +297,7 @@ class TurnoCaja(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     cajero_nombre = Column(String(150), nullable=False)
     monto_apertura = Column(Float, nullable=False, default=0.0)
-    fecha_apertura = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_apertura = Column(DateTime, default=utc_now, nullable=False)
     fecha_cierre = Column(DateTime, nullable=True)
     ventas_efectivo = Column(Float, nullable=False, default=0.0)
     ventas_tarjeta = Column(Float, nullable=False, default=0.0)
@@ -307,7 +307,7 @@ class TurnoCaja(Base):
     diferencia_efectivo = Column(Float, nullable=True)  # Positivo = Sobrante, Negativo = Faltante
     estado = Column(String(20), default="ABIERTO", nullable=False)  # ABIERTO, CERRADO
     notas = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     usuario = relationship("Usuario", back_populates="turnos")
     ventas = relationship("Venta", back_populates="turno")
@@ -318,7 +318,7 @@ class Venta(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     folio_ticket = Column(String(40), unique=True, index=True, nullable=False)
-    fecha_venta = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_venta = Column(DateTime, default=utc_now, nullable=False)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True)
     comprador_nombre = Column(String(150), nullable=True, default="Público General")
     comprador_identificacion = Column(String(50), nullable=True)
@@ -400,7 +400,7 @@ class Devolucion(Base):
     id = Column(Integer, primary_key=True, index=True)
     folio_devolucion = Column(String(40), unique=True, index=True, nullable=False)
     venta_id = Column(Integer, ForeignKey("ventas.id"), nullable=False)
-    fecha_devolucion = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    fecha_devolucion = Column(DateTime, default=utc_now, nullable=False)
     motivo = Column(String(255), nullable=False)
     total_reembolsado = Column(Float, nullable=False, default=0.0)
     metodo_reembolso = Column(String(30), default="EFECTIVO", nullable=False)  # EFECTIVO, TRANSFERENCIA
@@ -431,7 +431,7 @@ class BitacoraAmbiental(Base):
     __tablename__ = "bitacora_ambiental"
 
     id = Column(Integer, primary_key=True, index=True)
-    fecha_registro = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
+    fecha_registro = Column(DateTime, default=utc_now, nullable=False, index=True)
     turno = Column(String(20), nullable=False, default="MATUTINO")  # MATUTINO, VESPERTINO, NOCTURNO
     zona = Column(String(30), nullable=False, default="ANAQUEL_GENERAL")  # ANAQUEL_GENERAL, RED_FRIO
     temperatura_c = Column(Float, nullable=False)
@@ -450,7 +450,7 @@ class DocumentoSanitario(Base):
     fecha_emision = Column(Date, nullable=False)
     fecha_vencimiento = Column(Date, nullable=False, index=True)
     activo = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
 
 class ParametroFinancieroMensual(Base):
@@ -462,7 +462,7 @@ class ParametroFinancieroMensual(Base):
     gastos_fijos_mensuales = Column(Float, nullable=False, default=28500.0)
     nomina_mensual = Column(Float, nullable=False, default=16500.0)
     actualizado_por = Column(String(150), nullable=True)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, nullable=False)
 
 
 class GastoOperativo(Base):
@@ -478,4 +478,4 @@ class GastoOperativo(Base):
     metodo_pago = Column(String(30), nullable=False, default="EFECTIVO")
     comprobante_folio = Column(String(80), nullable=True)
     registrado_por = Column(String(150), nullable=False, default="Administrador")
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)

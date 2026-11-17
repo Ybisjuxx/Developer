@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_db, utc_now
 from ..models import (
     BitacoraAmbiental,
     Cliente,
@@ -333,7 +333,7 @@ def _calcular_indicadores_periodo(
     exactitud_inv = round(max(0.0, 100.0 - ((piezas_ajustadas / max(1, piezas_totales)) * 100.0)), 1)
 
     # Stock inmovilizado > 180 días
-    hace_180 = datetime.datetime.utcnow() - datetime.timedelta(days=180)
+    hace_180 = utc_now() - datetime.timedelta(days=180)
     lotes_movidos_180 = {
         k.lote_id
         for k in kardex_total_all
@@ -358,7 +358,7 @@ def _calcular_indicadores_periodo(
     clientes_con_compra_60 = {
         v.cliente_id
         for v in db.query(Venta)
-        .filter(Venta.cliente_id.isnot(None), Venta.fecha_venta >= datetime.datetime.utcnow() - datetime.timedelta(days=60))
+        .filter(Venta.cliente_id.isnot(None), Venta.fecha_venta >= utc_now() - datetime.timedelta(days=60))
         .all()
     }
     retencion_clientes = round((len(clientes_con_compra_60) / max(1, len(clientes))) * 100, 1)
@@ -843,7 +843,7 @@ def actualizar_parametros_financieros(
         param.gastos_fijos_mensuales = payload.gastos_fijos_mensuales
         param.nomina_mensual = payload.nomina_mensual
         param.actualizado_por = usuario.nombre_completo if usuario else "Administrador"
-        param.updated_at = datetime.datetime.utcnow()
+        param.updated_at = utc_now()
     db.commit()
     db.refresh(param)
     return param

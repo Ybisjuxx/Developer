@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_db, utc_now
 from ..models import (
     ParSustitucion,
     Producto,
@@ -135,7 +135,7 @@ def _asegurar_datos_estructurados(db: Session) -> None:
                         requiere_receta_por_defecto=bool(p.requiere_receta),
                         grupo_farmacopea=p.grupo_farmacopea or "GRUPO_VI",
                         clasificado_por="Migración Catálogo Base",
-                        fecha_clasificacion=datetime.datetime.utcnow(),
+                        fecha_clasificacion=utc_now(),
                     )
                     db.add(sust)
                     db.flush()
@@ -573,7 +573,7 @@ def clasificar_sustancia(
     sust.requiere_receta_por_defecto = payload.requiere_receta_por_defecto
     sust.estado_clasificacion = "CLASIFICADA"
     sust.clasificado_por = payload.clasificado_por
-    sust.fecha_clasificacion = datetime.datetime.utcnow()
+    sust.fecha_clasificacion = utc_now()
 
     for tarea in sust.tareas:
         tarea.estado = "COMPLETADA"
@@ -596,7 +596,7 @@ def crear_par_sustitucion(
         nivel="CONSULTAR_MEDICO",
         advertencias=json.dumps(payload.advertencias, ensure_ascii=False),
         validado_por=payload.validado_por,
-        fecha_validacion=datetime.datetime.utcnow() if payload.validado_por else None,
+        fecha_validacion=utc_now() if payload.validado_por else None,
     )
     db.add(par)
     db.commit()

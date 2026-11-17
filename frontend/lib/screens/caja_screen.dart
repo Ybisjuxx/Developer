@@ -51,12 +51,16 @@ class _CajaScreenState extends State<CajaScreen> with SingleTickerProviderStateM
     });
 
     try {
-      final turno = await ApiService.getTurnoActivo();
+      final results = await Future.wait([
+        ApiService.getTurnoActivo(),
+        ApiService.getHistorialTurnos(),
+      ]);
+      final turno = results[0] as Map<String, dynamic>?;
+      final historial = results[1] as List<dynamic>;
       Map<String, dynamic>? resumen;
       if (turno != null) {
         resumen = await ApiService.getResumenTurno();
       }
-      final historial = await ApiService.getHistorialTurnos();
 
       if (mounted) {
         setState(() {
