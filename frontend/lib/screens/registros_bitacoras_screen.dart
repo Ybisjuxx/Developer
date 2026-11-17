@@ -374,23 +374,25 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                       width: 150,
                       child: DropdownButtonFormField<String>(
                         initialValue: _turno,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Turno', isDense: true),
                         items: const [
-                          DropdownMenuItem(value: 'MATUTINO', child: Text('Matutino')),
-                          DropdownMenuItem(value: 'VESPERTINO', child: Text('Vespertino')),
-                          DropdownMenuItem(value: 'NOCTURNO', child: Text('Nocturno')),
+                          DropdownMenuItem(value: 'MATUTINO', child: Text('Matutino', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'VESPERTINO', child: Text('Vespertino', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'NOCTURNO', child: Text('Nocturno', overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) => setState(() => _turno = v ?? 'MATUTINO'),
                       ),
                     ),
                     SizedBox(
-                      width: 190,
+                      width: 200,
                       child: DropdownButtonFormField<String>(
                         initialValue: _zona,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Zona', isDense: true),
                         items: const [
-                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General')),
-                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío')),
+                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) => setState(() => _zona = v ?? 'ANAQUEL_GENERAL'),
                       ),
@@ -447,14 +449,15 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                       },
                     ),
                     SizedBox(
-                      width: 180,
+                      width: 190,
                       child: DropdownButtonFormField<String>(
                         initialValue: _filtroZona,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Filtrar zona', isDense: true),
                         items: const [
-                          DropdownMenuItem(value: 'TODAS', child: Text('Todas las zonas')),
-                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General')),
-                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío')),
+                          DropdownMenuItem(value: 'TODAS', child: Text('Todas las zonas', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) {
                           setState(() => _filtroZona = v ?? 'TODAS');
@@ -532,16 +535,17 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                   runSpacing: 10,
                   children: [
                     SizedBox(
-                      width: 220,
+                      width: 260,
                       child: DropdownButtonFormField<String>(
                         initialValue: _tipoDoc,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Tipo de documento', isDense: true),
                         items: const [
-                          DropdownMenuItem(value: 'AVISO_FUNCIONAMIENTO', child: Text('Aviso de Funcionamiento')),
-                          DropdownMenuItem(value: 'LICENCIA_SANITARIA', child: Text('Licencia Sanitaria')),
-                          DropdownMenuItem(value: 'RESPONSABLE_SANITARIO', child: Text('Responsable Sanitario')),
-                          DropdownMenuItem(value: 'CAPACITACION_COFEPRIS', child: Text('Capacitación Personal')),
-                          DropdownMenuItem(value: 'FUMIGACION_CONTROL_PLAGAS', child: Text('Control de Plagas')),
+                          DropdownMenuItem(value: 'AVISO_FUNCIONAMIENTO', child: Text('Aviso de Funcionamiento', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'LICENCIA_SANITARIA', child: Text('Licencia Sanitaria', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'RESPONSABLE_SANITARIO', child: Text('Responsable Sanitario', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'CAPACITACION_COFEPRIS', child: Text('Capacitación Personal', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'FUMIGACION_CONTROL_PLAGAS', child: Text('Control de Plagas', overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) => setState(() => _tipoDoc = v ?? 'AVISO_FUNCIONAMIENTO'),
                       ),
@@ -659,12 +663,13 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                       },
                     ),
                     SizedBox(
-                      width: 210,
+                      width: 250,
                       child: DropdownButtonFormField<String>(
                         initialValue: _categoriaGasto,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Categoría', isDense: true),
                         items: _categoriasGasto
-                            .map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!)))
+                            .map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!, overflow: TextOverflow.ellipsis)))
                             .toList(),
                         onChanged: (v) => setState(() => _categoriaGasto = v ?? 'SERVICIOS'),
                       ),
@@ -685,14 +690,15 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                       ),
                     ),
                     SizedBox(
-                      width: 150,
+                      width: 160,
                       child: DropdownButtonFormField<String>(
                         initialValue: _metodoPagoGasto,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Método pago', isDense: true),
                         items: const [
-                          DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo')),
-                          DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferencia')),
-                          DropdownMenuItem(value: 'TARJETA', child: Text('Tarjeta')),
+                          DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferencia', overflow: TextOverflow.ellipsis)),
+                          DropdownMenuItem(value: 'TARJETA', child: Text('Tarjeta', overflow: TextOverflow.ellipsis)),
                         ],
                         onChanged: (v) => setState(() => _metodoPagoGasto = v ?? 'EFECTIVO'),
                       ),
@@ -733,13 +739,14 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                       },
                     ),
                     SizedBox(
-                      width: 200,
+                      width: 240,
                       child: DropdownButtonFormField<String>(
                         initialValue: _filtroCategoriaGasto,
+                        isExpanded: true,
                         decoration: const InputDecoration(labelText: 'Categoría', isDense: true),
                         items: [
-                          const DropdownMenuItem(value: 'TODAS', child: Text('Todas las categorías')),
-                          ..._categoriasGasto.map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!))),
+                          const DropdownMenuItem(value: 'TODAS', child: Text('Todas las categorías', overflow: TextOverflow.ellipsis)),
+                          ..._categoriasGasto.map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!, overflow: TextOverflow.ellipsis))),
                         ],
                         onChanged: (v) {
                           setState(() => _filtroCategoriaGasto = v ?? 'TODAS');
