@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/medico.dart';
 import '../../services/theme_service.dart';
+import '../../widgets/premium_ui.dart';
 
 /// Abre el ticket de venta en un BottomSheet responsivo para pantallas móviles.
 void mostrarTicketBottomSheet(
@@ -207,19 +208,9 @@ class PosTicketPanel extends StatelessWidget {
     final ts = ThemeService.instance;
     final bool enCarrito = carrito.isNotEmpty;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: ts.surfaceBg,
-        borderRadius: enBottomSheet
-            ? const BorderRadius.vertical(top: Radius.circular(20))
-            : BorderRadius.circular(16),
-        border: Border.all(
-          color: enCarrito ? ts.accentPrimary : ts.borderColor,
-          width: enCarrito ? 1.6 : 1.2,
-        ),
-        boxShadow: ts.cardGlowShadow,
-      ),
+    return PremiumSurfaceCard(
       padding: const EdgeInsets.all(16.0),
+      accentBorder: enCarrito ? ts.accentPrimary : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -559,68 +550,166 @@ class PosTicketPanel extends StatelessWidget {
                   )
                 : ListView.separated(
                     itemCount: carrito.length,
-                    separatorBuilder: (_, index) => const Divider(height: 10),
+                    separatorBuilder: (_, index) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final item = carrito[index];
                       final p = item['producto'];
                       final cant = item['cantidad'] as int;
-                      final sub = (p['precio_venta'] as num) * cant;
+                      final sub = ((p['precio_venta'] as num) * cant).toDouble();
 
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p['nombre_comercial'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                Text('\$${p["precio_venta"]} c/u', style: TextStyle(fontSize: 11, color: ts.textSecondary)),
-                              ],
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: ts.surfaceBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: ts.borderColor.withValues(alpha: 0.75)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p['nombre_comercial'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5,
+                                      color: ts.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '\$${p["precio_venta"]} c/u',
+                                    style: TextStyle(fontSize: 11, color: ts.textSecondary),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.remove_circle_outline, size: 20),
-                            onPressed: () => onCambiarCantidad(index, -1),
-                          ),
-                          Text('$cant', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline, size: 20),
-                            onPressed: () => onCambiarCantidad(index, 1),
-                          ),
-                          SizedBox(
-                            width: 70,
-                            child: Text(
-                              '\$$sub',
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            const SizedBox(width: 6),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: ts.cardBg,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: ts.borderColor),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                                    onTap: () => onCambiarCantidad(index, -1),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                                      child: Icon(Icons.remove, size: 15, color: ts.textPrimary),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                                    child: Text(
+                                      '$cant',
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    borderRadius: const BorderRadius.horizontal(right: Radius.circular(10)),
+                                    onTap: () => onCambiarCantidad(index, 1),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                                      child: Icon(Icons.add, size: 15, color: ts.accentPrimary),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 64,
+                              child: Text(
+                                '\$${sub.toStringAsFixed(2)}',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12.5,
+                                  color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),
           ),
 
-          // Método de Pago y Totales
-          const Divider(height: 16),
-
-          Row(
-            children: [
-              const Text('Método de Pago: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              DropdownButton<String>(
-                value: metodoPago,
-                isDense: true,
-                underline: const SizedBox(),
-                items: const [
-                  DropdownMenuItem(value: 'EFECTIVO', child: Text('💵 Efectivo')),
-                  DropdownMenuItem(value: 'TARJETA', child: Text('💳 Tarjeta')),
-                  DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('🏦 Transferencia')),
-                ],
-                onChanged: (val) {
-                  if (val != null) onMetodoPagoChanged(val);
-                },
-              ),
-            ],
+          // Método de Pago (Segmented Pills) y Totales
+          const SizedBox(height: 10),
+          Text(
+            'Método de Pago',
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: ts.textSecondary),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: ts.surfaceBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: ts.borderColor),
+            ),
+            child: Row(
+              children: [
+                for (final op in const [
+                  ('EFECTIVO', 'Efectivo', Icons.payments_outlined),
+                  ('TARJETA', 'Tarjeta', Icons.credit_card),
+                  ('TRANSFERENCIA', 'Transf.', Icons.account_balance),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(9),
+                        onTap: () => onMetodoPagoChanged(op.$1),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: metodoPago == op.$1 ? ts.accentPrimary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                op.$3,
+                                size: 14,
+                                color: metodoPago == op.$1
+                                    ? (ts.esTemaNeon ? Colors.black : Colors.white)
+                                    : ts.textSecondary,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  op.$2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: metodoPago == op.$1
+                                        ? (ts.esTemaNeon ? Colors.black : Colors.white)
+                                        : ts.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
 
           if (metodoPago == 'EFECTIVO' && carrito.isNotEmpty) ...[
@@ -659,68 +748,98 @@ class PosTicketPanel extends StatelessWidget {
             ],
           ],
 
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Subtotal:', style: TextStyle(fontSize: 13, color: ts.textSecondary)),
-              Text(
-                '\$${subtotal.toStringAsFixed(2)} MXN',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          const SizedBox(height: 10),
+          // Caja elevada de totales
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: ts.surfaceBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: ts.accentPrimary.withValues(alpha: 0.38),
+                width: 1.2,
               ),
-            ],
-          ),
-          if (descuento > 0) ...[
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              boxShadow: ts.cardGlowShadow,
+            ),
+            child: Column(
               children: [
-                Text(
-                  'Desc. Lealtad (${clienteSeleccionado!["descuento_porcentaje"]}%):',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonGreen),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Subtotal:', style: TextStyle(fontSize: 12.5, color: ts.textSecondary)),
+                    Text(
+                      '\$${subtotal.toStringAsFixed(2)} MXN',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ts.textPrimary),
+                    ),
+                  ],
                 ),
-                Text(
-                  '-\$${descuento.toStringAsFixed(2)} MXN',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: ts.neonGreen),
+                if (descuento > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Descuento (${clienteSeleccionado!["descuento_porcentaje"]}%):',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonGreen),
+                      ),
+                      Text(
+                        '-\$${descuento.toStringAsFixed(2)} MXN',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: ts.neonGreen),
+                      ),
+                    ],
+                  ),
+                ],
+                Divider(height: 14, color: ts.borderColor),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total',
+                      style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: ts.textPrimary),
+                    ),
+                    Text(
+                      '\$${total.toStringAsFixed(2)} MXN',
+                      style: TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                        color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Total a Cobrar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(
-                '\$${total.toStringAsFixed(2)} MXN',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 12),
 
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: ts.accentPrimary,
-              foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: procesandoVenta ? null : ts.cardGlowShadow,
             ),
-            onPressed: procesandoVenta ? null : onCobrar,
-            icon: procesandoVenta
-                ? SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: ts.esTemaNeon ? Colors.black : Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.payments),
-            label: Text(procesandoVenta ? 'Despachando FEFO...' : 'Cobrar e Imprimir Ticket'),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: procesandoVenta ? null : onCobrar,
+              icon: procesandoVenta
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: ts.esTemaNeon ? Colors.black : Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.payments_rounded, size: 20),
+              label: Text(
+                procesandoVenta ? 'Despachando FEFO...' : 'Cobrar e Imprimir Ticket',
+                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: 0.2),
+              ),
+            ),
           ),
         ],
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/premium_ui.dart';
 
 class DevolucionesScreen extends StatefulWidget {
   const DevolucionesScreen({super.key});
@@ -182,26 +183,52 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
     }).toList();
   }
 
+  Widget _buildPill(String text, Color color, {IconData? icon}) {
+    final ts = ThemeService.instance;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIconBadge(IconData icon, Color color) {
+    final ts = ThemeService.instance;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
+      ),
+      child: Icon(icon, color: color, size: 20),
+    );
+  }
+
   Widget _buildBarraFiltrosFechas() {
     final ts = ThemeService.instance;
     final String labelRango = (_fechaInicio != null && _fechaFin != null)
         ? '${_fechaInicio!.day.toString().padLeft(2, "0")}/${_fechaInicio!.month.toString().padLeft(2, "0")}/${_fechaInicio!.year} - ${_fechaFin!.day.toString().padLeft(2, "0")}/${_fechaFin!.month.toString().padLeft(2, "0")}/${_fechaFin!.year}'
         : 'Seleccionar Rango de Fechas';
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ts.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ts.borderColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: ts.esOscuro ? 0.2 : 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return PremiumSurfaceCard(
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -469,87 +496,113 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
             itemBuilder: (context, index) {
               final d = lista[index];
               final List<dynamic> detalles = d['detalles'] ?? [];
+              final hasMerma = detalles.any((det) => det['estado_producto'] != 'BUEN_ESTADO');
+              final allGood = detalles.isNotEmpty && !hasMerma;
+              final statusColor = allGood ? ts.neonGreen : (hasMerma ? ts.neonAmber : ts.accentPrimary);
+              final statusLabel = allGood ? 'Reingreso Stock' : (hasMerma ? 'Con Merma' : 'Devolución');
+              final rawFecha = (d['fecha_devolucion'] ?? '').toString().replaceFirst('T', ' ');
+              final fechaFmt = rawFecha.length >= 16 ? rawFecha.substring(0, 16) : rawFecha;
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                elevation: ts.esTemaNeon ? 0 : 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
-                ),
-                color: ts.cardBg,
-                child: ExpansionTile(
-                  leading: CircleAvatar(
-                    backgroundColor: ts.tintBg(ts.neonAmber, lightAlpha: 0.15, darkAlpha: 0.25),
-                    child: Icon(Icons.replay, color: ts.neonAmber),
-                  ),
-                  title: Text(
-                    'Folio: ${d["folio_devolucion"]}',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
-                  ),
-                  subtitle: Text(
-                    'Venta ID: #${d["venta_id"]} | Motivo: ${d["motivo"]}\n'
-                    'Fecha: ${d["fecha_devolucion"].toString().replaceFirst("T", " ").substring(0, 16)}',
-                    style: TextStyle(color: ts.textSecondary),
-                  ),
-                  trailing: Text(
-                    'Reembolso:\n\$${d["total_reembolsado"]} MXN',
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: ts.neonRed,
-                    ),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AnimatedHoverScaleCard(
+                  hoverScale: 1.01,
+                  child: PremiumSurfaceCard(
+                    padding: EdgeInsets.zero,
+                    accentBorder: statusColor.withValues(alpha: 0.32),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        leading: _buildIconBadge(Icons.replay_rounded, ts.neonAmber),
+                        title: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _buildPill(
+                              'Folio: ${d["folio_devolucion"]}',
+                              ts.accentPrimary,
+                              icon: Icons.confirmation_number_outlined,
+                            ),
+                            _buildPill(
+                              statusLabel,
+                              statusColor,
+                              icon: allGood ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                            ),
+                          ],
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Venta ID: #${d["venta_id"]} • Motivo: ${d["motivo"]}\n'
+                            'Fecha: $fechaFmt',
+                            style: TextStyle(fontSize: 12, color: ts.textSecondary),
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: ts.tintBg(ts.neonRed, lightAlpha: 0.12, darkAlpha: 0.22),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: ts.neonRed.withValues(alpha: 0.35)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('Reembolso', style: TextStyle(fontSize: 10, color: ts.textSecondary, fontWeight: FontWeight.w600)),
+                              Text(
+                                '\$${d["total_reembolsado"]} MXN',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ts.neonRed),
+                              ),
+                            ],
+                          ),
+                        ),
                         children: [
-                          Text('Artículos Devueltos:', style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary)),
-                          const SizedBox(height: 8),
-                          ...detalles.map((det) {
-                            final bool buenEstado = det['estado_producto'] == 'BUEN_ESTADO';
-                            final Color itemColor = buenEstado ? ts.neonGreen : ts.neonRed;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: ts.tintBg(itemColor, lightAlpha: 0.10, darkAlpha: 0.18),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: itemColor.withValues(alpha: 0.35)),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '• ${det["cantidad"]} pzas (Prod #${det["producto_id"]}, Lote #${det["lote_id"]})',
-                                    style: TextStyle(fontWeight: FontWeight.w500, color: ts.textPrimary),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text('Artículos Devueltos:', style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary)),
+                                const SizedBox(height: 8),
+                                ...detalles.map((det) {
+                                  final bool buenEstado = det['estado_producto'] == 'BUEN_ESTADO';
+                                  final Color itemColor = buenEstado ? ts.neonGreen : ts.neonRed;
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
-                                      color: ts.tintBg(itemColor, lightAlpha: 0.20, darkAlpha: 0.30),
+                                      color: ts.tintBg(itemColor, lightAlpha: 0.10, darkAlpha: 0.18),
                                       borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: itemColor.withValues(alpha: 0.35)),
                                     ),
-                                    child: Text(
-                                      buenEstado ? 'Reingresó a Stock' : 'MERMA (Dañado)',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: itemColor,
-                                      ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            '• ${det["cantidad"]} pzas (Prod #${det["producto_id"]}, Lote #${det["lote_id"]})',
+                                            style: TextStyle(fontWeight: FontWeight.w600, color: ts.textPrimary, fontSize: 12),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        _buildPill(
+                                          buenEstado ? 'Reingresó a Stock' : 'MERMA (Dañado)',
+                                          itemColor,
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -629,36 +682,73 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
             itemCount: listaMermas.length,
             itemBuilder: (context, index) {
               final m = listaMermas[index];
+              final rawFecha = (m['fecha'] ?? '').toString().replaceFirst('T', ' ');
+              final fechaFmt = rawFecha.length >= 16 ? rawFecha.substring(0, 16) : rawFecha;
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                elevation: ts.esTemaNeon ? 0 : 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: ts.esOscuro ? BorderSide(color: ts.borderColor) : BorderSide.none,
-                ),
-                color: ts.cardBg,
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: ts.tintBg(ts.neonRed, lightAlpha: 0.15, darkAlpha: 0.25),
-                    child: Icon(Icons.delete_forever, color: ts.neonRed),
-                  ),
-                  title: Text(
-                    '${m["producto_nombre"]} (Lote: ${m["numero_lote"]})',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: ts.textPrimary),
-                  ),
-                  subtitle: Text(
-                    'Cantidad Merma: ${m["cantidad"]} piezas | Motivo: ${m["motivo"]}\n'
-                    'Fecha de baja: ${m["fecha"].toString().replaceFirst("T", " ").substring(0, 16)}',
-                    style: TextStyle(color: ts.textSecondary),
-                  ),
-                  trailing: Text(
-                    'Costo Baja:\n\$${m["costo_total"]} MXN',
-                    textAlign: TextAlign.end,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: ts.neonRed,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AnimatedHoverScaleCard(
+                  hoverScale: 1.01,
+                  child: PremiumSurfaceCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    accentBorder: ts.neonRed.withValues(alpha: 0.30),
+                    child: Row(
+                      children: [
+                        _buildIconBadge(Icons.delete_forever_rounded, ts.neonRed),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    '${m["producto_nombre"]}',
+                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: ts.textPrimary),
+                                  ),
+                                  _buildPill(
+                                    'Lote: ${m["numero_lote"]}',
+                                    ts.accentPrimary,
+                                    icon: Icons.qr_code_2_rounded,
+                                  ),
+                                  _buildPill(
+                                    'MERMA (${m["cantidad"]} pzas)',
+                                    ts.neonRed,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'Motivo: ${m["motivo"]} • Fecha de baja: $fechaFmt',
+                                style: TextStyle(fontSize: 12, color: ts.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: ts.tintBg(ts.neonRed, lightAlpha: 0.12, darkAlpha: 0.22),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: ts.neonRed.withValues(alpha: 0.35)),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('Costo Baja', style: TextStyle(fontSize: 10, color: ts.textSecondary, fontWeight: FontWeight.w600)),
+                              Text(
+                                '\$${m["costo_total"]} MXN',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ts.neonRed),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

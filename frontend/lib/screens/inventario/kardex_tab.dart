@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/theme_service.dart';
 import '../../widgets/lector_codigo_barras_dialog.dart';
+import '../../widgets/premium_ui.dart';
 import 'lote_acciones_dialogs.dart';
 
 class KardexTab extends StatefulWidget {
@@ -213,36 +214,53 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
     return str.length >= 16 ? str.substring(0, 16).replaceAll('T', ' ') : str;
   }
 
+  Color _movimientoColor(ThemeService ts, String tipo, bool esEntrada) {
+    if (tipo.contains('MERMA') || tipo.contains('BAJA') || tipo.contains('CADUCADO')) {
+      return ts.neonRed;
+    }
+    if (tipo.contains('AJUSTE')) {
+      return ts.neonAmber;
+    }
+    if (esEntrada || tipo.contains('ENTRADA')) {
+      return ts.neonGreen;
+    }
+    return ts.neonBlue;
+  }
+
   Widget _buildBarraFiltrosKardex() {
     final ts = ThemeService.instance;
     final String labelRango = (_fechaInicioKardex != null && _fechaFinKardex != null)
         ? '${_fechaInicioKardex!.day.toString().padLeft(2, "0")}/${_fechaInicioKardex!.month.toString().padLeft(2, "0")}/${_fechaInicioKardex!.year} - ${_fechaFinKardex!.day.toString().padLeft(2, "0")}/${_fechaFinKardex!.month.toString().padLeft(2, "0")}/${_fechaFinKardex!.year}'
         : 'Seleccionar Rango de Fechas';
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: ts.surfaceBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ts.borderColor, width: 1.2),
-        boxShadow: ts.cardGlowShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Fila Superior: Buscador de texto + Botón de Cámara + Selector de Rango de Fechas
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 650;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: PremiumSurfaceCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Fila Superior: Buscador de texto + Botón de Cámara + Selector de Rango de Fechas
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 650;
 
-              final searchField = TextField(
-                controller: _busquedaKardexController,
-                decoration: InputDecoration(
-                  hintText: 'Buscar por medicamento, lote, motivo, auditor o referencia...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                final searchField = TextField(
+                  controller: _busquedaKardexController,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por medicamento, lote, motivo, auditor o referencia...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    filled: true,
+                    fillColor: ts.surfaceBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: ts.borderColor),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: ts.borderColor),
+                    ),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -415,10 +433,11 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                     },
                   ),
                 ],
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -459,60 +478,82 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
 
         // Resumen KPI del Período Filtrado
         if (movimientos.isNotEmpty)
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: ts.surfaceBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: ts.borderColor),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 600;
-                final kpiMovs = Text(
-                  '${movimientos.length} mov. filtrados (${widget.kardex.length} total)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.textPrimary),
-                );
-                final kpiBalance = Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      '+$totalEntradas pzas entrantes',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonGreen),
-                    ),
-                    Text(
-                      '-$totalSalidas pzas salientes',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonRed),
-                    ),
-                    if (totalIrregulares > 0)
-                      Text(
-                        '⚠️ $totalIrregulares irregulares',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.neonRed),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: PremiumSurfaceCard(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              elevatedGlow: false,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isNarrow = constraints.maxWidth < 600;
+                  final kpiMovs = Text(
+                    '${movimientos.length} mov. filtrados (${widget.kardex.length} total)',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: ts.textPrimary),
+                  );
+                  final kpiBalance = Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ts.tintBg(ts.neonGreen),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: ts.neonGreen.withValues(alpha: 0.35)),
+                        ),
+                        child: Text(
+                          '+$totalEntradas pzas entrantes',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.neonGreen),
+                        ),
                       ),
-                  ],
-                );
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: ts.tintBg(ts.neonRed),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: ts.neonRed.withValues(alpha: 0.35)),
+                        ),
+                        child: Text(
+                          '-$totalSalidas pzas salientes',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.neonRed),
+                        ),
+                      ),
+                      if (totalIrregulares > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: ts.tintBg(ts.neonRed),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: ts.neonRed.withValues(alpha: 0.45)),
+                          ),
+                          child: Text(
+                            '⚠️ $totalIrregulares irregulares',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: ts.neonRed),
+                          ),
+                        ),
+                    ],
+                  );
 
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      kpiMovs,
-                      const SizedBox(height: 4),
-                      kpiBalance,
-                    ],
-                  );
-                } else {
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      kpiMovs,
-                      kpiBalance,
-                    ],
-                  );
-                }
-              },
+                  if (isNarrow) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        kpiMovs,
+                        const SizedBox(height: 6),
+                        kpiBalance,
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        kpiMovs,
+                        kpiBalance,
+                      ],
+                    );
+                  }
+                },
+              ),
             ),
           ),
 
@@ -556,16 +597,16 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: movimientos.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (context, index) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final k = movimientos[index];
                     final int stockAnt = (k['stock_anterior'] as num?)?.toInt() ?? 0;
                     final int stockPost = (k['stock_posterior'] as num?)?.toInt() ?? 0;
                     final String tipo = (k['tipo_movimiento'] ?? '').toString().toUpperCase();
                     final int rawCant = (k['cantidad'] as num?)?.toInt() ?? 0;
-                    final bool esEntrada = tipo.contains('ENTRADA') || (stockPost > stockAnt) || (rawCant > 0 && !tipo.contains('SALIDA') && !tipo.contains('BAJA'));
+                    final bool esEntrada = tipo.contains('ENTRADA') || (stockPost > stockAnt) || (rawCant > 0 && !tipo.contains('SALIDA') && !tipo.contains('BAJA') && !tipo.contains('MERMA'));
                     final bool esIrregular = k['es_irregular'] ?? false;
                     final String? obs = k['observaciones_auditoria'];
                     final String? auditor = k['usuario_auditor'];
@@ -579,19 +620,14 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                     final String fechaStr = _formatoFechaKardex(k['created_at']);
 
                     final int displayCant = (stockPost - stockAnt) != 0 ? (stockPost - stockAnt).abs() : rawCant.abs();
+                    final Color tipoColor = _movimientoColor(ts, tipo, esEntrada);
+                    final Color avatarColor = esIrregular ? ts.neonRed : tipoColor;
 
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: ts.cardBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: esIrregular ? ts.neonRed : ts.borderColor,
-                          width: esIrregular ? 1.6 : 1.2,
-                        ),
-                        boxShadow: ts.cardGlowShadow,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
+                    return AnimatedHoverScaleCard(
+                      hoverScale: 1.008,
+                      child: PremiumSurfaceCard(
+                        padding: const EdgeInsets.all(14),
+                        accentBorder: esIrregular ? ts.neonRed.withValues(alpha: 0.7) : null,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -599,31 +635,19 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 CircleAvatar(
-                                  backgroundColor: esIrregular
-                                      ? ts.tintBg(ts.neonRed)
-                                      : esEntrada
-                                          ? ts.tintBg(ts.neonGreen)
-                                          : tipo.contains('BAJA')
-                                              ? ts.tintBg(ts.neonRed)
-                                              : ts.tintBg(ts.neonBlue),
+                                  backgroundColor: ts.tintBg(avatarColor),
                                   radius: 20,
                                   child: Icon(
                                     esIrregular
                                         ? Icons.warning_amber_rounded
                                         : esEntrada
                                             ? Icons.arrow_downward
-                                            : tipo.contains('BAJA')
+                                            : (tipo.contains('BAJA') || tipo.contains('MERMA'))
                                                 ? Icons.delete_outline
                                                 : tipo.contains('AJUSTE')
                                                     ? Icons.sync_alt
                                                     : Icons.arrow_upward,
-                                    color: esIrregular
-                                        ? ts.neonRed
-                                        : esEntrada
-                                            ? ts.neonGreen
-                                            : tipo.contains('BAJA')
-                                                ? ts.neonRed
-                                                : ts.neonBlue,
+                                    color: avatarColor,
                                     size: 20,
                                   ),
                                 ),
@@ -637,38 +661,34 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                         prodNombre,
                                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: ts.textPrimary),
                                       ),
-                                      const SizedBox(height: 3),
+                                      const SizedBox(height: 4),
                                       // Badges de Tipo y Anomalía
                                       Wrap(
                                         spacing: 6,
                                         runSpacing: 4,
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: esEntrada ? ts.tintBg(ts.neonGreen) : ts.tintBg(ts.neonBlue),
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: esEntrada
-                                                    ? ts.neonGreen.withValues(alpha: 0.4)
-                                                    : ts.neonBlue.withValues(alpha: 0.4),
-                                              ),
+                                              color: ts.tintBg(tipoColor),
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(color: tipoColor.withValues(alpha: 0.4)),
                                             ),
                                             child: Text(
                                               tipo,
                                               style: TextStyle(
                                                 fontSize: 10,
                                                 fontWeight: FontWeight.bold,
-                                                color: esEntrada ? ts.neonGreen : ts.neonBlue,
+                                                color: tipoColor,
                                               ),
                                             ),
                                           ),
                                           if (numLote.isNotEmpty)
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: ts.surfaceAltBg,
-                                                borderRadius: BorderRadius.circular(4),
+                                                borderRadius: BorderRadius.circular(20),
                                                 border: Border.all(color: ts.borderColor),
                                               ),
                                               child: Text(
@@ -678,10 +698,10 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                             ),
                                           if (esIrregular)
                                             Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: ts.tintBg(ts.neonRed),
-                                                borderRadius: BorderRadius.circular(4),
+                                                borderRadius: BorderRadius.circular(20),
                                                 border: Border.all(color: ts.neonRed.withValues(alpha: 0.4)),
                                               ),
                                               child: Text(
@@ -695,7 +715,7 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                             ),
                                         ],
                                       ),
-                                      const SizedBox(height: 4),
+                                      const SizedBox(height: 5),
                                       // Metadatos: Fecha, Motivo y Saldo
                                       if (fechaStr.isNotEmpty) ...[
                                         Row(
@@ -708,7 +728,13 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                             ),
                                             if (lab.isNotEmpty) ...[
                                               const SizedBox(width: 6),
-                                              Text('• $lab', style: TextStyle(fontSize: 11, color: ts.textSecondary)),
+                                              Flexible(
+                                                child: Text(
+                                                  '• $lab',
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 11, color: ts.textSecondary),
+                                                ),
+                                              ),
                                             ],
                                           ],
                                         ),
@@ -725,12 +751,22 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text(
-                                      '${esEntrada ? "+" : "-"}$displayCant pzas',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: esEntrada ? ts.neonGreen : ts.neonRed,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: ts.tintBg(esEntrada ? ts.neonGreen : tipoColor),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: (esEntrada ? ts.neonGreen : tipoColor).withValues(alpha: 0.35),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${esEntrada ? "+" : "-"}$displayCant pzas',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: esEntrada ? ts.neonGreen : tipoColor,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
@@ -758,7 +794,7 @@ class _KardexTabState extends State<KardexTab> with AutomaticKeepAliveClientMixi
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
                                   color: esIrregular ? ts.tintBg(ts.neonRed) : ts.tintBg(ts.accentPrimary),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: esIrregular
                                         ? ts.neonRed.withValues(alpha: 0.4)

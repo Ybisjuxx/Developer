@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/premium_ui.dart';
 import 'inventario/caducidades_tab.dart';
 import 'inventario/kardex_tab.dart';
 import 'inventario/nuevo_lote_dialog.dart';
@@ -78,110 +79,144 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   @override
   Widget build(BuildContext context) {
     final ts = ThemeService.instance;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isMobile = constraints.maxWidth < 800;
+    return ListenableBuilder(
+      listenable: ts,
+      builder: (context, _) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final bool isMobile = constraints.maxWidth < 800;
 
-        return Scaffold(
-          backgroundColor: ts.scaffoldBg,
-          floatingActionButton: isMobile
-              ? FloatingActionButton.extended(
-                  onPressed: _abrirNuevoLote,
-                  backgroundColor: ts.accentPrimary,
-                  foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Registrar Lote'),
-                )
-              : null,
-          appBar: PreferredSize(
-            preferredSize: const Size.fromHeight(60),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: ts.heroBannerGradient,
-                border: Border(
-                  bottom: BorderSide(
-                    color: ts.esTemaNeon ? ts.accentPrimary.withValues(alpha: 0.45) : ts.borderColor,
-                    width: 1.2,
+            return Scaffold(
+              backgroundColor: ts.scaffoldBg,
+              floatingActionButton: isMobile
+                  ? FloatingActionButton.extended(
+                      onPressed: _abrirNuevoLote,
+                      backgroundColor: ts.accentPrimary,
+                      foregroundColor: ts.esTemaNeon ? Colors.black : Colors.white,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Nuevo Lote'),
+                    )
+                  : null,
+              body: SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 12 : 16,
+                    isMobile ? 12 : 16,
+                    isMobile ? 12 : 16,
+                    0,
                   ),
-                ),
-                boxShadow: ts.cardGlowShadow,
-              ),
-              child: SafeArea(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        labelColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
-                        unselectedLabelColor: ts.esTemaNeon ? ts.textSecondary : Colors.white.withValues(alpha: 0.75),
-                        indicatorColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
-                        indicatorWeight: 3,
-                        tabs: [
-                          Tab(
-                            icon: const Icon(Icons.inventory_2),
-                            text: isMobile ? 'Catálogo y Lotes' : 'Catálogo y Todos los Lotes',
-                          ),
-                          Tab(
-                            icon: Badge(
-                              isLabelVisible: _lotesCaducidades.isNotEmpty,
-                              label: Text('${_lotesCaducidades.length}'),
-                              backgroundColor: ts.neonRed,
-                              child: const Icon(Icons.warning_amber_rounded),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      PremiumModuleHeader(
+                        title: 'Inventario, Caducidades FEFO y Kardex',
+                        subtitle: 'Control de existencias por lote, alertas sanitarias FEFO y auditoría inmutable de Kardex.',
+                        icon: Icons.inventory_2_rounded,
+                        badge: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: ts.esTemaNeon
+                                ? ts.accentPrimary.withValues(alpha: 0.25)
+                                : Colors.white.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: ts.esTemaNeon
+                                  ? ts.accentPrimary.withValues(alpha: 0.5)
+                                  : Colors.white.withValues(alpha: 0.35),
                             ),
-                            text: isMobile ? 'Alertas FEFO' : 'Lotes por Caducar (Alertas FEFO)',
                           ),
-                          Tab(
-                            icon: const Icon(Icons.history_edu),
-                            text: isMobile ? 'Kardex' : 'Kardex y Auditoría de Movimientos',
+                          child: Text(
+                            _lotesCaducidades.isNotEmpty
+                                ? '${_lotesCaducidades.length} FEFO'
+                                : '${_productos.length} PRODUCTOS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        actions: [
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                              foregroundColor: ts.esTemaNeon ? Colors.black : ts.accentPrimary,
+                            ),
+                            onPressed: _abrirNuevoLote,
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Nuevo Lote', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ),
-                    ),
-                    if (!isMobile)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
-                            foregroundColor: ts.esTemaNeon ? Colors.black : ts.accentPrimary,
-                          ),
-                          onPressed: _abrirNuevoLote,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Registrar Lote', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      PremiumSurfaceCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        elevatedGlow: false,
+                        child: TabBar(
+                          controller: _tabController,
+                          isScrollable: true,
+                          labelColor: ts.accentPrimary,
+                          unselectedLabelColor: ts.textSecondary,
+                          indicatorColor: ts.accentPrimary,
+                          indicatorWeight: 3,
+                          dividerColor: Colors.transparent,
+                          tabs: [
+                            Tab(
+                              icon: const Icon(Icons.inventory_2_outlined),
+                              text: isMobile ? 'Catálogo y Lotes' : 'Catálogo y Todos los Lotes',
+                            ),
+                            Tab(
+                              icon: Badge(
+                                isLabelVisible: _lotesCaducidades.isNotEmpty,
+                                label: Text('${_lotesCaducidades.length}'),
+                                backgroundColor: ts.neonRed,
+                                child: const Icon(Icons.warning_amber_rounded),
+                              ),
+                              text: isMobile ? 'Alertas FEFO' : 'Lotes por Caducar (Alertas FEFO)',
+                            ),
+                            Tab(
+                              icon: const Icon(Icons.history_edu_outlined),
+                              text: isMobile ? 'Kardex' : 'Kardex y Auditoría de Movimientos',
+                            ),
+                          ],
                         ),
                       ),
-                  ],
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: _isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _error != null
+                                ? Center(child: Text('Error: $_error', style: TextStyle(color: ts.neonRed)))
+                                : TabBarView(
+                                    controller: _tabController,
+                                    children: [
+                                      // Pestaña 1: Catálogo y Lotes
+                                      ProductosTab(
+                                        productos: _productos,
+                                        onReload: _cargarTodo,
+                                      ),
+                                      // Pestaña 2: Sub-Agente 1 - Lotes Próximos a Caducar Separados
+                                      CaducidadesTab(
+                                        lotesCaducidades: _lotesCaducidades,
+                                        productos: _productos,
+                                        onReload: _cargarTodo,
+                                      ),
+                                      // Pestaña 3: Kardex Inmutable con Comentarios
+                                      KardexTab(
+                                        kardex: _kardex,
+                                        productos: _productos,
+                                        onReload: _cargarTodo,
+                                      ),
+                                    ],
+                                  ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
-          body: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-                  ? Center(child: Text('Error: $_error', style: TextStyle(color: ts.neonRed)))
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        // Pestaña 1: Catálogo y Lotes
-                        ProductosTab(
-                          productos: _productos,
-                          onReload: _cargarTodo,
-                        ),
-                        // Pestaña 2: Sub-Agente 1 - Lotes Próximos a Caducar Separados
-                        CaducidadesTab(
-                          lotesCaducidades: _lotesCaducidades,
-                          productos: _productos,
-                          onReload: _cargarTodo,
-                        ),
-                        // Pestaña 3: Kardex Inmutable con Comentarios
-                        KardexTab(
-                          kardex: _kardex,
-                          productos: _productos,
-                          onReload: _cargarTodo,
-                        ),
-                      ],
-                    ),
+            );
+          },
         );
       },
     );

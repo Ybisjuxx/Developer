@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/lector_codigo_barras_dialog.dart';
+import '../widgets/premium_ui.dart';
 import '../widgets/ticket_impresion_dialog.dart';
 import 'ventas/devolucion_dialog.dart';
 import 'ventas/facturacion_dialog.dart';
@@ -225,51 +226,106 @@ class _VentasScreenState extends State<VentasScreen> {
     }
   }
 
-  Widget _buildVentasKpiCard({
+  IconData _iconoMetodoPago(String metodo) {
+    final m = metodo.toUpperCase();
+    if (m.contains('TARJETA')) return Icons.credit_card_rounded;
+    if (m.contains('TRANSFER')) return Icons.account_balance_rounded;
+    if (m.contains('MIXTO')) return Icons.call_split_rounded;
+    return Icons.payments_outlined;
+  }
+
+  String _formatearFechaCorta(dynamic rawFecha) {
+    final str = (rawFecha ?? '').toString().replaceFirst('T', ' ');
+    return str.length >= 16 ? str.substring(0, 16) : str;
+  }
+
+  Widget _buildPill({
+    required String label,
+    required Color color,
+    required ThemeService ts,
+    IconData? icon,
+    bool filled = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: filled
+            ? ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24)
+            : ts.tintBg(color, lightAlpha: 0.10, darkAlpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBentoStat({
     required String titulo,
     required String valor,
     required IconData icono,
     required Color color,
     required ThemeService ts,
-    double? width,
   }) {
     return Container(
-      width: width ?? 190,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: ts.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: ts.borderColor, width: 1.2),
-        boxShadow: ts.cardGlowShadow,
+        color: ts.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ts.borderColor, width: 1),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                titulo,
-                style: TextStyle(fontSize: 11, color: ts.textSecondary, fontWeight: FontWeight.w600),
-              ),
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: BoxDecoration(
-                  color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.22),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icono, color: color, size: 16),
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.22),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icono, color: color, size: 18),
           ),
-          const SizedBox(height: 6),
-          Text(
-            valor,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: ts.textPrimary,
-              letterSpacing: -0.2,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  titulo,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: ts.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  valor,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: ts.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ],
@@ -287,7 +343,6 @@ class _VentasScreenState extends State<VentasScreen> {
       (sum, v) => sum + ((v['total'] as num?)?.toDouble() ?? 0.0),
     );
     final totalFacturadas = _ventasFiltradas.where((v) => v['facturada'] == true).length;
-    final totalCompletadas = _ventasFiltradas.where((v) => (v['estado'] ?? 'COMPLETADA') == 'COMPLETADA').length;
 
     return Scaffold(
       body: Padding(
@@ -295,126 +350,42 @@ class _VentasScreenState extends State<VentasScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Cabecera de módulo HeroUI / Fragments UI
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: ts.heroBannerGradient,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ts.borderColor, width: 1.2),
-                boxShadow: ts.cardGlowShadow,
-              ),
-              child: Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 10,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: ts.esTemaNeon
-                              ? ts.accentPrimary.withValues(alpha: 0.16)
-                              : Colors.white.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: ts.esTemaNeon
-                                ? ts.accentPrimary.withValues(alpha: 0.45)
-                                : Colors.white.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.receipt_long,
-                          color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Historial de Ventas, Tickets y Facturación',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: ts.esTemaNeon ? ts.textPrimary : Colors.white,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Emisión de CFDI 4.0, reimpresión de tickets y control de devoluciones.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: ts.esTemaNeon ? ts.textSecondary : Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+            PremiumModuleHeader(
+              title: 'Historial de Ventas y Facturación',
+              subtitle: 'Emisión de CFDI 4.0, reimpresión de tickets y control de devoluciones.',
+              icon: Icons.receipt_long_rounded,
+              badge: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(
+                  color: ts.esTemaNeon
+                      ? ts.accentPrimary.withValues(alpha: 0.22)
+                      : Colors.white.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: ts.esTemaNeon
+                        ? ts.accentPrimary.withValues(alpha: 0.5)
+                        : Colors.white.withValues(alpha: 0.35),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.refresh,
-                      color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
-                    ),
-                    onPressed: _cargarVentas,
-                    tooltip: 'Actualizar ventas',
+                ),
+                child: Text(
+                  '$totalVentasCount tickets',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
                   ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Strip de KPIs de Ventas y Facturación
-            LayoutBuilder(
-              builder: (context, kConstraints) {
-                final double w = kConstraints.maxWidth;
-                final double cardWidth = w < 480 ? (w - 12) / 2 : (w < 820 ? (w - 24) / 3 : 210);
-
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 10,
-                  children: [
-                    _buildVentasKpiCard(
-                      titulo: 'Tickets en Consulta',
-                      valor: '$totalVentasCount tickets',
-                      icono: Icons.receipt_long,
-                      color: ts.accentPrimary,
-                      ts: ts,
-                      width: cardWidth,
-                    ),
-                    _buildVentasKpiCard(
-                      titulo: 'Total Vendido',
-                      valor: '\$${totalIngresos.toStringAsFixed(2)} MXN',
-                      icono: Icons.payments,
-                      color: ts.neonGreen,
-                      ts: ts,
-                      width: cardWidth,
-                    ),
-                    _buildVentasKpiCard(
-                      titulo: 'Facturas CFDI 4.0',
-                      valor: '$totalFacturadas emitidas',
-                      icono: Icons.verified_user,
-                      color: ts.neonBlue,
-                      ts: ts,
-                      width: cardWidth,
-                    ),
-                    _buildVentasKpiCard(
-                      titulo: 'Tickets Completados',
-                      valor: '$totalCompletadas órdenes',
-                      icono: Icons.check_circle,
-                      color: ts.neonAmber,
-                      ts: ts,
-                      width: cardWidth,
-                    ),
-                  ],
-                );
-              },
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: ts.esTemaNeon ? ts.accentPrimary : Colors.white,
+                  ),
+                  onPressed: _cargarVentas,
+                  tooltip: 'Actualizar ventas',
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 
@@ -534,15 +505,9 @@ class _VentasScreenState extends State<VentasScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Barra de Búsqueda y Filtros de Fecha para el Historial de Ventas
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: ts.cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: ts.borderColor, width: 1.2),
-                boxShadow: ts.cardGlowShadow,
-              ),
+            // Barra de Búsqueda, Filtros de Fecha y Resumen Bento en PremiumSurfaceCard
+            PremiumSurfaceCard(
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -555,7 +520,7 @@ class _VentasScreenState extends State<VentasScreen> {
                           hintText: 'Filtrar ventas por ticket (TK-...), cliente o medicamento...',
                           prefixIcon: const Icon(Icons.search, size: 20),
                           isDense: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                           suffixIcon: _busquedaVentasController.text.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear, size: 18),
@@ -617,7 +582,7 @@ class _VentasScreenState extends State<VentasScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -666,10 +631,63 @@ class _VentasScreenState extends State<VentasScreen> {
                       ],
                     ),
                   ),
+                  Divider(height: 18, color: ts.borderColor.withValues(alpha: 0.6)),
+                  LayoutBuilder(
+                    builder: (context, kConstraints) {
+                      final isCompact = kConstraints.maxWidth < 560;
+                      final statTickets = _buildBentoStat(
+                        titulo: 'Total tickets',
+                        valor: '$totalVentasCount tickets',
+                        icono: Icons.receipt_long_rounded,
+                        color: ts.accentPrimary,
+                        ts: ts,
+                      );
+                      final statMonto = _buildBentoStat(
+                        titulo: 'Monto total',
+                        valor: '\$${totalIngresos.toStringAsFixed(2)} MXN',
+                        icono: Icons.payments_rounded,
+                        color: ts.neonGreen,
+                        ts: ts,
+                      );
+                      final statCfdi = _buildBentoStat(
+                        titulo: 'Facturadas CFDI',
+                        valor: '$totalFacturadas emitidas',
+                        icono: Icons.verified_user_rounded,
+                        color: ts.neonBlue,
+                        ts: ts,
+                      );
+
+                      if (isCompact) {
+                        return Column(
+                          children: [
+                            statTickets,
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(child: statMonto),
+                                const SizedBox(width: 8),
+                                Expanded(child: statCfdi),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: statTickets),
+                          const SizedBox(width: 10),
+                          Expanded(child: statMonto),
+                          const SizedBox(width: 10),
+                          Expanded(child: statCfdi),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             // Lista de Ventas
             Expanded(
@@ -707,174 +725,208 @@ class _VentasScreenState extends State<VentasScreen> {
                           : ListView.builder(
                               itemCount: _ventasFiltradas.length,
                               itemBuilder: (context, index) {
-                                final v = _ventasFiltradas[index];
+                                final v = _ventasFiltradas[index] as Map<String, dynamic>;
                                 final List<dynamic> detalles = v['detalles'] ?? [];
                                 final String estado = v['estado'] ?? 'COMPLETADA';
                                 final bool estaFacturada = v['facturada'] == true;
+                                final String metodoPago = (v['metodo_pago'] ?? 'EFECTIVO').toString();
+                                final String folio = (v['folio_ticket'] ?? '').toString();
+                                final String comprador = (v['comprador_nombre'] ?? 'Público General').toString();
+                                final String fechaCorta = _formatearFechaCorta(v['fecha_venta']);
+                                final double totalVenta = (v['total'] as num?)?.toDouble() ?? 0.0;
+                                final Color estadoColor = _obtenerColorEstado(estado);
 
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  decoration: BoxDecoration(
-                                    color: ts.cardBg,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: ts.borderColor, width: 1.2),
-                                    boxShadow: ts.cardGlowShadow,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: ExpansionTile(
-                                      shape: const Border(),
-                                      collapsedShape: const Border(),
-                                      leading: CircleAvatar(
-                                        backgroundColor: estaFacturada ? ts.tintBg(ts.neonBlue) : ts.tintBg(ts.accentPrimary),
-                                        child: Icon(
-                                          estaFacturada ? Icons.verified : Icons.receipt,
-                                          color: estaFacturada ? ts.neonBlue : ts.accentPrimary,
-                                        ),
-                                      ),
-                                    title: Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Folio: ${v["folio_ticket"]}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: _obtenerColorEstado(estado).withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: _obtenerColorEstado(estado)),
-                                          ),
-                                          child: Text(
-                                            estado,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: _obtenerColorEstado(estado),
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: AnimatedHoverScaleCard(
+                                    hoverScale: 1.008,
+                                    child: PremiumSurfaceCard(
+                                      padding: EdgeInsets.zero,
+                                      accentBorder: estaFacturada
+                                          ? ts.neonBlue.withValues(alpha: 0.45)
+                                          : null,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: ExpansionTile(
+                                          shape: const Border(),
+                                          collapsedShape: const Border(),
+                                          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                          leading: CircleAvatar(
+                                            backgroundColor: estaFacturada
+                                                ? ts.tintBg(ts.neonBlue)
+                                                : ts.tintBg(ts.accentPrimary),
+                                            child: Icon(
+                                              estaFacturada ? Icons.verified_rounded : Icons.receipt_rounded,
+                                              color: estaFacturada ? ts.neonBlue : ts.accentPrimary,
+                                              size: 20,
                                             ),
                                           ),
-                                        ),
-                                        if (estaFacturada)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: ts.tintBg(ts.neonBlue),
-                                              borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: ts.neonBlue.withValues(alpha: 0.5)),
-                                            ),
+                                          title: Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            crossAxisAlignment: WrapCrossAlignment.center,
+                                            children: [
+                                              _buildPill(
+                                                label: 'Folio $folio',
+                                                color: ts.accentPrimary,
+                                                ts: ts,
+                                                icon: Icons.tag_rounded,
+                                                filled: true,
+                                              ),
+                                              _buildPill(
+                                                label: estado,
+                                                color: estadoColor,
+                                                ts: ts,
+                                              ),
+                                              _buildPill(
+                                                label: metodoPago,
+                                                color: ts.accentSecondary,
+                                                ts: ts,
+                                                icon: _iconoMetodoPago(metodoPago),
+                                              ),
+                                              _buildPill(
+                                                label: estaFacturada
+                                                    ? 'Facturada${v["folio_factura"] != null ? " • ${v["folio_factura"]}" : ""}'
+                                                    : 'Sin facturar',
+                                                color: estaFacturada ? ts.neonBlue : ts.textSecondary,
+                                                ts: ts,
+                                                icon: estaFacturada
+                                                    ? Icons.verified_user_rounded
+                                                    : Icons.pending_outlined,
+                                                filled: estaFacturada,
+                                              ),
+                                            ],
+                                          ),
+                                          subtitle: Padding(
+                                            padding: const EdgeInsets.only(top: 6),
                                             child: Text(
-                                              'FACTURADA: ${v["folio_factura"] ?? "CFDI"}',
-                                              style: TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.bold,
-                                                color: ts.neonBlue,
+                                              '$comprador  •  $fechaCorta',
+                                              style: TextStyle(fontSize: 12, color: ts.textSecondary),
+                                            ),
+                                          ),
+                                          trailing: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                '\$${totalVenta.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                                                ),
+                                              ),
+                                              Text(
+                                                'MXN',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: ts.textSecondary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          children: [
+                                            Padding(
+                                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Wrap(
+                                                    alignment: WrapAlignment.end,
+                                                    spacing: 8,
+                                                    runSpacing: 8,
+                                                    children: [
+                                                      OutlinedButton.icon(
+                                                        icon: const Icon(Icons.print_rounded, size: 16),
+                                                        label: const Text('Ver Ticket', style: TextStyle(fontSize: 12)),
+                                                        onPressed: () => TicketImpresionDialog.mostrar(context, v),
+                                                      ),
+                                                      FilledButton.tonalIcon(
+                                                        icon: Icon(
+                                                          estaFacturada
+                                                              ? Icons.description_outlined
+                                                              : Icons.request_quote_outlined,
+                                                          size: 16,
+                                                        ),
+                                                        label: Text(
+                                                          estaFacturada ? 'Ver XML / CFDI' : 'Facturar / XML',
+                                                          style: const TextStyle(fontSize: 12),
+                                                        ),
+                                                        style: FilledButton.styleFrom(
+                                                          backgroundColor: ts.tintBg(ts.neonBlue),
+                                                          foregroundColor: ts.neonBlue,
+                                                        ),
+                                                        onPressed: () => _abrirModalFacturacion(v),
+                                                      ),
+                                                      if (estado != 'DEVUELTA')
+                                                        FilledButton.tonalIcon(
+                                                          icon: const Icon(Icons.replay_rounded, size: 16),
+                                                          label: const Text('Devolución', style: TextStyle(fontSize: 12)),
+                                                          style: FilledButton.styleFrom(
+                                                            backgroundColor: ts.tintBg(ts.neonAmber),
+                                                            foregroundColor: ts.neonAmber,
+                                                          ),
+                                                          onPressed: () => _abrirModalDevolucion(v),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const Divider(height: 20),
+                                                  const Text(
+                                                    'Detalle de artículos despachados:',
+                                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  ...detalles.map((d) {
+                                                    final List<dynamic> lotesDespachados = d['despachos_lotes'] ?? [];
+                                                    final String nombreProd =
+                                                        d['producto_nombre'] ?? 'Prod ID #${d["producto_id"]}';
+                                                    return Container(
+                                                      margin: const EdgeInsets.only(bottom: 8),
+                                                      padding: const EdgeInsets.all(10),
+                                                      decoration: BoxDecoration(
+                                                        color: ts.surfaceBg,
+                                                        borderRadius: BorderRadius.circular(10),
+                                                        border: Border.all(color: ts.borderColor),
+                                                      ),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Text(
+                                                            '$nombreProd [ID: #${d["producto_id"]}]  •  Cantidad: ${d["cantidad"]} pzas  •  Subtotal: \$${d["subtotal"]}',
+                                                            style: const TextStyle(fontWeight: FontWeight.w600),
+                                                          ),
+                                                          if (lotesDespachados.isNotEmpty) ...[
+                                                            const SizedBox(height: 6),
+                                                            Wrap(
+                                                              spacing: 8,
+                                                              runSpacing: 4,
+                                                              children: lotesDespachados.map((ld) {
+                                                                return Chip(
+                                                                  label: Text(
+                                                                    'Lote #${ld["lote_id"]}: ${ld["cantidad_despachada"]} pzas',
+                                                                    style: const TextStyle(fontSize: 11),
+                                                                  ),
+                                                                  backgroundColor: ts.tintBg(ts.accentPrimary),
+                                                                  side: BorderSide(color: ts.borderColor),
+                                                                );
+                                                              }).toList(),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    );
+                                                  }),
+                                                ],
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
-                                    subtitle: Text(
-                                      'Comprador: ${v["comprador_nombre"] ?? "Público General"} | Pago: ${v["metodo_pago"] ?? "EFECTIVO"}\n'
-                                      'Fecha: ${v["fecha_venta"].toString().replaceFirst("T", " ").substring(0, 16)}',
-                                    ),
-                                    trailing: Text(
-                                      '\$${v["total"]} MXN',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
-                                      ),
-                                    ),
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                                          children: [
-                                            Wrap(
-                                              alignment: WrapAlignment.end,
-                                              spacing: 8,
-                                              runSpacing: 8,
-                                              children: [
-                                                OutlinedButton.icon(
-                                                  icon: const Icon(Icons.print, size: 16),
-                                                  label: const Text('Ver Ticket Térmico', style: TextStyle(fontSize: 12)),
-                                                  onPressed: () => TicketImpresionDialog.mostrar(context, v),
-                                                ),
-                                                // Sub-Agente 1: Botón Facturar o Ver Factura
-                                                FilledButton.tonalIcon(
-                                                  icon: Icon(estaFacturada ? Icons.description : Icons.request_quote_outlined, size: 16),
-                                                  label: Text(
-                                                    estaFacturada ? 'Ver Factura CFDI' : 'Facturar Ticket',
-                                                    style: const TextStyle(fontSize: 12),
-                                                  ),
-                                                  style: FilledButton.styleFrom(
-                                                    backgroundColor: estaFacturada ? ts.tintBg(ts.neonBlue) : null,
-                                                    foregroundColor: estaFacturada ? ts.neonBlue : null,
-                                                  ),
-                                                  onPressed: () => _abrirModalFacturacion(v),
-                                                ),
-                                                if (estado != 'DEVUELTA')
-                                                  FilledButton.tonalIcon(
-                                                    icon: const Icon(Icons.replay, size: 16),
-                                                    label: const Text('Devolución / Merma', style: TextStyle(fontSize: 12)),
-                                                    onPressed: () => _abrirModalDevolucion(v),
-                                                  ),
-                                              ],
-                                            ),
-                                            const Divider(),
-                                            const Text(
-                                              'Detalle de artículos despachados:',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            ...detalles.map((d) {
-                                              final List<dynamic> lotesDespachados = d['despachos_lotes'] ?? [];
-                                              final String nombreProd = d['producto_nombre'] ?? 'Prod ID #${d["producto_id"]}';
-                                              return Container(
-                                                margin: const EdgeInsets.only(bottom: 8),
-                                                padding: const EdgeInsets.all(8),
-                                                decoration: BoxDecoration(
-                                                  color: ts.surfaceBg,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(color: ts.borderColor),
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      '$nombreProd [ID: #${d["producto_id"]}]  •  Cantidad: ${d["cantidad"]} pzas  •  Subtotal: \$${d["subtotal"]}',
-                                                      style: const TextStyle(fontWeight: FontWeight.w600),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Wrap(
-                                                      spacing: 8,
-                                                      children: lotesDespachados.map((ld) {
-                                                        return Chip(
-                                                          label: Text(
-                                                            'Lote #${ld["lote_id"]}: ${ld["cantidad_despachada"]} pzas',
-                                                            style: const TextStyle(fontSize: 11),
-                                                          ),
-                                                          backgroundColor: ts.tintBg(ts.accentPrimary),
-                                                          side: BorderSide(color: ts.borderColor),
-                                                        );
-                                                      }).toList(),
-                                                    ),
-                                                  ],
-                                                ),
-                                              );
-                                            }),
                                           ],
                                         ),
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
                             ),
             ),
           ],

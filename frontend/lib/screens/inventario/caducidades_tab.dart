@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/theme_service.dart';
+import '../../widgets/premium_ui.dart';
 import 'chip_metadato_lote.dart';
 import 'lote_acciones_dialogs.dart';
 
@@ -86,15 +87,14 @@ class _CaducidadesTabState extends State<CaducidadesTab> with AutomaticKeepAlive
     return Column(
       children: [
         // Banner Superior Informativo de Alertas FEFO HeroUI
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        PremiumSurfaceCard(
+          padding: EdgeInsets.zero,
+          accentBorder: bannerColor.withValues(alpha: 0.45),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: ts.tintBg(bannerColor),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: bannerColor.withValues(alpha: 0.4), width: 1.2),
-              boxShadow: ts.cardGlowShadow,
+              borderRadius: BorderRadius.circular(15),
             ),
             child: LayoutBuilder(
               builder: (context, bConstraints) {
@@ -157,107 +157,108 @@ class _CaducidadesTabState extends State<CaducidadesTab> with AutomaticKeepAlive
             ),
           ),
         ),
+        const SizedBox(height: 10),
 
         // Filtros y Búsqueda de Lotes por Caducar HeroUI
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: ts.surfaceBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: ts.borderColor, width: 1.2),
-              boxShadow: ts.cardGlowShadow,
-            ),
-            child: LayoutBuilder(
-              builder: (context, fConstraints) {
-                final isNarrow = fConstraints.maxWidth < 650;
-                final searchField = TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: 'Filtrar por medicamento, sustancia o lote...',
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: _busquedaCaducidad.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => setState(() => _busquedaCaducidad = ''),
-                          )
-                        : null,
+        PremiumSurfaceCard(
+          padding: const EdgeInsets.all(14),
+          child: LayoutBuilder(
+            builder: (context, fConstraints) {
+              final isNarrow = fConstraints.maxWidth < 650;
+              final searchField = TextField(
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Filtrar por medicamento, sustancia o lote...',
+                  isDense: true,
+                  filled: true,
+                  fillColor: ts.surfaceBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: ts.borderColor),
                   ),
-                  onChanged: (val) => setState(() => _busquedaCaducidad = val.trim()),
-                );
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: ts.borderColor),
+                  ),
+                  suffixIcon: _busquedaCaducidad.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _busquedaCaducidad = ''),
+                        )
+                      : null,
+                ),
+                onChanged: (val) => setState(() => _busquedaCaducidad = val.trim()),
+              );
 
-                final chips = SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ChoiceChip(
-                        label: Text('Todos (${widget.lotesCaducidades.length})'),
-                        selected: _filtroCaducidad == 'TODOS',
-                        selectedColor: ts.tintBg(ts.accentPrimary),
-                        onSelected: (_) => setState(() => _filtroCaducidad = 'TODOS'),
-                      ),
+              final chips = SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: Text('Todos (${widget.lotesCaducidades.length})'),
+                      selected: _filtroCaducidad == 'TODOS',
+                      selectedColor: ts.tintBg(ts.accentPrimary),
+                      onSelected: (_) => setState(() => _filtroCaducidad = 'TODOS'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      avatar: Icon(Icons.alarm, color: ts.neonRed, size: 16),
+                      label: Text('Críticos <= 30d ($criticos)'),
+                      selected: _filtroCaducidad == 'CRITICA',
+                      selectedColor: ts.tintBg(ts.neonRed),
+                      onSelected: (_) => setState(() => _filtroCaducidad = 'CRITICA'),
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      avatar: Icon(Icons.schedule, color: ts.neonAmber, size: 16),
+                      label: Text('Preventivos ($preventivos)'),
+                      selected: _filtroCaducidad == 'PREVENTIVA',
+                      selectedColor: ts.tintBg(ts.neonAmber),
+                      onSelected: (_) => setState(() => _filtroCaducidad = 'PREVENTIVA'),
+                    ),
+                    if (caducados > 0) ...[
                       const SizedBox(width: 8),
                       ChoiceChip(
-                        avatar: Icon(Icons.alarm, color: ts.neonRed, size: 16),
-                        label: Text('Críticos <= 30d ($criticos)'),
-                        selected: _filtroCaducidad == 'CRITICA',
-                        selectedColor: ts.tintBg(ts.neonRed),
-                        onSelected: (_) => setState(() => _filtroCaducidad = 'CRITICA'),
+                        avatar: Icon(Icons.block, color: ts.neonPurple, size: 16),
+                        label: Text('Caducados ($caducados)'),
+                        selected: _filtroCaducidad == 'CADUCADO',
+                        selectedColor: ts.tintBg(ts.neonPurple),
+                        onSelected: (_) => setState(() => _filtroCaducidad = 'CADUCADO'),
                       ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        avatar: Icon(Icons.schedule, color: ts.neonAmber, size: 16),
-                        label: Text('Preventivos ($preventivos)'),
-                        selected: _filtroCaducidad == 'PREVENTIVA',
-                        selectedColor: ts.tintBg(ts.neonAmber),
-                        onSelected: (_) => setState(() => _filtroCaducidad = 'PREVENTIVA'),
-                      ),
-                      if (caducados > 0) ...[
-                        const SizedBox(width: 8),
-                        ChoiceChip(
-                          avatar: Icon(Icons.block, color: ts.neonPurple, size: 16),
-                          label: Text('Caducados ($caducados)'),
-                          selected: _filtroCaducidad == 'CADUCADO',
-                          selectedColor: ts.tintBg(ts.neonPurple),
-                          onSelected: (_) => setState(() => _filtroCaducidad = 'CADUCADO'),
-                        ),
-                      ],
                     ],
-                  ),
-                );
+                  ],
+                ),
+              );
 
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      searchField,
-                      const SizedBox(height: 8),
-                      chips,
-                    ],
-                  );
-                } else {
-                  return Row(
-                    children: [
-                      Expanded(flex: 4, child: searchField),
-                      const SizedBox(width: 12),
-                      Expanded(flex: 6, child: chips),
-                    ],
-                  );
-                }
-              },
-            ),
+              if (isNarrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 8),
+                    chips,
+                  ],
+                );
+              } else {
+                return Row(
+                  children: [
+                    Expanded(flex: 4, child: searchField),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 6, child: chips),
+                  ],
+                );
+              }
+            },
           ),
         ),
-        const Divider(height: 1),
+        const SizedBox(height: 12),
 
         // Listado de Tarjetas de Lotes Próximos a Vencer
         Expanded(
           child: lotesFiltrados.isEmpty
               ? const Center(child: Text('No hay lotes que coincidan con los filtros seleccionados.'))
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.only(bottom: 16),
                   itemCount: lotesFiltrados.length,
                   itemBuilder: (context, index) {
                     final lote = lotesFiltrados[index];
@@ -319,82 +320,81 @@ class _CaducidadesTabState extends State<CaducidadesTab> with AutomaticKeepAlive
       'activo': true,
     };
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: ts.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: urgencia == 'CRITICA' ? ts.neonRed : ts.borderColor,
-          width: urgencia == 'CRITICA' ? 1.6 : 1.2,
-        ),
-        boxShadow: ts.cardGlowShadow,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Cabecera: Producto y Badge de Urgencia
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          lote['nombre_comercial'] ?? 'Medicamento',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: ts.surfaceAltBg,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: ts.borderColor),
-                          ),
-                          child: Text(
-                            '${lote["grupo_farmacopea"] ?? "GRUPO_VI"}',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: ts.textPrimary),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${lote["sustancia_activa"]} • ${lote["presentacion"]}',
-                      style: TextStyle(color: ts.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: badgeFg.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+    final Color? cardAccentBorder = urgencia == 'CRITICA'
+        ? ts.neonRed.withValues(alpha: 0.7)
+        : (urgencia == 'CADUCADO' ? ts.neonPurple.withValues(alpha: 0.7) : null);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AnimatedHoverScaleCard(
+        hoverScale: 1.008,
+        child: PremiumSurfaceCard(
+          accentBorder: cardAccentBorder,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cabecera: Producto y Badge de Urgencia
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(badgeIcon, color: badgeFg, size: 16),
-                      const SizedBox(width: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              lote['nombre_comercial'] ?? 'Medicamento',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: ts.tintBg(ts.accentPrimary),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: ts.accentPrimary.withValues(alpha: 0.35)),
+                            ),
+                            child: Text(
+                              '${lote["grupo_farmacopea"] ?? "GRUPO_VI"}',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: ts.accentPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
-                        badgeTexto,
-                        style: TextStyle(color: badgeFg, fontWeight: FontWeight.bold, fontSize: 12),
+                        '${lote["sustancia_activa"]} • ${lote["presentacion"]}',
+                        style: TextStyle(color: ts.textSecondary, fontSize: 13),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: badgeBg,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: badgeFg.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(badgeIcon, color: badgeFg, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          badgeTexto,
+                          style: TextStyle(color: badgeFg, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             const SizedBox(height: 12),
 
             // Metadatos del Lote (Sub-Agente 2)
@@ -505,6 +505,7 @@ class _CaducidadesTabState extends State<CaducidadesTab> with AutomaticKeepAlive
             ),
           ],
         ),
+      ),
       ),
     );
   }

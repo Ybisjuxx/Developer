@@ -358,16 +358,210 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
     );
   }
 
+  Widget _buildBentoMetricTile({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    String? subtitle,
+  }) {
+    final ts = ThemeService.instance;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: ts.tintBg(color, lightAlpha: 0.08, darkAlpha: 0.16),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.30), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: ts.tintBg(color, lightAlpha: 0.16, darkAlpha: 0.26),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ts.textSecondary),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: ts.textPrimary),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(String text, Color color, {IconData? icon}) {
+    final ts = ThemeService.instance;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: ts.tintBg(color, lightAlpha: 0.14, darkAlpha: 0.24),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogRow({
+    required IconData icon,
+    required Color accentColor,
+    required Widget title,
+    required String subtitle,
+    required Widget trailing,
+    Color? borderColor,
+  }) {
+    final ts = ThemeService.instance;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: ts.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor ?? ts.borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: ts.tintBg(accentColor, lightAlpha: 0.12, darkAlpha: 0.22),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accentColor.withValues(alpha: 0.30)),
+            ),
+            child: Icon(icon, color: accentColor, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                const SizedBox(height: 3),
+                Text(subtitle, style: TextStyle(fontSize: 11, color: ts.textSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateBtn({
+    required String label,
+    required IconData icon,
+    required DateTime initial,
+    required DateTime first,
+    required DateTime last,
+    required ValueChanged<DateTime> onPicked,
+  }) {
+    return OutlinedButton.icon(
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      onPressed: () async {
+        final picked = await showDatePicker(context: context, initialDate: initial, firstDate: first, lastDate: last);
+        if (picked != null) onPicked(picked);
+      },
+    );
+  }
+
+  Widget _buildFieldBox(double width, TextEditingController ctrl, String label, {TextInputType? keyboard}) {
+    return SizedBox(
+      width: width,
+      child: TextField(
+        controller: ctrl,
+        keyboardType: keyboard,
+        decoration: InputDecoration(labelText: label, isDense: true),
+      ),
+    );
+  }
+
+  Widget _buildDropdownBox(
+    double width,
+    String value,
+    String label,
+    List<DropdownMenuItem<String>> items,
+    ValueChanged<String?> onChanged,
+  ) {
+    return SizedBox(
+      width: width,
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        isExpanded: true,
+        decoration: InputDecoration(labelText: label, isDense: true),
+        items: items,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
   Widget _buildTabBitacoraTemp() {
     final ts = ThemeService.instance;
     final total = _bitacora.length;
     final dentro = _bitacora.where((b) => b['dentro_norma'] == true).length;
     final pct = total > 0 ? ((dentro / total) * 100.0).toStringAsFixed(1) : '100.0';
+    final normaColor = dentro == total
+        ? ts.neonGreen
+        : (total > 0 && (dentro / total) < 0.8 ? ts.neonRed : ts.neonAmber);
 
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildBentoMetricTile(
+                label: 'Total lecturas',
+                value: '$total',
+                icon: Icons.thermostat_rounded,
+                color: ts.accentPrimary,
+                subtitle: _filtroZona == 'TODAS' ? 'Todas las zonas' : _filtroZona,
+              ),
+              _buildBentoMetricTile(
+                label: '% en norma',
+                value: '$pct%',
+                icon: Icons.verified_outlined,
+                color: normaColor,
+                subtitle: '$dentro de $total dentro de rango',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           PremiumSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,56 +575,18 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    SizedBox(
-                      width: 150,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _turno,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Turno', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'MATUTINO', child: Text('Matutino', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'VESPERTINO', child: Text('Vespertino', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'NOCTURNO', child: Text('Nocturno', overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => setState(() => _turno = v ?? 'MATUTINO'),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 200,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _zona,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Zona', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => setState(() => _zona = v ?? 'ANAQUEL_GENERAL'),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: _tempCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        decoration: const InputDecoration(labelText: 'Temp (°C)', isDense: true),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 120,
-                      child: TextField(
-                        controller: _humCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Humedad (%)', isDense: true),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 240,
-                      child: TextField(
-                        controller: _obsCtrl,
-                        decoration: const InputDecoration(labelText: 'Observaciones (opcional)', isDense: true),
-                      ),
-                    ),
+                    _buildDropdownBox(150, _turno, 'Turno', const [
+                      DropdownMenuItem(value: 'MATUTINO', child: Text('Matutino', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'VESPERTINO', child: Text('Vespertino', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'NOCTURNO', child: Text('Nocturno', overflow: TextOverflow.ellipsis)),
+                    ], (v) => setState(() => _turno = v ?? 'MATUTINO')),
+                    _buildDropdownBox(200, _zona, 'Zona', const [
+                      DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
+                    ], (v) => setState(() => _zona = v ?? 'ANAQUEL_GENERAL')),
+                    _buildFieldBox(120, _tempCtrl, 'Temp (°C)', keyboard: const TextInputType.numberWithOptions(decimal: true, signed: true)),
+                    _buildFieldBox(120, _humCtrl, 'Humedad (%)', keyboard: const TextInputType.numberWithOptions(decimal: true)),
+                    _buildFieldBox(240, _obsCtrl, 'Observaciones (opcional)'),
                     ElevatedButton.icon(
                       onPressed: _savingBitacora ? null : _guardarLecturaBitacora,
                       icon: const Icon(Icons.save_outlined, size: 18),
@@ -459,23 +615,14 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                         _cargarBitacora();
                       },
                     ),
-                    SizedBox(
-                      width: 190,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _filtroZona,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Filtrar zona', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'TODAS', child: Text('Todas las zonas', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) {
-                          setState(() => _filtroZona = v ?? 'TODAS');
-                          _cargarBitacora();
-                        },
-                      ),
-                    ),
+                    _buildDropdownBox(190, _filtroZona, 'Filtrar zona', const [
+                      DropdownMenuItem(value: 'TODAS', child: Text('Todas las zonas', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'ANAQUEL_GENERAL', child: Text('Anaquel General', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'RED_FRIO', child: Text('Red de Frío', overflow: TextOverflow.ellipsis)),
+                    ], (v) {
+                      setState(() => _filtroZona = v ?? 'TODAS');
+                      _cargarBitacora();
+                    }),
                     Text(
                       '$total lecturas • $pct% en norma',
                       style: TextStyle(fontWeight: FontWeight.bold, color: ts.accentPrimary),
@@ -495,28 +642,26 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: _bitacora.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final b = _bitacora[i];
                       final ok = b['dentro_norma'] == true;
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(
-                          ok ? Icons.check_circle : Icons.warning_amber_rounded,
-                          color: ok ? ts.neonGreen : ts.neonRed,
-                        ),
+                      final statusColor = ok ? ts.neonGreen : ts.neonRed;
+                      final obs = (b['observaciones'] ?? '').toString();
+                      return _buildLogRow(
+                        icon: ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                        accentColor: statusColor,
+                        borderColor: ok ? ts.borderColor : ts.neonRed.withValues(alpha: 0.40),
                         title: Text(
                           '${b['zona']} (${b['turno']}) — ${b['temperatura_c']} °C | ${b['humedad_relativa_pct']}% HR',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ts.textPrimary),
                         ),
-                        subtitle: Text(
-                          '${_fmtFechaHora(b['fecha_registro']?.toString())} • ${b['responsable_nombre'] ?? ''}'
-                          '${(b['observaciones'] ?? '').toString().isNotEmpty ? ' • ${b['observaciones']}' : ''}',
-                          style: TextStyle(fontSize: 11, color: ts.textSecondary),
-                        ),
-                        trailing: Chip(
-                          label: Text(ok ? 'EN NORMA' : 'FUERA', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                          backgroundColor: (ok ? ts.neonGreen : ts.neonRed).withValues(alpha: 0.15),
+                        subtitle: '${_fmtFechaHora(b['fecha_registro']?.toString())} • ${b['responsable_nombre'] ?? ''}'
+                            '${obs.isNotEmpty ? ' • $obs' : ''}',
+                        trailing: _buildStatusPill(
+                          ok ? 'EN NORMA' : 'FUERA',
+                          statusColor,
+                          icon: ok ? Icons.verified_outlined : Icons.error_outline,
                         ),
                       );
                     },
@@ -531,10 +676,45 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
 
   Widget _buildTabDocumentos() {
     final ts = ThemeService.instance;
+    final activos = _docs.where((d) => d['activo'] != false).length;
+    int? minDias;
+    for (final d in _docs) {
+      final dias = (d['dias_restantes'] as num?)?.toInt();
+      if (dias != null && (minDias == null || dias < minDias)) {
+        minDias = dias;
+      }
+    }
+    final vigenciaColor = minDias == null
+        ? ts.textSecondary
+        : (minDias >= 30 ? ts.neonGreen : (minDias >= 0 ? ts.neonAmber : ts.neonRed));
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildBentoMetricTile(
+                label: 'Documentos activos',
+                value: '$activos',
+                icon: Icons.folder_copy_outlined,
+                color: ts.accentPrimary,
+                subtitle: '${_docs.length} registrados',
+              ),
+              _buildBentoMetricTile(
+                label: 'Menor vigencia',
+                value: minDias == null ? 'Sin docs' : '$minDias días',
+                icon: Icons.event_available_rounded,
+                color: vigenciaColor,
+                subtitle: minDias == null
+                    ? 'Registra un documento'
+                    : (minDias >= 30 ? 'Vigencia saludable' : 'Requiere renovación'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           PremiumSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,54 +725,29 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    SizedBox(
-                      width: 260,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _tipoDoc,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Tipo de documento', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'AVISO_FUNCIONAMIENTO', child: Text('Aviso de Funcionamiento', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'LICENCIA_SANITARIA', child: Text('Licencia Sanitaria', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'RESPONSABLE_SANITARIO', child: Text('Responsable Sanitario', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'CAPACITACION_COFEPRIS', child: Text('Capacitación Personal', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'FUMIGACION_CONTROL_PLAGAS', child: Text('Control de Plagas', overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => setState(() => _tipoDoc = v ?? 'AVISO_FUNCIONAMIENTO'),
-                      ),
+                    _buildDropdownBox(260, _tipoDoc, 'Tipo de documento', const [
+                      DropdownMenuItem(value: 'AVISO_FUNCIONAMIENTO', child: Text('Aviso de Funcionamiento', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'LICENCIA_SANITARIA', child: Text('Licencia Sanitaria', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'RESPONSABLE_SANITARIO', child: Text('Responsable Sanitario', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'CAPACITACION_COFEPRIS', child: Text('Capacitación Personal', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'FUMIGACION_CONTROL_PLAGAS', child: Text('Control de Plagas', overflow: TextOverflow.ellipsis)),
+                    ], (v) => setState(() => _tipoDoc = v ?? 'AVISO_FUNCIONAMIENTO')),
+                    _buildFieldBox(180, _folioDocCtrl, 'Folio / Certificado'),
+                    _buildDateBtn(
+                      label: 'Emisión: ${_fmtDate(_emisionDoc)}',
+                      icon: Icons.date_range,
+                      initial: _emisionDoc,
+                      first: DateTime(2015),
+                      last: DateTime(2040),
+                      onPicked: (d) => setState(() => _emisionDoc = d),
                     ),
-                    SizedBox(
-                      width: 180,
-                      child: TextField(
-                        controller: _folioDocCtrl,
-                        decoration: const InputDecoration(labelText: 'Folio / Certificado', isDense: true),
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.date_range, size: 16),
-                      label: Text('Emisión: ${_fmtDate(_emisionDoc)}'),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _emisionDoc,
-                          firstDate: DateTime(2015),
-                          lastDate: DateTime(2040),
-                        );
-                        if (picked != null) setState(() => _emisionDoc = picked);
-                      },
-                    ),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.event_available, size: 16),
-                      label: Text('Vence: ${_fmtDate(_vencimientoDoc)}'),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _vencimientoDoc,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2050),
-                        );
-                        if (picked != null) setState(() => _vencimientoDoc = picked);
-                      },
+                    _buildDateBtn(
+                      label: 'Vence: ${_fmtDate(_vencimientoDoc)}',
+                      icon: Icons.event_available,
+                      initial: _vencimientoDoc,
+                      first: DateTime(2020),
+                      last: DateTime(2050),
+                      onPicked: (d) => setState(() => _vencimientoDoc = d),
                     ),
                     ElevatedButton.icon(
                       onPressed: _savingDoc ? null : _guardarDocumento,
@@ -608,27 +763,38 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
           PremiumSurfaceCard(
             child: _loadingDocs
                 ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _docs.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (_, i) {
-                      final d = _docs[i];
-                      final dias = (d['dias_restantes'] as num?)?.toInt() ?? 0;
-                      final ok = dias >= 30;
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(Icons.description_outlined, color: ok ? ts.neonGreen : ts.neonRed),
-                        title: Text('${d['tipo_documento']} • Folio: ${d['folio_documento']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: Text('Emisión: ${d['fecha_emision']} • Vence: ${d['fecha_vencimiento']}', style: TextStyle(fontSize: 11, color: ts.textSecondary)),
-                        trailing: Chip(
-                          label: Text('$dias días', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          backgroundColor: (ok ? ts.neonGreen : ts.neonRed).withValues(alpha: 0.15),
-                        ),
-                      );
-                    },
-                  ),
+                : _docs.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('No hay documentos sanitarios registrados.', style: TextStyle(color: ts.textSecondary)),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _docs.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final d = _docs[i];
+                          final dias = (d['dias_restantes'] as num?)?.toInt() ?? 0;
+                          final ok = dias >= 30;
+                          final docColor = ok ? ts.neonGreen : (dias >= 0 ? ts.neonAmber : ts.neonRed);
+                          return _buildLogRow(
+                            icon: Icons.description_outlined,
+                            accentColor: docColor,
+                            borderColor: ok ? ts.borderColor : docColor.withValues(alpha: 0.40),
+                            title: Text(
+                              '${d['tipo_documento']} • Folio: ${d['folio_documento']}',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ts.textPrimary),
+                            ),
+                            subtitle: 'Emisión: ${d['fecha_emision']} • Vence: ${d['fecha_vencimiento']}',
+                            trailing: _buildStatusPill(
+                              '$dias días',
+                              docColor,
+                              icon: ok ? Icons.verified_user_outlined : Icons.schedule_rounded,
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -650,6 +816,34 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildBentoMetricTile(
+                label: 'Total periodo',
+                value: '\$${totalMonto.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet_rounded,
+                color: ts.accentPrimary,
+                subtitle: '${items.length} movimientos',
+              ),
+              _buildBentoMetricTile(
+                label: 'Nómina',
+                value: '\$${totalNomina.toStringAsFixed(2)}',
+                icon: Icons.badge_outlined,
+                color: ts.neonPurple,
+                subtitle: 'Sueldos y prestaciones',
+              ),
+              _buildBentoMetricTile(
+                label: 'Operativos',
+                value: '\$${totalOtros.toStringAsFixed(2)}',
+                icon: Icons.receipt_long_rounded,
+                color: ts.neonAmber,
+                subtitle: 'Servicios, renta e insumos',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           PremiumSurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,67 +854,31 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text('Fecha: ${_fmtDate(_fechaGasto)}'),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _fechaGasto,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                        );
-                        if (picked != null) setState(() => _fechaGasto = picked);
-                      },
+                    _buildDateBtn(
+                      label: 'Fecha: ${_fmtDate(_fechaGasto)}',
+                      icon: Icons.calendar_today,
+                      initial: _fechaGasto,
+                      first: DateTime(2020),
+                      last: DateTime(2035),
+                      onPicked: (d) => setState(() => _fechaGasto = d),
                     ),
-                    SizedBox(
-                      width: 250,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _categoriaGasto,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Categoría', isDense: true),
-                        items: _categoriasGasto
-                            .map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!, overflow: TextOverflow.ellipsis)))
-                            .toList(),
-                        onChanged: (v) => setState(() => _categoriaGasto = v ?? 'SERVICIOS'),
-                      ),
+                    _buildDropdownBox(
+                      250,
+                      _categoriaGasto,
+                      'Categoría',
+                      _categoriasGasto
+                          .map((c) => DropdownMenuItem(value: c['code'], child: Text(c['label']!, overflow: TextOverflow.ellipsis)))
+                          .toList(),
+                      (v) => setState(() => _categoriaGasto = v ?? 'SERVICIOS'),
                     ),
-                    SizedBox(
-                      width: 220,
-                      child: TextField(
-                        controller: _conceptoGastoCtrl,
-                        decoration: const InputDecoration(labelText: 'Concepto / Detalle *', isDense: true),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 130,
-                      child: TextField(
-                        controller: _montoGastoCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(labelText: 'Monto MXN *', isDense: true),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 160,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _metodoPagoGasto,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Método pago', isDense: true),
-                        items: const [
-                          DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferencia', overflow: TextOverflow.ellipsis)),
-                          DropdownMenuItem(value: 'TARJETA', child: Text('Tarjeta', overflow: TextOverflow.ellipsis)),
-                        ],
-                        onChanged: (v) => setState(() => _metodoPagoGasto = v ?? 'EFECTIVO'),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 150,
-                      child: TextField(
-                        controller: _folioGastoCtrl,
-                        decoration: const InputDecoration(labelText: 'Folio / Factura', isDense: true),
-                      ),
-                    ),
+                    _buildFieldBox(220, _conceptoGastoCtrl, 'Concepto / Detalle *'),
+                    _buildFieldBox(130, _montoGastoCtrl, 'Monto MXN *', keyboard: const TextInputType.numberWithOptions(decimal: true)),
+                    _buildDropdownBox(160, _metodoPagoGasto, 'Método pago', const [
+                      DropdownMenuItem(value: 'EFECTIVO', child: Text('Efectivo', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'TRANSFERENCIA', child: Text('Transferencia', overflow: TextOverflow.ellipsis)),
+                      DropdownMenuItem(value: 'TARJETA', child: Text('Tarjeta', overflow: TextOverflow.ellipsis)),
+                    ], (v) => setState(() => _metodoPagoGasto = v ?? 'EFECTIVO')),
+                    _buildFieldBox(150, _folioGastoCtrl, 'Folio / Factura'),
                     ElevatedButton.icon(
                       onPressed: _savingGasto ? null : _guardarGasto,
                       icon: const Icon(Icons.add_circle_outline, size: 18),
@@ -768,20 +926,19 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text('Total periodo: \$${totalMonto.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold))),
-                    Chip(label: Text('Nómina: \$${totalNomina.toStringAsFixed(2)}')),
-                    Chip(label: Text('Operativos: \$${totalOtros.toStringAsFixed(2)}')),
-                    ...porCategoria.entries.map(
-                      (e) => Chip(
-                        label: Text('${e.key}: \$${(e.value as num).toStringAsFixed(2)}', style: const TextStyle(fontSize: 11)),
-                      ),
-                    ),
-                  ],
-                ),
+                if (porCategoria.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: porCategoria.entries
+                        .map((e) => _buildStatusPill(
+                              '${e.key}: \$${(e.value as num).toStringAsFixed(2)}',
+                              e.key == 'NOMINA' ? ts.neonPurple : ts.accentPrimary,
+                            ))
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 if (_loadingGastos)
                   const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
@@ -795,25 +952,28 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: items.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final g = items[i];
-                      return ListTile(
-                        dense: true,
-                        leading: CircleAvatar(
-                          radius: 16,
-                          backgroundColor: ts.accentPrimary.withValues(alpha: 0.15),
-                          child: Icon(Icons.receipt_long, size: 16, color: ts.accentPrimary),
+                      final cat = (g['categoria'] ?? '').toString();
+                      final catColor = cat == 'NOMINA' ? ts.neonPurple : ts.accentPrimary;
+                      final folio = (g['comprobante_folio'] ?? '').toString();
+                      return _buildLogRow(
+                        icon: Icons.receipt_long_rounded,
+                        accentColor: catColor,
+                        title: Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              '${g['concepto']} — \$${(g['monto'] as num).toStringAsFixed(2)}',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: ts.textPrimary),
+                            ),
+                            _buildStatusPill(cat, catColor),
+                          ],
                         ),
-                        title: Text(
-                          '${g['concepto']} — \$${(g['monto'] as num).toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                        subtitle: Text(
-                          '${g['fecha_gasto']} • ${g['categoria']} • ${g['metodo_pago']}'
-                          '${(g['comprobante_folio'] ?? '').toString().isNotEmpty ? ' • Folio: ${g['comprobante_folio']}' : ''}',
-                          style: TextStyle(fontSize: 11, color: ts.textSecondary),
-                        ),
+                        subtitle: '${g['fecha_gasto']} • ${g['metodo_pago']}${folio.isNotEmpty ? ' • Folio: $folio' : ''}',
                         trailing: IconButton(
                           icon: Icon(Icons.delete_outline, color: ts.neonRed, size: 20),
                           tooltip: 'Eliminar gasto',

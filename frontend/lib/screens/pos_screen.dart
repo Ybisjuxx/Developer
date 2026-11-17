@@ -592,14 +592,8 @@ class _PosScreenState extends State<PosScreen> {
               const SizedBox(height: 10),
 
               // Contenedor de Búsqueda y Filtros HeroUI / Fragments UI
-              Container(
+              PremiumSurfaceCard(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: ts.surfaceBg,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: ts.borderColor, width: 1.2),
-                  boxShadow: ts.cardGlowShadow,
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -759,138 +753,188 @@ class _PosScreenState extends State<PosScreen> {
                               final int enCarrito = _cantidadEnCarrito(p['id']);
                               final bool estaEnCarrito = enCarrito > 0;
 
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: ts.cardBg,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: estaEnCarrito ? ts.accentPrimary : ts.borderColor,
-                                    width: estaEnCarrito ? 1.6 : 1.2,
-                                  ),
-                                  boxShadow: ts.cardGlowShadow,
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(16),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: InkWell(
-                                    onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(9.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                              return AnimatedHoverScaleCard(
+                                hoverScale: stock > 0 ? 1.02 : 1.0,
+                                cursor: stock > 0 ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                                onTap: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                child: PremiumSurfaceCard(
+                                  padding: const EdgeInsets.all(10),
+                                  accentBorder: estaEnCarrito ? ts.accentPrimary : null,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      // Barra Superior: Clasificación y Stock Pill
+                                      Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          // Barra Superior: Clasificación y Stock
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: reqReceta ? ts.tintBg(ts.neonAmber) : ts.tintBg(ts.accentPrimary),
-                                                  borderRadius: BorderRadius.circular(4),
+                                          Flexible(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: reqReceta ? ts.tintBg(ts.neonAmber) : ts.tintBg(ts.accentPrimary),
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: (reqReceta ? ts.neonAmber : ts.accentPrimary).withValues(alpha: 0.35),
                                                 ),
-                                                child: Text(
-                                                  p['grupo_farmacopea'] ?? 'GRUPO_VI',
-                                                  style: TextStyle(
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: reqReceta ? ts.neonAmber : ts.accentPrimary,
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (reqReceta) ...[
+                                                    Icon(Icons.medical_information, size: 10, color: ts.neonAmber),
+                                                    const SizedBox(width: 3),
+                                                  ],
+                                                  Flexible(
+                                                    child: Text(
+                                                      p['grupo_farmacopea'] ?? 'GRUPO_VI',
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: reqReceta ? ts.neonAmber : ts.accentPrimary,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
                                               ),
-                                              Text(
-                                                'Stock: $stock',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: stock > 0 ? ts.neonGreen : ts.neonRed,
-                                                ),
-                                              ),
-                                            ],
+                                            ),
                                           ),
-                                          const SizedBox(height: 4),
-
-                                          // Nombre comercial y sustancia
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                p['nombre_comercial'],
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: isMobile ? 12 : 13),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                            decoration: BoxDecoration(
+                                              color: ts.tintBg(stock > 0 ? ts.neonGreen : ts.neonRed),
+                                              borderRadius: BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: (stock > 0 ? ts.neonGreen : ts.neonRed).withValues(alpha: 0.4),
                                               ),
-                                              Text(
-                                                p['sustancia_activa'],
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(fontSize: 10, color: ts.textSecondary),
+                                            ),
+                                            child: Text(
+                                              stock > 0 ? 'Stock: $stock' : 'Agotado',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: stock > 0 ? ts.neonGreen : ts.neonRed,
                                               ),
-                                            ],
-                                          ),
-
-                                          // Presentación y Laboratorio
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                p['presentacion'],
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(fontSize: 9, color: ts.textSecondary),
-                                              ),
-                                              Text(
-                                                p['laboratorio'],
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(fontSize: 9, color: ts.accentPrimary, fontWeight: FontWeight.w500),
-                                              ),
-                                            ],
-                                          ),
-
-                                          // Precio y Botón de Añadir con Badge
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  '\$${p["precio_venta"]} MXN',
-                                                  style: TextStyle(
-                                                    fontSize: isMobile ? 11 : 13,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              if (enCarrito > 0)
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: ts.accentPrimary,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                  ),
-                                                  child: Text(
-                                                    '🛒 $enCarrito',
-                                                    style: TextStyle(color: ts.esTemaNeon ? Colors.black : Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                                  ),
-                                                )
-                                              else
-                                                FilledButton.tonal(
-                                                  style: FilledButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                                                    minimumSize: const Size(32, 28),
-                                                  ),
-                                                  onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
-                                                  child: const Icon(Icons.add_shopping_cart, size: 14),
-                                                ),
-                                            ],
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
+                                      const SizedBox(height: 4),
+
+                                      // Nombre comercial y sustancia
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            p['nombre_comercial'],
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: isMobile ? 12 : 13.5,
+                                              color: ts.textPrimary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          Text(
+                                            p['sustancia_activa'],
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 10, color: ts.textSecondary),
+                                          ),
+                                        ],
+                                      ),
+
+                                      // Presentación y Laboratorio
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            p['presentacion'],
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 9.5, color: ts.textSecondary),
+                                          ),
+                                          Text(
+                                            p['laboratorio'],
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 9.5,
+                                              color: ts.accentPrimary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      // Precio Highlight y Botón + Agregar
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: ts.tintBg(ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary, lightAlpha: 0.08, darkAlpha: 0.14),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                '\$${p["precio_venta"]} MXN',
+                                                style: TextStyle(
+                                                  fontSize: isMobile ? 11 : 13,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: ts.esTemaNeon ? ts.neonGreen : ts.accentPrimary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          if (enCarrito > 0)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: ts.accentPrimary,
+                                                borderRadius: BorderRadius.circular(10),
+                                                boxShadow: ts.cardGlowShadow,
+                                              ),
+                                              child: Text(
+                                                '🛒 $enCarrito',
+                                                style: TextStyle(
+                                                  color: ts.esTemaNeon ? Colors.black : Colors.white,
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            )
+                                          else
+                                            FilledButton(
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: stock > 0 ? ts.accentPrimary : ts.surfaceAltBg,
+                                                foregroundColor: stock > 0
+                                                    ? (ts.esTemaNeon ? Colors.black : Colors.white)
+                                                    : ts.textSecondary,
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: isSmallPhone ? 7 : 10,
+                                                  vertical: 0,
+                                                ),
+                                                minimumSize: const Size(0, 28),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                              ),
+                                              onPressed: stock > 0 ? () => _agregarAlCarrito(p) : null,
+                                              child: Text(
+                                                isSmallPhone ? '+' : '+ Agregar',
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
                               );
