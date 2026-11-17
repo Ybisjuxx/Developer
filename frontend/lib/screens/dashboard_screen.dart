@@ -2041,9 +2041,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 1:
         return ts.neonBlue;
       case 2:
-        return ts.accentPrimary;
+        // Almacén e Inventario: Naranja vivo de alto contraste
+        return ts.esOscuro ? const Color(0xFFFB923C) : const Color(0xFFEA580C);
       case 3:
-        return ts.accentSecondary;
+        // Compras y Proveedores: Fucsia/Magenta intenso de alto contraste
+        return ts.esOscuro ? const Color(0xFFF472B6) : const Color(0xFFDB2777);
       case 4:
         return ts.neonPurple;
       case 5:
