@@ -10,7 +10,7 @@ from .database import Base, engine, ensure_sqlite_schema
 from .security import ENV_MODE, auth_guard
 from .routers import auth, caja, clientes, devoluciones, enfermedades, ia, inventario, medicos, reportes, ventas
 
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.6.0"
 MAX_REQUEST_BYTES = 1_048_576  # 1 MB
 FORCE_HTTPS = os.getenv("FORCE_HTTPS", "0").strip().lower() in {"1", "true", "yes", "si"}
 

@@ -6,6 +6,23 @@ y este proyecto se adhiere a [Semantic Versioning (SemVer 2.0.0)](https://semver
 
 ---
 
+## [1.6.0] - 2026-11-16 (Registros y Bitácoras, Auditoría Thermos, Modularización y Acabado Premium HeroUI/Bento)
+
+### 📋 Nuevo Módulo Registros, Bitácoras y Devoluciones (`frontend/lib/screens/registros_bitacoras_screen.dart`, `backend/app/routers/reportes.py`)
+- **Reorganización de navegación:** La pestaña de Devoluciones pasó a **Registros y Bitácoras** (`Bitácoras`) concentrando **Temp. y Humedad** (con filtros por fecha `Hoy`, `Últimos 7 días`, `Este mes` y por zona), **Docs. Sanitarios**, **Gastos y Nómina** y **Devoluciones y Mermas**.
+- **Gastos Operativos Fechados:** Nueva tabla `gastos_operativos` (`GastoOperativo`) y endpoints `GET/POST/DELETE /api/reportes/gastos-operativos` con desglose por categoría (`Nómina`, `Renta`, `Servicios`, `Mantenimiento`, `Insumos`, `Impuestos y Permisos`, `Otros`) conectados a `FIN-02`, `FIN-03` y `FIN-04`.
+
+### 🛡️ Auditoría Thermos (Seguridad, Corrección, Concurrencia y Calidad)
+- **Corrección HTTP 500 en Mermas:** Alineación entre `MermaSanitariaOut` y `GET /api/devoluciones/mermas` con `joinedload`.
+- **Concurrencia SQLite y Migraciones:** `PRAGMA journal_mode=WAL` + `busy_timeout=5000`, `BEGIN IMMEDIATE` en ventas FEFO y devoluciones, y corrección de `ALTER TABLE lotes` en `ensure_sqlite_schema`.
+- **RBAC, Corte Z y CFDI 4.0:** RLS por cajero en tickets/facturas, restricción de `reporte-mensual` y escritura en `enfermedades`, descuento automático de devoluciones en arqueo de `TurnoCaja`, escape XML y tasa IVA dinámica en CFDI 4.0, y purga de tokens revocados expirados.
+- **Modularización y Limpieza:** Descomposición de los 8 archivos monolíticos (`inventario_screen.dart`, `dashboard_screen.dart`, `dashboard_kpi_widgets.dart`, `clientes_screen.dart`, `configuracion_screen.dart`, `pos_screen.dart`, `ventas_screen.dart`, `catalogo_medicamentos.py` → `backend/data/medicamentos_100.json`), `utc_now()` sin deprecaciones, `Future.wait` en `caja_screen.dart` y `devoluciones_screen.dart`, y eliminación de código muerto.
+
+### 🎨 Acabado Visual Premium HeroUI / Bento
+- Elevación estética con `PremiumModuleHeader`, `PremiumSurfaceCard`, `AnimatedHoverScaleCard` y píldoras semánticas en **CIE-11**, **Bitácoras y Devoluciones**, **Ventas**, **Inventario**, **Cobro (POS)** y colores de alto contraste para **Almacén** y **Compras** en el Tablero.
+
+---
+
 ## [1.5.0] - 2026-11-15 (Conexión Completa de los 35 Indicadores KPI a Base de Datos y Captura COFEPRIS/Finanzas)
 
 ### 📊 Indicadores Dinámicos y Nuevos Modelos (`backend/app/models.py`, `database.py`, `routers/reportes.py`)
