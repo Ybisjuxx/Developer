@@ -1,10 +1,11 @@
 import datetime
 import uuid
 from typing import List, Optional
+from xml.sax.saxutils import escape as xml_escape
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import DATABASE_URL, get_db, utc_now
 from ..models import (
     Cliente,
     KardexMovimiento,
@@ -17,7 +18,7 @@ from ..models import (
     VentaDetalle,
     VentaDetalleLote,
 )
-from ..security import encrypt_pii, get_current_user_optional
+from ..security import encrypt_pii, get_current_user_optional, require_roles
 from ..schemas import (
     FacturaCreate,
     FacturaOut,
@@ -28,6 +29,19 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas y Despacho FEFO"])
+
+
+def _xml_attr(val: object) -> str:
+    return xml_escape(str(val or ""), {'"': "&quot;", "'": "&apos;"})
+
+
+def _verificar_acceso_venta(venta: Venta, usuario: Optional[Usuario]) -> None:
+    if usuario is not None and (usuario.rol or "").upper() == "CAJERO":
+        if (venta.cajero_nombre or "").strip() != (usuario.nombre_completo or "").strip():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para consultar o facturar tickets de otro cajero.",
+            )
 
 
 
@@ -46,6 +60,10 @@ def registrar_venta(
     5. Guarda el detalle del ticket con los lotes específicos despachados.
     6. Asocia la venta al turno de caja activo para corte contable.
     """
+    # 0. Serializar escrituras en SQLite para evitar condiciones de carrera FEFO
+    if DATABASE_URL.startswith("sqlite") and not db.in_transaction():
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+
     # 1. Si se especificó médico, verificar vigencia
     if venta_in.medico_id:
         medico = db.query(Medico).filter(Medico.id == venta_in.medico_id).first()
@@ -271,7 +289,8 @@ def listar_ventas(
 @router.get("/reporte-mensual", response_model=ReporteVentasMensualOut)
 def obtener_reporte_ventas_mensual(
     anio: Optional[int] = Query(None, description="Año a consultar"),
-    db: Session = Depends(get_db)
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
 ):
     """
     Genera el desglose analítico de ventas mes a mes para el año solicitado,
@@ -334,17 +353,19 @@ def obtener_reporte_ventas_mensual(
 
 
 def _generar_xml_cfdi_40(venta: Venta, forma_sat: str, iva_calc: float, sello_emisor: str, sello_sat: str) -> str:
-    fecha_iso = (venta.fecha_factura or datetime.datetime.utcnow()).strftime("%Y-%m-%dT%H:%M:%S")
-    rfc_rec = (venta.rfc_receptor or "XAXX010101000").replace("-", "").strip().upper()
-    razon_rec = (venta.razon_social_receptor or venta.comprador_nombre or "PÚBLICO EN GENERAL").strip().upper()
-    cp_rec = (venta.codigo_postal_receptor or "44100").strip()
-    regimen_rec = (venta.regimen_fiscal_receptor or "616").split(" ")[0]
-    uso_cfdi = (venta.uso_cfdi or "G03").split(" ")[0]
-    uuid_timbre = venta.uuid_fiscal or str(uuid.uuid4()).upper()
+    fecha_iso = (venta.fecha_factura or utc_now()).strftime("%Y-%m-%dT%H:%M:%S")
+    rfc_rec = _xml_attr((venta.rfc_receptor or "XAXX010101000").replace("-", "").strip().upper())
+    razon_rec = _xml_attr((venta.razon_social_receptor or venta.comprador_nombre or "PÚBLICO EN GENERAL").strip().upper())
+    cp_rec = _xml_attr((venta.codigo_postal_receptor or "44100").strip())
+    regimen_rec = _xml_attr((venta.regimen_fiscal_receptor or "616").split(" ")[0])
+    uso_cfdi = _xml_attr((venta.uso_cfdi or "G03").split(" ")[0])
+    uuid_timbre = _xml_attr(venta.uuid_fiscal or str(uuid.uuid4()).upper())
+    folio_fac = _xml_attr(venta.folio_factura or f"FAC-{venta.id}")
+    tasa_global = "0.000000" if iva_calc <= 0 else "0.160000"
 
     conceptos_xml = []
     for d in venta.detalles:
-        prod_nom = (d.producto.nombre_comercial if d.producto else f"PRODUCTO {d.producto_id}").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+        prod_nom = _xml_attr(d.producto.nombre_comercial if d.producto else f"PRODUCTO {d.producto_id}")
         clave_prod = "51101500"  # Medicamentos y productos farmacéuticos según catálogo SAT
         tasa_iva = "0.000000"
         impuesto_iva = 0.0
@@ -364,7 +385,7 @@ def _generar_xml_cfdi_40(venta: Venta, forma_sat: str, iva_calc: float, sello_em
     conceptos_block = "\n".join(conceptos_xml)
 
     xml_text = f'''<?xml version="1.0" encoding="UTF-8"?>
-<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="4.0" Serie="FAC" Folio="{venta.folio_factura or f"FAC-{venta.id}"}" Fecha="{fecha_iso}" Sello="{sello_emisor}" FormaPago="{forma_sat}" NoCertificado="00001000000504465028" SubTotal="{venta.subtotal:.2f}" Descuento="{venta.descuento:.2f}" Moneda="MXN" Total="{venta.total:.2f}" TipoDeComprobante="I" Exportacion="01" MetodoPago="PUE" LugarExpedicion="44100">
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="4.0" Serie="FAC" Folio="{folio_fac}" Fecha="{fecha_iso}" Sello="{sello_emisor}" FormaPago="{_xml_attr(forma_sat)}" NoCertificado="00001000000504465028" SubTotal="{venta.subtotal:.2f}" Descuento="{venta.descuento:.2f}" Moneda="MXN" Total="{venta.total:.2f}" TipoDeComprobante="I" Exportacion="01" MetodoPago="PUE" LugarExpedicion="44100">
   <cfdi:Emisor Rfc="FCM2410269Z1" Nombre="FARMACONTROL MÉXICO S.A. DE C.V." RegimenFiscal="601"/>
   <cfdi:Receptor Rfc="{rfc_rec}" Nombre="{razon_rec}" DomicilioFiscalReceptor="{cp_rec}" RegimenFiscalReceptor="{regimen_rec}" UsoCFDI="{uso_cfdi}"/>
   <cfdi:Conceptos>
@@ -372,7 +393,7 @@ def _generar_xml_cfdi_40(venta: Venta, forma_sat: str, iva_calc: float, sello_em
   </cfdi:Conceptos>
   <cfdi:Impuestos TotalImpuestosTrasladados="{iva_calc:.2f}">
     <cfdi:Traslados>
-      <cfdi:Traslado Base="{venta.subtotal:.2f}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="{iva_calc:.2f}"/>
+      <cfdi:Traslado Base="{venta.subtotal:.2f}" Impuesto="002" TipoFactor="Tasa" TasaOCuota="{tasa_global}" Importe="{iva_calc:.2f}"/>
     </cfdi:Traslados>
   </cfdi:Impuestos>
   <cfdi:Complemento>
@@ -431,7 +452,11 @@ def _construir_factura_out(venta: Venta) -> FacturaOut:
 
 
 @router.get("/ticket/{folio_ticket}", response_model=VentaOut)
-def buscar_venta_por_ticket(folio_ticket: str, db: Session = Depends(get_db)):
+def buscar_venta_por_ticket(
+    folio_ticket: str,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """
     Automatización de consulta por ticket: busca una venta por su Folio de Ticket (ej: TK-20261028-A1B2C3)
     o por ID numérico de venta para facilitar la facturación al cliente.
@@ -450,11 +475,17 @@ def buscar_venta_por_ticket(folio_ticket: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No se encontró ninguna venta con el ticket o folio '{folio_ticket}'"
         )
+    _verificar_acceso_venta(venta, usuario)
     return venta
 
 
 @router.post("/{venta_id}/facturar", response_model=FacturaOut)
-def generar_factura_venta(venta_id: int, fac_in: FacturaCreate, db: Session = Depends(get_db)):
+def generar_factura_venta(
+    venta_id: int,
+    fac_in: FacturaCreate,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """
     Genera la factura electrónica CFDI 4.0 para una venta ya registrada a solicitud del cliente.
     Asigna folio fiscal, UUID digital del SAT y actualiza el estado de la venta.
@@ -462,9 +493,10 @@ def generar_factura_venta(venta_id: int, fac_in: FacturaCreate, db: Session = De
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    _verificar_acceso_venta(venta, usuario)
 
     # Si ya estaba facturada, actualizamos datos o retornamos la existente
-    hoy_str = datetime.datetime.utcnow().strftime("%Y%m%d")
+    hoy_str = utc_now().strftime("%Y%m%d")
     if not venta.folio_factura:
         venta.folio_factura = f"FAC-{hoy_str}-{uuid.uuid4().hex[:5].upper()}"
     if not venta.uuid_fiscal:
@@ -477,7 +509,7 @@ def generar_factura_venta(venta_id: int, fac_in: FacturaCreate, db: Session = De
     venta.codigo_postal_receptor = fac_in.codigo_postal_receptor.strip()
     venta.uso_cfdi = fac_in.uso_cfdi.strip()
     venta.correo_factura = fac_in.correo_factura.strip() if fac_in.correo_factura else None
-    venta.fecha_factura = datetime.datetime.utcnow()
+    venta.fecha_factura = utc_now()
 
     db.commit()
     db.refresh(venta)
@@ -486,11 +518,16 @@ def generar_factura_venta(venta_id: int, fac_in: FacturaCreate, db: Session = De
 
 
 @router.get("/{venta_id}/factura", response_model=FacturaOut)
-def obtener_factura_venta(venta_id: int, db: Session = Depends(get_db)):
+def obtener_factura_venta(
+    venta_id: int,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Obtiene el comprobante fiscal digital CFDI 4.0 de una venta facturada."""
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    _verificar_acceso_venta(venta, usuario)
     if not venta.facturada:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -500,11 +537,16 @@ def obtener_factura_venta(venta_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{venta_id}/factura/xml")
-def descargar_xml_factura(venta_id: int, db: Session = Depends(get_db)):
+def descargar_xml_factura(
+    venta_id: int,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Descarga el comprobante oficial en formato XML CFDI 4.0 de la factura."""
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    _verificar_acceso_venta(venta, usuario)
     if not venta.facturada:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -522,9 +564,14 @@ def descargar_xml_factura(venta_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{venta_id}", response_model=VentaOut)
-def obtener_venta(venta_id: int, db: Session = Depends(get_db)):
+def obtener_venta(
+    venta_id: int,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Obtiene el detalle completo de un ticket de venta."""
     venta = db.query(Venta).filter(Venta.id == venta_id).first()
     if not venta:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venta no encontrada")
+    _verificar_acceso_venta(venta, usuario)
     return venta

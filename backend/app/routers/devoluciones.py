@@ -1,34 +1,42 @@
-import datetime
 import uuid
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from ..database import get_db
+from ..database import DATABASE_URL, get_db, utc_now
 from ..models import (
     Devolucion,
     DevolucionDetalle,
     KardexMovimiento,
     Lote,
     Producto,
+    Usuario,
     Venta,
     VentaDetalle,
     VentaDetalleLote,
 )
 from ..schemas import DevolucionCreate, DevolucionOut, MermaOut
+from ..security import get_current_user_optional
 
 router = APIRouter(prefix="/api/devoluciones", tags=["Devoluciones y Mermas Sanitarias"])
 
 
 @router.post("/", response_model=DevolucionOut, status_code=status.HTTP_201_CREATED)
-def procesar_devolucion(dev_in: DevolucionCreate, db: Session = Depends(get_db)):
+def procesar_devolucion(
+    dev_in: DevolucionCreate,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """
     Procesa la devolución de productos de una venta:
     1. Si el producto está en BUEN_ESTADO: Se reintegra al lote original con Kardex 'ENTRADA_DEVOLUCION'.
     2. Si el producto está DAÑADO: No vuelve a stock para venta; se audita en Kardex como 'SALIDA_MERMA'.
     3. Calcula el monto reembolsado y actualiza el estado de la venta.
     """
+    if DATABASE_URL.startswith("sqlite") and not db.in_transaction():
+        db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+
     venta = db.query(Venta).filter(Venta.id == dev_in.venta_id).first()
     if not venta:
         raise HTTPException(
@@ -54,16 +62,17 @@ def procesar_devolucion(dev_in: DevolucionCreate, db: Session = Depends(get_db))
     factor_neto = (venta.total / venta.subtotal) if venta.subtotal else 1.0
     pedidas_por_lote: dict = {}
 
-    folio_dev = f"DEV-{datetime.datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+    ahora = utc_now()
+    folio_dev = f"DEV-{ahora.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
     nueva_devolucion = Devolucion(
         folio_devolucion=folio_dev,
         venta_id=venta.id,
-        fecha_devolucion=datetime.datetime.utcnow(),
+        fecha_devolucion=ahora,
         motivo=dev_in.motivo,
         total_reembolsado=0.0,
         metodo_reembolso=dev_in.metodo_reembolso,
-        cajero_nombre=dev_in.cajero_nombre or "Cajero Principal",
+        cajero_nombre=usuario.nombre_completo if usuario else (dev_in.cajero_nombre or "Cajero Principal"),
         notas=dev_in.notas,
     )
     db.add(nueva_devolucion)
@@ -209,6 +218,7 @@ def listar_mermas_sanitarias(db: Session = Depends(get_db)):
     """Lista todos los productos declarados en merma (dañados o vencidos) para auditoría sanitaria."""
     movs = (
         db.query(KardexMovimiento)
+        .options(joinedload(KardexMovimiento.lote).joinedload(Lote.producto))
         .filter(KardexMovimiento.tipo_movimiento.in_(["SALIDA_MERMA", "MERMA_CADUCIDAD"]))
         .order_by(KardexMovimiento.created_at.desc())
         .all()
@@ -216,19 +226,26 @@ def listar_mermas_sanitarias(db: Session = Depends(get_db)):
 
     resultado = []
     for m in movs:
-        lote = db.query(Lote).filter(Lote.id == m.lote_id).first()
+        lote = m.lote
         prod = lote.producto if lote else None
+        costo_tot = round(abs(m.cantidad) * float(m.costo_unitario or 0.0), 2)
         resultado.append(
             MermaOut(
                 id=m.id,
+                devolucion_id=0,
+                folio_devolucion="MERMA-KARDEX",
+                fecha_merma=m.created_at,
+                fecha=m.created_at,
                 producto_id=prod.id if prod else 0,
                 producto_nombre=prod.nombre_comercial if prod else "Desconocido",
+                producto_codigo=prod.codigo_barras if prod else "",
                 lote_id=lote.id if lote else 0,
                 numero_lote=lote.numero_lote if lote else "N/A",
                 cantidad=abs(m.cantidad),
+                monto_merma=costo_tot,
+                costo_total=costo_tot,
                 motivo=m.motivo or "Merma de inventario",
-                fecha=m.created_at,
-                costo_total=round(abs(m.cantidad) * m.costo_unitario, 2),
+                cajero_nombre=m.usuario_auditor or "Sistema",
             )
         )
     return resultado

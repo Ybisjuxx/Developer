@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
@@ -13,8 +14,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController(text: 'admin');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _usernameController = TextEditingController(text: kReleaseMode ? '' : 'admin');
+  final _passwordController = TextEditingController(text: kReleaseMode ? '' : 'admin123');
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
@@ -297,35 +298,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Botones de Acceso Rápido por Perfil para Auditoría
-                      _botonAccesoRapido(
-                        titulo: 'Administrador (Control Total)',
-                        subtitulo: 'admin · admin123',
-                        icono: Icons.admin_panel_settings,
-                        color: ts.neonPurple,
-                        backgroundColor: ts.tintBg(ts.neonPurple),
-                        onTap: () => _ingresoRapidoDemo('admin'),
-                      ),
-                      const SizedBox(height: 8),
-                      _botonAccesoRapido(
-                        titulo: 'Cajero (Punto de Venta y Turnos)',
-                        subtitulo: 'cajero · caja123',
-                        icono: Icons.point_of_sale,
-                        color: ts.accentPrimary,
-                        backgroundColor: ts.tintBg(ts.accentPrimary),
-                        onTap: () => _ingresoRapidoDemo('cajero'),
-                      ),
-                      const SizedBox(height: 8),
-                      _botonAccesoRapido(
-                        titulo: 'Responsable Sanitario (Kardex y Lotes)',
-                        subtitulo: 'sanitario · resp123',
-                        icono: Icons.medical_services,
-                        color: ts.neonBlue,
-                        backgroundColor: ts.tintBg(ts.neonBlue),
-                        onTap: () => _ingresoRapidoDemo('sanitario'),
-                      ),
-
-                      const SizedBox(height: 20),
+                      if (!kReleaseMode) ...[
+                        // Botones de Acceso Rápido por Perfil para Auditoría (solo Debug/Profile)
+                        _botonAccesoRapido(
+                          titulo: 'Administrador (Control Total)',
+                          subtitulo: 'admin · admin123',
+                          icono: Icons.admin_panel_settings,
+                          color: ts.neonPurple,
+                          backgroundColor: ts.tintBg(ts.neonPurple),
+                          onTap: () => _ingresoRapidoDemo('admin'),
+                        ),
+                        const SizedBox(height: 8),
+                        _botonAccesoRapido(
+                          titulo: 'Cajero (Punto de Venta y Turnos)',
+                          subtitulo: 'cajero · caja123',
+                          icono: Icons.point_of_sale,
+                          color: ts.accentPrimary,
+                          backgroundColor: ts.tintBg(ts.accentPrimary),
+                          onTap: () => _ingresoRapidoDemo('cajero'),
+                        ),
+                        const SizedBox(height: 8),
+                        _botonAccesoRapido(
+                          titulo: 'Responsable Sanitario (Kardex y Lotes)',
+                          subtitulo: 'sanitario · resp123',
+                          icono: Icons.medical_services,
+                          color: ts.neonBlue,
+                          backgroundColor: ts.tintBg(ts.neonBlue),
+                          onTap: () => _ingresoRapidoDemo('sanitario'),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
 
                       // Indicador de Servidor Backend
                       Center(

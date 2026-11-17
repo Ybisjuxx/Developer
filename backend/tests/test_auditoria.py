@@ -565,3 +565,58 @@ def test_bitacora_rangos_y_gastos_operativos_fechados(client):
     assert r_del.status_code == 204
 
 
+def test_regresion_thermos_mermas_caja_rbac(client, producto_factory):
+    from app import security
+
+    p = producto_factory(precio=100.0)
+
+    # 1. Venta en efectivo por $100 y devolución dañada (crea SALIDA_MERMA)
+    r_v = client.post(
+        "/api/ventas/",
+        json={
+            "comprador_nombre": "Cliente Merma",
+            "metodo_pago": "EFECTIVO",
+            "monto_recibido": 100.0,
+            "items": [{"producto_id": p["id"], "cantidad": 1}],
+        },
+    )
+    assert r_v.status_code == 201, r_v.text
+    v_json = r_v.json()
+    v_id = v_json["id"]
+    lote_id = v_json["detalles"][0]["despachos_lotes"][0]["lote_id"]
+
+    r_dev = client.post(
+        "/api/devoluciones/",
+        json={
+            "venta_id": v_id,
+            "motivo": "Caja aplastada en mostrador",
+            "metodo_reembolso": "EFECTIVO",
+            "items": [{"producto_id": p["id"], "lote_id": lote_id, "cantidad": 1, "estado_producto": "DANADO"}],
+        },
+    )
+    assert r_dev.status_code == 201, r_dev.text
+
+    # 2. GET /api/devoluciones/mermas no debe fallar con ValidationError 500
+    r_mermas = client.get("/api/devoluciones/mermas")
+    assert r_mermas.status_code == 200, r_mermas.text
+    assert len(r_mermas.json()) >= 1
+    assert "costo_total" in r_mermas.json()[0]
+
+    # 3. RBAC estricto para CAJERO en reporte-mensual y enfermedades
+    db = SessionLocal()
+    caj = db.query(Usuario).filter_by(rol="CAJERO").first()
+    tok_caj = security.create_token(caj)
+    db.close()
+
+    r_rep = client.get("/api/ventas/reporte-mensual", headers={"Authorization": f"Bearer {tok_caj}"})
+    assert r_rep.status_code == 403
+
+    r_enf = client.post(
+        "/api/enfermedades/",
+        json={"codigo_cie10": "Z99", "nombre": "Prueba RBAC", "es_cronica": False},
+        headers={"Authorization": f"Bearer {tok_caj}"},
+    )
+    assert r_enf.status_code == 403
+
+
+

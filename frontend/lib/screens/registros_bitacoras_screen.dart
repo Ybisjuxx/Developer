@@ -64,9 +64,20 @@ class _RegistrosBitacorasScreenState extends State<RegistrosBitacorasScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _cargarBitacora();
-    _cargarDocumentos();
+    final rol = AuthService().usuarioActual.rol.toUpperCase();
+    final puedeCofepris = rol == 'ADMINISTRADOR' || rol == 'RESPONSABLE_SANITARIO';
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: puedeCofepris ? 0 : 3,
+    );
+    if (puedeCofepris) {
+      _cargarBitacora();
+      _cargarDocumentos();
+    } else {
+      _loadingBitacora = false;
+      _loadingDocs = false;
+    }
     _cargarGastos();
   }
 

@@ -482,16 +482,20 @@ class DevolucionCreate(StrictInputModel):
 
 class MermaSanitariaOut(BaseModel):
     id: int
-    devolucion_id: int
-    folio_devolucion: str
+    devolucion_id: int = 0
+    folio_devolucion: str = "MERMA-KARDEX"
     fecha_merma: datetime
+    fecha: datetime
+    producto_id: int = 0
     producto_nombre: str
-    producto_codigo: str
+    producto_codigo: str = ""
+    lote_id: int = 0
     numero_lote: str
     cantidad: int
     monto_merma: float
+    costo_total: float
     motivo: str
-    cajero_nombre: str
+    cajero_nombre: str = "Sistema"
 
 
 MermaOut = MermaSanitariaOut

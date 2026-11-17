@@ -58,11 +58,28 @@ class ApiService {
     return headers;
   }
 
+  static bool _isLoggingOut = false;
+
   static http.Response _checkAuth(http.Response response, {bool isAuthEndpoint = false}) {
-    if (response.statusCode == 401 && !isAuthEndpoint) {
-      AuthService().logout();
+    if (response.statusCode == 401 && !isAuthEndpoint && !_isLoggingOut) {
+      _isLoggingOut = true;
+      try {
+        AuthService().logout();
+      } finally {
+        _isLoggingOut = false;
+      }
     }
     return response;
+  }
+
+  static String _extractErrorDetail(http.Response response, String fallback) {
+    try {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      if (body is Map && body['detail'] != null) {
+        return body['detail'].toString();
+      }
+    } catch (_) {}
+    return '$fallback (HTTP ${response.statusCode})';
   }
 
   static Future<http.Response> _get(Uri uri, {Duration timeout = const Duration(seconds: 10)}) async {
@@ -882,8 +899,7 @@ class ApiService {
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    final err = jsonDecode(utf8.decode(response.bodyBytes));
-    throw Exception(err['detail'] ?? 'Error al registrar lectura ambiental');
+    throw Exception(_extractErrorDetail(response, 'Error al registrar lectura ambiental'));
   }
 
   static Future<List<dynamic>> getDocumentosSanitarios() async {
@@ -901,8 +917,7 @@ class ApiService {
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    final err = jsonDecode(utf8.decode(response.bodyBytes));
-    throw Exception(err['detail'] ?? 'Error al guardar documento sanitario');
+    throw Exception(_extractErrorDetail(response, 'Error al guardar documento sanitario'));
   }
 
   static Future<Map<String, dynamic>> getParametrosFinancieros({int? anio, int? mes}) async {
@@ -926,8 +941,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    final err = jsonDecode(utf8.decode(response.bodyBytes));
-    throw Exception(err['detail'] ?? 'Error al actualizar parámetros financieros');
+    throw Exception(_extractErrorDetail(response, 'Error al actualizar parámetros financieros'));
   }
 
   static Future<Map<String, dynamic>> getGastosOperativos({
@@ -955,8 +969,7 @@ class ApiService {
     if (response.statusCode == 201 || response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes));
     }
-    final err = jsonDecode(utf8.decode(response.bodyBytes));
-    throw Exception(err['detail'] ?? 'Error al registrar gasto operativo');
+    throw Exception(_extractErrorDetail(response, 'Error al registrar gasto operativo'));
   }
 
   static Future<void> eliminarGastoOperativo(int id) async {

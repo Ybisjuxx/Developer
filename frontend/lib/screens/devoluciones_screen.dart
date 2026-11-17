@@ -44,8 +44,12 @@ class _DevolucionesScreenState extends State<DevolucionesScreen> with SingleTick
     });
 
     try {
-      final devs = await ApiService.getDevoluciones();
-      final mermas = await ApiService.getMermas();
+      final results = await Future.wait([
+        ApiService.getDevoluciones(),
+        ApiService.getMermas(),
+      ]);
+      final devs = results[0];
+      final mermas = results[1];
 
       if (mounted) {
         setState(() {

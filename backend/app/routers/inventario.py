@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..security import get_current_user_optional, require_roles
@@ -131,7 +131,7 @@ def listar_productos(
             (Producto.laboratorio.ilike(termino))
         )
     
-    productos = query.all()
+    productos = query.options(joinedload(Producto.lotes)).all()
     for p in productos:
         p.stock_total = sum(lote.stock_actual for lote in p.lotes if lote.activo)
     return productos

@@ -4,8 +4,9 @@ from sqlalchemy.orm import Session
 
 from ..catalogo_cie import buscar_en_catalogo_cie_local, consultar_api_cie_externa
 from ..database import get_db
-from ..models import Enfermedad
+from ..models import Enfermedad, Usuario
 from ..schemas import EnfermedadCreate, EnfermedadOut, EnfermedadUpdate
+from ..security import require_roles
 
 router = APIRouter(prefix="/api/enfermedades", tags=["Enfermedades (CIE-11)"])
 
@@ -55,7 +56,11 @@ def buscar_catalogo_cie(
 
 
 @router.post("/catalogo-cie/importar", response_model=EnfermedadOut, status_code=status.HTTP_201_CREATED)
-def importar_desde_catalogo_cie(enf_in: EnfermedadCreate, db: Session = Depends(get_db)):
+def importar_desde_catalogo_cie(
+    enf_in: EnfermedadCreate,
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """
     Importa un diagnóstico desde el Catálogo CIE-11 a la base de datos de la farmacia con 1 clic.
     Si ya existe, retorna el registro existente sin duplicar ni arrojar error.
@@ -79,7 +84,11 @@ def importar_desde_catalogo_cie(enf_in: EnfermedadCreate, db: Session = Depends(
 
 
 @router.post("/auto-registrar", response_model=EnfermedadOut)
-def auto_registrar_enfermedad(enf_in: EnfermedadCreate, db: Session = Depends(get_db)):
+def auto_registrar_enfermedad(
+    enf_in: EnfermedadCreate,
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """
     Permite el registro dinámico de enfermedades conforme se van registrando recetas o ventas.
     """
@@ -98,7 +107,11 @@ def auto_registrar_enfermedad(enf_in: EnfermedadCreate, db: Session = Depends(ge
 
 
 @router.post("/", response_model=EnfermedadOut, status_code=status.HTTP_201_CREATED)
-def crear_enfermedad(enf_in: EnfermedadCreate, db: Session = Depends(get_db)):
+def crear_enfermedad(
+    enf_in: EnfermedadCreate,
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Registra una nueva enfermedad o diagnóstico CIE manualmente con comentarios especiales."""
     codigo_limpio = enf_in.codigo_cie.strip().upper()
     existente = db.query(Enfermedad).filter(Enfermedad.codigo_cie == codigo_limpio).first()
@@ -150,7 +163,12 @@ def obtener_enfermedad(enfermedad_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{enfermedad_id}", response_model=EnfermedadOut)
-def actualizar_enfermedad(enfermedad_id: int, enf_in: EnfermedadUpdate, db: Session = Depends(get_db)):
+def actualizar_enfermedad(
+    enfermedad_id: int,
+    enf_in: EnfermedadUpdate,
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Actualiza la información de una enfermedad."""
     enf = db.query(Enfermedad).filter(Enfermedad.id == enfermedad_id).first()
     if not enf:
@@ -180,7 +198,11 @@ def actualizar_enfermedad(enfermedad_id: int, enf_in: EnfermedadUpdate, db: Sess
 
 
 @router.delete("/{enfermedad_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_enfermedad(enfermedad_id: int, db: Session = Depends(get_db)):
+def eliminar_enfermedad(
+    enfermedad_id: int,
+    _usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
+    db: Session = Depends(get_db),
+):
     """Desactiva una enfermedad (soft delete)."""
     enf = db.query(Enfermedad).filter(Enfermedad.id == enfermedad_id).first()
     if not enf:

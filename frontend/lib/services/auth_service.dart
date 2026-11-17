@@ -135,23 +135,7 @@ class AuthService extends ChangeNotifier {
       throw Exception('El acceso rápido de demostración está deshabilitado en producción.');
     }
     final password = credencialesDemostracion[username] ?? 'admin123';
-    try {
-      await login(username, password);
-    } catch (_) {
-      final demo = usuariosDemostracion.firstWhere(
-        (u) => u.username == username,
-        orElse: () => UsuarioSesion(
-          id: 1,
-          username: username,
-          nombreCompleto: username,
-          rol: 'ADMINISTRADOR',
-        ),
-      );
-      _token = 'demo_token_${demo.username}';
-      ApiService.authToken = _token;
-      _usuarioActual = demo;
-      notifyListeners();
-    }
+    await login(username, password);
   }
 
   /// Método retrocompatible para cambio de usuario

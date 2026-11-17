@@ -99,7 +99,7 @@ class _PosScreenState extends State<PosScreen> {
     final apePaternoCtrl = TextEditingController();
     final apeMaternoCtrl = TextEditingController();
     final telCtrl = TextEditingController();
-    final descCtrl = TextEditingController(text: '5.0');
+    final descCtrl = TextEditingController(text: '0');
 
     // Sub-Agente 3 & 4: Sexo y Fecha de Nacimiento en Alta Rápida
     String? sexoSeleccionado;
@@ -274,7 +274,7 @@ class _PosScreenState extends State<PosScreen> {
                   fechaNacStr = "${a.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}";
                 }
 
-                final desc = double.tryParse(descCtrl.text.trim()) ?? 5.0;
+                final desc = double.tryParse(descCtrl.text.trim()) ?? 0.0;
                 try {
                   final nuevoCliente = await ApiService.createCliente({
                     'nombre': nom,

@@ -223,7 +223,13 @@ def _ensure_indicadores_base_data(db: Session, anio: int, mes: int) -> None:
         db.commit()
 
 
-def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) -> Dict[str, Any]:
+def _calcular_indicadores_periodo(
+    db: Session,
+    anio: int,
+    mes: int,
+    rol: str,
+    guardar_archivo: bool = False,
+) -> Dict[str, Any]:
     _ensure_indicadores_base_data(db, anio, mes)
     hoy = datetime.date.today()
     inicio_mes = datetime.datetime(anio, mes, 1)
@@ -394,9 +400,11 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
         .first()
     )
     if gastos_mes:
-        gastos_fijos_est = round(sum(float(g.monto or 0.0) for g in gastos_mes), 2)
-        nomina_est = round(
-            sum(float(g.monto or 0.0) for g in gastos_mes if (g.categoria or "").upper() == "NOMINA"),
+        nomina_items = [float(g.monto or 0.0) for g in gastos_mes if (g.categoria or "").upper() == "NOMINA"]
+        otros_items = [float(g.monto or 0.0) for g in gastos_mes if (g.categoria or "").upper() != "NOMINA"]
+        nomina_est = round(sum(nomina_items), 2) if nomina_items else (float(param_fin.nomina_mensual) if param_fin else 16500.0)
+        gastos_fijos_est = round(
+            (sum(otros_items) if otros_items else (float(param_fin.gastos_fijos_mensuales) if param_fin else 28500.0)) + nomina_est,
             2,
         )
     else:
@@ -435,13 +443,13 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
 
     ventas_ctrl = [v for v in ventas_validas if v.id in venta_ids_controlados]
     cuadratura_controlados_pct = round(
-        (sum(1 for v in ventas_ctrl if v.receta_retenida or v.medico_id is not None) / len(ventas_ctrl)) * 100.0,
+        (sum(1 for v in ventas_ctrl if v.receta_retenida is True) / len(ventas_ctrl)) * 100.0,
         1,
     ) if ventas_ctrl else 100.0
 
     ventas_abx = [v for v in ventas_validas if v.id in venta_ids_antibioticos]
     antibioticos_receta_pct = round(
-        (sum(1 for v in ventas_abx if v.receta_retenida or v.medico_id is not None) / len(ventas_abx)) * 100.0,
+        (sum(1 for v in ventas_abx if v.receta_retenida is True) / len(ventas_abx)) * 100.0,
         1,
     ) if ventas_abx else 100.0
 
@@ -578,7 +586,7 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
     areas_filtradas = [
         a for a in areas_completas if rol_upper in a["roles_permitidos"]
     ]
-    rutas = _guardar_reporte_en_carpetas(periodo, areas_filtradas)
+    rutas = _guardar_reporte_en_carpetas(periodo, areas_filtradas) if guardar_archivo else []
 
     return {
         "periodo": periodo,
@@ -597,11 +605,12 @@ def _calcular_indicadores_periodo(db: Session, anio: int, mes: int, rol: str) ->
 def obtener_indicadores_mensuales(
     anio: int = Query(default_factory=lambda: datetime.date.today().year, ge=2020, le=2100),
     mes: int = Query(default_factory=lambda: datetime.date.today().month, ge=1, le=12),
+    guardar_archivo: bool = Query(default=False, description="Si true, exporta respaldo JSON/CSV en disco"),
     usuario: Optional[Usuario] = Depends(require_roles("ADMINISTRADOR", "RESPONSABLE_SANITARIO")),
     db: Session = Depends(get_db),
 ):
     rol = usuario.rol if usuario else "ADMINISTRADOR"
-    return _calcular_indicadores_periodo(db, anio, mes, rol)
+    return _calcular_indicadores_periodo(db, anio, mes, rol, guardar_archivo=guardar_archivo)
 
 
 @router.get("/indicadores-mensuales/descargar")

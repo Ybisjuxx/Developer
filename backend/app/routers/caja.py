@@ -1,14 +1,49 @@
-import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import TurnoCaja, Usuario, Venta
+from ..database import get_db, utc_now
+from ..models import Devolucion, TurnoCaja, Usuario, Venta
 from ..schemas import TurnoCajaApertura, TurnoCajaCierre, TurnoCajaOut, TurnoResumenOut
 from ..security import get_current_user_optional
 
 router = APIRouter(prefix="/api/caja", tags=["Cortes de Caja y Turnos"])
+
+
+def _calcular_totales_turno(db: Session, turno: TurnoCaja) -> Tuple[int, float, float, float, float]:
+    """Calcula ventas netas del turno descontando reembolsos de devoluciones."""
+    ventas_turno = db.query(Venta).filter(Venta.turno_id == turno.id).all()
+    efectivo = sum(float(v.total or 0.0) for v in ventas_turno if v.metodo_pago == "EFECTIVO")
+    tarjeta = sum(
+        float(v.total or 0.0)
+        for v in ventas_turno
+        if v.metodo_pago in ["TARJETA", "TARJETA_CREDITO", "TARJETA_DEBITO"]
+    )
+    transferencia = sum(float(v.total or 0.0) for v in ventas_turno if v.metodo_pago == "TRANSFERENCIA")
+
+    venta_ids = [v.id for v in ventas_turno]
+    if venta_ids:
+        devs = db.query(Devolucion).filter(Devolucion.venta_id.in_(venta_ids)).all()
+        for d in devs:
+            monto = float(d.total_reembolsado or 0.0)
+            met = (d.metodo_reembolso or "EFECTIVO").upper()
+            if met == "EFECTIVO":
+                efectivo -= monto
+            elif met in ("TARJETA", "TARJETA_CREDITO", "TARJETA_DEBITO"):
+                tarjeta -= monto
+            elif met == "TRANSFERENCIA":
+                transferencia -= monto
+
+    efectivo = round(efectivo, 2)
+    tarjeta = round(tarjeta, 2)
+    transferencia = round(transferencia, 2)
+    total_acumulado = round(efectivo + tarjeta + transferencia, 2)
+
+    turno.ventas_efectivo = efectivo
+    turno.ventas_tarjeta = tarjeta
+    turno.ventas_transferencia = transferencia
+    turno.total_ventas = total_acumulado
+    return len(ventas_turno), efectivo, tarjeta, transferencia, total_acumulado
 
 
 def _verificar_acceso_turno(turno: TurnoCaja, usuario: Optional[Usuario]) -> None:
@@ -33,7 +68,11 @@ def obtener_turno_activo(db: Session = Depends(get_db)):
 
 
 @router.post("/abrir", response_model=TurnoCajaOut, status_code=status.HTTP_201_CREATED)
-def abrir_turno(apertura: TurnoCajaApertura, db: Session = Depends(get_db)):
+def abrir_turno(
+    apertura: TurnoCajaApertura,
+    usuario: Optional[Usuario] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db),
+):
     """Abre un nuevo turno de caja con fondo inicial en efectivo."""
     activo = db.query(TurnoCaja).filter(TurnoCaja.estado == "ABIERTO").first()
     if activo:
@@ -43,10 +82,10 @@ def abrir_turno(apertura: TurnoCajaApertura, db: Session = Depends(get_db)):
         )
 
     nuevo_turno = TurnoCaja(
-        usuario_id=apertura.usuario_id,
-        cajero_nombre=apertura.cajero_nombre,
+        usuario_id=usuario.id if usuario else apertura.usuario_id,
+        cajero_nombre=usuario.nombre_completo if usuario else apertura.cajero_nombre,
         monto_apertura=round(apertura.monto_apertura, 2),
-        fecha_apertura=datetime.datetime.utcnow(),
+        fecha_apertura=utc_now(),
         ventas_efectivo=0.0,
         ventas_tarjeta=0.0,
         ventas_transferencia=0.0,
@@ -79,19 +118,7 @@ def obtener_resumen_turno_actual(
         )
     _verificar_acceso_turno(turno, usuario)
 
-    ventas_turno = db.query(Venta).filter(Venta.turno_id == turno.id).all()
-    total_tickets = len(ventas_turno)
-
-    efectivo = sum(v.total for v in ventas_turno if v.metodo_pago == "EFECTIVO")
-    tarjeta = sum(v.total for v in ventas_turno if v.metodo_pago in ["TARJETA", "TARJETA_CREDITO", "TARJETA_DEBITO"])
-    transferencia = sum(v.total for v in ventas_turno if v.metodo_pago == "TRANSFERENCIA")
-    total_acumulado = efectivo + tarjeta + transferencia
-
-    # Actualizar valores calculados en el objeto de turno
-    turno.ventas_efectivo = round(efectivo, 2)
-    turno.ventas_tarjeta = round(tarjeta, 2)
-    turno.ventas_transferencia = round(transferencia, 2)
-    turno.total_ventas = round(total_acumulado, 2)
+    total_tickets, efectivo, tarjeta, transferencia, _ = _calcular_totales_turno(db, turno)
     db.commit()
 
     efectivo_esperado = round(turno.monto_apertura + efectivo, 2)
@@ -132,22 +159,13 @@ def cerrar_turno(
         )
     _verificar_acceso_turno(turno, usuario)
 
-    # Calcular ventas definitivas
-    ventas_turno = db.query(Venta).filter(Venta.turno_id == turno.id).all()
-    efectivo = sum(v.total for v in ventas_turno if v.metodo_pago == "EFECTIVO")
-    tarjeta = sum(v.total for v in ventas_turno if v.metodo_pago in ["TARJETA", "TARJETA_CREDITO", "TARJETA_DEBITO"])
-    transferencia = sum(v.total for v in ventas_turno if v.metodo_pago == "TRANSFERENCIA")
-    total_acumulado = efectivo + tarjeta + transferencia
-
-    turno.ventas_efectivo = round(efectivo, 2)
-    turno.ventas_tarjeta = round(tarjeta, 2)
-    turno.ventas_transferencia = round(transferencia, 2)
-    turno.total_ventas = round(total_acumulado, 2)
+    # Calcular ventas netas definitivas descontando devoluciones
+    _, efectivo, _, _, _ = _calcular_totales_turno(db, turno)
 
     efectivo_esperado = round(turno.monto_apertura + efectivo, 2)
     diferencia = round(cierre.monto_cierre_efectivo - efectivo_esperado, 2)
 
-    turno.fecha_cierre = datetime.datetime.utcnow()
+    turno.fecha_cierre = utc_now()
     turno.monto_cierre_efectivo = round(cierre.monto_cierre_efectivo, 2)
     turno.diferencia_efectivo = diferencia
     turno.estado = "CERRADO"

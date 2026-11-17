@@ -134,8 +134,14 @@ class _InMemoryRateLimiter:
 
 
 rate_limiter = _InMemoryRateLimiter()
-_REVOKED_TOKENS: Set[str] = set()
+_REVOKED_TOKENS: Dict[str, float] = {}
 _REVOKED_LOCK = threading.Lock()
+
+
+def _purge_expired_revocations(now: float) -> None:
+    expired = [k for k, exp in _REVOKED_TOKENS.items() if exp <= now]
+    for k in expired:
+        _REVOKED_TOKENS.pop(k, None)
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +206,11 @@ def revoke_token(token: Optional[str]) -> None:
         return
     payload = decode_token(token)
     if payload and payload.get("jti"):
+        now = time.time()
+        exp = float(payload.get("exp") or (now + TOKEN_TTL_SECONDS))
         with _REVOKED_LOCK:
-            _REVOKED_TOKENS.add(str(payload["jti"]))
+            _purge_expired_revocations(now)
+            _REVOKED_TOKENS[str(payload["jti"])] = exp
 
 
 def decode_token(token: str) -> Optional[dict]:
@@ -211,11 +220,13 @@ def decode_token(token: str) -> Optional[dict]:
         if not hmac.compare_digest(sig, expected):
             return None
         payload = json.loads(_unb64(body))
-        if int(payload.get("exp", 0)) < time.time():
+        now = time.time()
+        if int(payload.get("exp", 0)) < now:
             return None
         jti = payload.get("jti")
         if jti:
             with _REVOKED_LOCK:
+                _purge_expired_revocations(now)
                 if str(jti) in _REVOKED_TOKENS:
                     return None
         return payload

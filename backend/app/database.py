@@ -1,6 +1,7 @@
+import datetime
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv()
@@ -11,13 +12,27 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):
-    engine_kwargs["connect_args"] = {"check_same_thread": False}
+    engine_kwargs["connect_args"] = {"check_same_thread": False, "timeout": 15.0}
 else:
     # Parámetros robustos para MySQL / MariaDB / PostgreSQL
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_recycle"] = 3600
 
 engine = create_engine(DATABASE_URL, **engine_kwargs)
+
+if DATABASE_URL.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragmas(dbapi_conn, _connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+def utc_now() -> datetime.datetime:
+    """UTC naive compatible con SQLite sin DeprecationWarning de Python 3.12+."""
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -128,6 +143,16 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_valor VARCHAR(50)")
                 if "dosis_unidad" not in existing_lotes_cols:
                     conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN dosis_unidad VARCHAR(50)")
+                if "fecha_ingreso" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
+                if "proveedor_nombre" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN proveedor_nombre VARCHAR(120) DEFAULT 'Distribuidor General'")
+                if "piezas_solicitadas" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN piezas_solicitadas INTEGER")
+                if "horas_entrega_lead_time" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN horas_entrega_lead_time FLOAT DEFAULT 24.0")
+                if "costo_unitario_anterior" not in existing_lotes_cols:
+                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN costo_unitario_anterior FLOAT")
                 conn.commit()
 
             # 5. Columnas en tabla productos (familia_terapeutica, indicacion_terapeutica, presentación estructurada y sustancia)
@@ -152,17 +177,6 @@ def ensure_sqlite_schema(engine):
                     conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN es_generico_intercambiable BOOLEAN NOT NULL DEFAULT 0")
                 if "requiere_revision_manual" not in existing_prod_cols:
                     conn.exec_driver_sql("ALTER TABLE productos ADD COLUMN requiere_revision_manual BOOLEAN NOT NULL DEFAULT 0")
-                conn.commit()
-                if "fecha_ingreso" not in existing_lotes_cols:
-                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN fecha_ingreso DATE")
-                if "proveedor_nombre" not in existing_lotes_cols:
-                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN proveedor_nombre VARCHAR(120) DEFAULT 'Distribuidor General'")
-                if "piezas_solicitadas" not in existing_lotes_cols:
-                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN piezas_solicitadas INTEGER")
-                if "horas_entrega_lead_time" not in existing_lotes_cols:
-                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN horas_entrega_lead_time FLOAT DEFAULT 24.0")
-                if "costo_unitario_anterior" not in existing_lotes_cols:
-                    conn.exec_driver_sql("ALTER TABLE lotes ADD COLUMN costo_unitario_anterior FLOAT")
                 conn.commit()
 
             # 5. Columnas en tabla medicos (apellido_paterno, apellido_materno)
